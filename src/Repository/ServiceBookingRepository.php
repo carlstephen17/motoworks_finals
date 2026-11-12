@@ -25,9 +25,7 @@ class ServiceBookingRepository extends ServiceEntityRepository
             ->addSelect('service')
             ->andWhere('booking.user = :user')
             ->setParameter('user', $user)
-            ->orderBy('booking.bookingDate', 'DESC')
-            ->addOrderBy('booking.bookingTime', 'DESC')
-            ->addOrderBy('booking.id', 'DESC');
+            ->orderBy('booking.id', 'DESC');
 
         if ($promosOnly) {
             $query->andWhere('booking.bundleSlug IS NOT NULL');

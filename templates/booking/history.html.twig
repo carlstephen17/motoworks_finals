@@ -1,29 +1,228 @@
 {% extends 'base.html.twig' %}
 
-{% block title %}Appointment history | Bencalo MotoWorks{% endblock %}
+{% block title %}Appointment History - Bencalo MotoWorks{% endblock %}
+
+{% block stylesheets %}
+    {{ parent() }}
+    <link rel="stylesheet" href="{{ asset('styles/appointment_history.css') }}">
+{% endblock %}
 
 {% block body %}
-    <main>
-        <p><a href="{{ path('booking_new') }}">Book a service</a></p>
-        <h1>Appointment history</h1>
-        {% for message in app.flashes('success') %}<p role="status">{{ message }}</p>{% endfor %}
-        {% for message in app.flashes('error') %}<p role="alert">{{ message }}</p>{% endfor %}
-        {% for booking in bookings %}
-            <article>
-                <h2>{{ booking.service.name }}</h2>
-                <p>{{ booking.bookingDate|date('M j, Y') }} at {{ booking.bookingTime|date('g:i A') }}</p>
-                <p>{{ booking.vehicleModel }} · {{ booking.status }}</p>
-                {% if booking.bundleSlug %}<p>Promotion: {{ booking.bundleSlug }} — {{ booking.bundleOption }}</p>{% endif %}
-                {% if booking.notes %}<p>{{ booking.notes }}</p>{% endif %}
-                {% if booking.status in ['Pending', 'Confirmed'] %}
-                    <form method="post" action="{{ path('appointment_cancel', {id: booking.id}) }}">
-                        <input type="hidden" name="_token" value="{{ csrf_token('appointment_cancel_' ~ booking.id) }}">
-                        <button type="submit">Cancel appointment</button>
-                    </form>
-                {% endif %}
-            </article>
-        {% else %}
-            <p>You have no service appointments.</p>
+    <main class="appointment-history-container container">
+        <div class="page-header-actions">
+            <div class="section-title">
+                <h2>Appointment History</h2>
+            </div>
+            <a href="{{ path('service_index') }}" class="btn-create-booking">
+                <i class="fa-solid fa-plus" aria-hidden="true"></i>
+                Book a Service
+            </a>
+        </div>
+
+        {% for message in app.flashes('success') %}
+            <div class="alert-toast" role="status">{{ message }}</div>
         {% endfor %}
+        {% for message in app.flashes('error') %}
+            <div class="alert-toast alert-toast-error" role="alert">{{ message }}</div>
+        {% endfor %}
+
+        {% if bookings is empty %}
+            <div class="empty-history-card">
+                <p>No appointments recorded yet.</p>
+                <a href="{{ path('service_index') }}" class="btn-buy-now">Book a Service</a>
+            </div>
+        {% else %}
+            <div class="appointment-table-wrapper">
+                <table class="appointment-table">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Service</th>
+                            <th>Vehicle</th>
+                            <th>Date &amp; Time</th>
+                            <th>Contact</th>
+                            <th>Price</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for booking in bookings %}
+                            {% set bookingId = booking.id %}
+                            {% set statusClass = booking.status|default('pending')|lower|replace({' ': '-'}) %}
+                            <tr>
+                                <td>{{ loop.index }}</td>
+                                <td>
+                                    <strong>{{ booking.service.name }}</strong>
+                                    {% if booking.bundleSlug %}
+                                        <span class="badge badge-promo">{{ booking.bundleSlug }}</span>
+                                    {% else %}
+                                        <span class="badge badge-standard">Standard</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ booking.vehicleModel|default('N/A') }}</td>
+                                <td>
+                                    <div>{{ booking.bookingDate|date('F j, Y') }}</div>
+                                    <small>{{ booking.bookingTime|date('g:i A') }}</small>
+                                </td>
+                                <td>{{ booking.user.phone|default('N/A') }}</td>
+                                <td>₱{{ booking.service.price|number_format(2) }}</td>
+                                <td><span class="badge-status-{{ statusClass }}">{{ booking.status|default('Pending') }}</span></td>
+                                <td>
+                                    <div class="table-actions">
+                                        <button type="button" class="btn-row-action btn-view" onclick="openModal('viewModal{{ bookingId }}')">
+                                            <i class="fa-solid fa-eye" aria-hidden="true"></i>
+                                            View
+                                        </button>
+                                        {% if editForms[bookingId] is defined %}
+                                            <button type="button" class="btn-row-action btn-edit" onclick="openModal('editModal{{ bookingId }}')">
+                                                <i class="fa-solid fa-pen" aria-hidden="true"></i>
+                                                Edit
+                                            </button>
+                                            <form
+                                                method="post"
+                                                action="{{ path('appointment_cancel', {id: bookingId}) }}"
+                                                onsubmit="return confirm('Are you sure you want to cancel this booking?');"
+                                            >
+                                                <input type="hidden" name="_token" value="{{ csrf_token('appointment_cancel_' ~ bookingId) }}">
+                                                <button type="submit" class="btn-row-action btn-delete">
+                                                    <i class="fa-solid fa-trash" aria-hidden="true"></i>
+                                                    Cancel
+                                                </button>
+                                            </form>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% endif %}
     </main>
+
+    {% for booking in bookings %}
+        {% set bookingId = booking.id %}
+        {% set statusClass = booking.status|default('pending')|lower|replace({' ': '-'}) %}
+        <div
+            class="modal-overlay"
+            id="viewModal{{ bookingId }}"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="view-title-{{ bookingId }}"
+        >
+            <div class="crud-modal-content">
+                <div class="crud-modal-header">
+                    <h3 id="view-title-{{ bookingId }}">Appointment Details</h3>
+                    <button type="button" class="close-modal-btn" onclick="closeModal('viewModal{{ bookingId }}')" aria-label="Close">&times;</button>
+                </div>
+                <div class="view-detail-group">
+                    <span class="detail-label">Service</span>
+                    <span class="detail-value highlight">{{ booking.service.name }}</span>
+                </div>
+                <div class="view-detail-group">
+                    <span class="detail-label">Status</span>
+                    <span class="badge-status-{{ statusClass }}">{{ booking.status|default('Pending') }}</span>
+                </div>
+                <div class="view-detail-group">
+                    <span class="detail-label">Booking Reference</span>
+                    <span class="detail-value highlight">N/A</span>
+                </div>
+                <div class="view-detail-group">
+                    <span class="detail-label">Vehicle Model</span>
+                    <span class="detail-value">{{ booking.vehicleModel|default('N/A') }}</span>
+                </div>
+                <div class="view-detail-group">
+                    <span class="detail-label">Booking Date &amp; Time</span>
+                    <span class="detail-value">{{ booking.bookingDate|date('F j, Y') }} ({{ booking.bookingTime|date('g:i A') }})</span>
+                </div>
+                <div class="view-detail-group">
+                    <span class="detail-label">Contact Number</span>
+                    <span class="detail-value">{{ booking.user.phone|default('N/A') }}</span>
+                </div>
+                <div class="view-detail-group">
+                    <span class="detail-label">Total Price</span>
+                    <span class="detail-value highlight">₱{{ booking.service.price|number_format(2) }}</span>
+                </div>
+                <div class="view-detail-group">
+                    <span class="detail-label">Notes</span>
+                    <span class="detail-value">{{ booking.notes|default('N/A') }}</span>
+                </div>
+                {% if booking.bundleSlug %}
+                    <div class="view-detail-group">
+                        <span class="detail-label">Promotion</span>
+                        <span class="detail-value">{{ booking.bundleSlug }} — {{ booking.bundleOption }}</span>
+                    </div>
+                {% endif %}
+                <button type="button" class="btn-row-action btn-view" style="width: 100%; justify-content: center; margin-top: 20px; padding: 10px;" onclick="closeModal('viewModal{{ bookingId }}')">
+                    Close
+                </button>
+            </div>
+        </div>
+
+        {% if editForms[bookingId] is defined %}
+            {% set editForm = editForms[bookingId] %}
+            <div
+                class="modal-overlay"
+                id="editModal{{ bookingId }}"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="edit-title-{{ bookingId }}"
+            >
+                <div class="crud-modal-content">
+                    <div class="crud-modal-header">
+                        <h3 id="edit-title-{{ bookingId }}">Update Appointment</h3>
+                        <button type="button" class="close-modal-btn" onclick="closeModal('editModal{{ bookingId }}')" aria-label="Close">&times;</button>
+                    </div>
+                    {{ form_start(editForm) }}
+                        {{ form_errors(editForm) }}
+                        <div class="form-group">
+                            {{ form_label(editForm.service) }}
+                            {{ form_widget(editForm.service) }}
+                            {{ form_errors(editForm.service) }}
+                        </div>
+                        <div class="form-group">
+                            {{ form_label(editForm.vehicleModel) }}
+                            {{ form_widget(editForm.vehicleModel) }}
+                            {{ form_errors(editForm.vehicleModel) }}
+                        </div>
+                        <div class="form-group">
+                            <label>Contact Number</label>
+                            <input type="text" class="form-control" value="{{ booking.user.phone|default('') }}" readonly>
+                        </div>
+                        <div class="form-group">
+                            {{ form_label(editForm.bookingDate) }}
+                            {{ form_widget(editForm.bookingDate) }}
+                            {{ form_errors(editForm.bookingDate) }}
+                        </div>
+                        <div class="form-group">
+                            {{ form_label(editForm.bookingTime) }}
+                            {{ form_widget(editForm.bookingTime) }}
+                            {{ form_errors(editForm.bookingTime) }}
+                        </div>
+                        <div class="form-group">
+                            {{ form_label(editForm.notes) }}
+                            {{ form_widget(editForm.notes) }}
+                            {{ form_errors(editForm.notes) }}
+                        </div>
+                        <div class="table-actions">
+                            <button type="submit" class="btn-row-action btn-edit">
+                                <i class="fa-solid fa-check" aria-hidden="true"></i>
+                                Save Changes
+                            </button>
+                            <button type="button" class="btn-row-action btn-view" onclick="closeModal('editModal{{ bookingId }}')">Close</button>
+                        </div>
+                    {{ form_end(editForm) }}
+                </div>
+            </div>
+        {% endif %}
+    {% endfor %}
+
+    {% if openEditId %}
+        <script>
+            document.addEventListener('DOMContentLoaded', function() {
+                openModal('editModal{{ openEditId }}');
+            });
+        </script>
+    {% endif %}
 {% endblock %}

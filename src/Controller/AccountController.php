@@ -113,10 +113,10 @@ class AccountController extends AbstractController
         if (!$booking || $booking->getUser() !== $user) {
             throw $this->createNotFoundException('Appointment not found.');
         }
-        if (!in_array($booking->getStatus(), ['Pending', 'Confirmed'], true)) {
-            $this->addFlash('error', 'This appointment can no longer be cancelled.');
+        if (strtolower(trim((string) $booking->getStatus())) !== 'pending') {
+            $this->addFlash('error', 'Only pending appointments can be cancelled.');
         } else {
-            $booking->setStatus('Cancelled');
+            $entityManager->remove($booking);
             $entityManager->flush();
             $this->addFlash('success', 'Appointment cancelled.');
         }

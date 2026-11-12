@@ -72,19 +72,20 @@ body {
 .appointment-table {
   width: 100%;
   table-layout: fixed; /* Forces columns to respect specified widths */
+  min-width: 1100px;
   border-collapse: collapse;
   text-align: left;
   color: #f0f6fc;
 }
 
-/* Define explicit column widths to prevent excessive spreading */
-.appointment-table th:nth-child(1), .appointment-table td:nth-child(1) { width: 23%; } /* Service */
-.appointment-table th:nth-child(2), .appointment-table td:nth-child(2) { width: 20%; } /* Vehicle */
-.appointment-table th:nth-child(3), .appointment-table td:nth-child(3) { width: 12%; } /* Date & Time */
-.appointment-table th:nth-child(4), .appointment-table td:nth-child(4) { width: 15%; } /* Contact */
-.appointment-table th:nth-child(5), .appointment-table td:nth-child(5) { width: 12%; } /* Price */
-.appointment-table th:nth-child(6), .appointment-table td:nth-child(6) { width: 10%; } /* Status */
-.appointment-table th:nth-child(7), .appointment-table td:nth-child(7) { width: 15%; } /* Actions */
+.appointment-table th:nth-child(1), .appointment-table td:nth-child(1) { width: 4%; }
+.appointment-table th:nth-child(2), .appointment-table td:nth-child(2) { width: 18%; }
+.appointment-table th:nth-child(3), .appointment-table td:nth-child(3) { width: 13%; }
+.appointment-table th:nth-child(4), .appointment-table td:nth-child(4) { width: 15%; }
+.appointment-table th:nth-child(5), .appointment-table td:nth-child(5) { width: 12%; }
+.appointment-table th:nth-child(6), .appointment-table td:nth-child(6) { width: 8%; }
+.appointment-table th:nth-child(7), .appointment-table td:nth-child(7) { width: 10%; }
+.appointment-table th:nth-child(8), .appointment-table td:nth-child(8) { width: 20%; }
 
 .appointment-table th {
   color: var(--color-border); /* Changes the column name text color (e.g., to your cyan accent color) */
@@ -251,9 +252,31 @@ body {
   border-radius: 8px;
   width: 100%;
   max-width: 500px;
+  max-height: 90vh;
+  overflow-y: auto;
   padding: 24px;
   color: #f0f6fc;
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+}
+
+.view-detail-group {
+  display: grid;
+  gap: 5px;
+  margin-bottom: 14px;
+}
+
+.detail-label {
+  color: #8b949e;
+  font-size: 0.85rem;
+}
+
+.detail-value {
+  overflow-wrap: anywhere;
+}
+
+.detail-value.highlight {
+  color: #00d2d3;
+  font-weight: 600;
 }
 
 .crud-modal-header {
@@ -309,6 +332,10 @@ body {
   color: #ffffff;
   border-radius: 6px;
   margin-bottom: 20px;
+}
+
+.alert-toast-error {
+  background: #b91c1c;
 }
 
 /* ==========================================================================
