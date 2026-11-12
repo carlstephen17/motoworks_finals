@@ -1,0 +1,79 @@
+.form-group {
+    margin-bottom: 16px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 6px;
+    color: #475569;
+    font-size: 0.88rem;
+    font-weight: 500;
+}
+
+.form-control {
+    width: 100%;
+    min-width: 0;
+    padding: 10px 12px;
+    color: #1e293b;
+    background-color: #f8fafc;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    font-size: 0.92rem;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+
+.form-control:focus {
+    background-color: #ffffff;
+    border-color: #2563eb;
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+textarea.form-control {
+    resize: vertical;
+}
+
+.btn-primary {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 18px;
+    color: #ffffff;
+    background: #2563eb;
+    border: 0;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    text-decoration: none;
+    cursor: pointer;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    transition: background-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.btn-primary:hover {
+    background: #1d4ed8;
+}
+
+.btn-primary:focus-visible,
+.btn-sm:focus-visible,
+.sidebar-menu a:focus-visible,
+.sidebar-menu button:focus-visible {
+    outline: 3px solid #93c5fd;
+    outline-offset: 2px;
+}
+
+@media (max-width: 576px) {
+    .form-group {
+        margin-bottom: 14px;
+    }
+
+    .btn-primary,
+    .btn-sm {
+        min-height: 40px;
+    }
+
+    .form-control {
+        min-height: 44px;
+        font-size: 16px;
+    }
+}

@@ -1,0 +1,20 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Book a service | Bencalo MotoWorks{% endblock %}
+
+{% block body %}
+    <main>
+        <h1>Book a service</h1>
+        {% for message in app.flashes('error') %}<p role="alert">{{ message }}</p>{% endfor %}
+        {{ form_start(form) }}
+            {{ form_row(form.serviceId) }}
+            {{ form_row(form.vehicleModel) }}
+            {{ form_row(form.bookingDate) }}
+            {{ form_row(form.bookingTime) }}
+            {{ form_row(form.promoSlug) }}
+            {{ form_row(form.promoOption) }}
+            {{ form_row(form.notes) }}
+            <button type="submit">Submit booking</button>
+        {{ form_end(form) }}
+    </main>
+{% endblock %}

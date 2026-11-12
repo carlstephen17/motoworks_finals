@@ -1,0 +1,25 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Promotion claim | Bencalo MotoWorks{% endblock %}
+
+{% block body %}
+    <main>
+        <h1>Promotion claim</h1>
+        <p>{{ booking.bundleSlug }}</p>
+        <p>{{ booking.user.firstName }} {{ booking.user.lastName }} · {{ booking.vehicleModel }}</p>
+        <p>{{ booking.bundleOption }}</p>
+        <p>{{ booking.bookingDate|date('M j, Y') }} at {{ booking.bookingTime|date('g:i A') }}</p>
+        <p>Status: {{ booking.status }}</p>
+        {% if booking.status|lower != 'completed' %}
+            <form method="post" action="{{ path('update_claim') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token('update_claim') }}">
+                <input type="hidden" name="claim_id" value="{{ booking.id }}">
+                <label>Selected option <input name="selected_option" value="{{ booking.bundleOption }}" required></label>
+                <label>Date <input name="appointment_date" type="date" value="{{ booking.bookingDate|date('Y-m-d') }}" required></label>
+                <label>Time <input name="appointment_time" type="time" value="{{ booking.bookingTime|date('H:i') }}" required></label>
+                <button type="submit">Save changes</button>
+            </form>
+        {% endif %}
+        <a href="{{ path('promo_history') }}">Back to promotion history</a>
+    </main>
+{% endblock %}

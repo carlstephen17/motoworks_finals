@@ -1,0 +1,19 @@
+{% extends 'base.html.twig' %}
+{% block site_header %}{% include 'staff/_nav.html.twig' %}{% endblock %}
+{% block title %}Orders | Staff{% endblock %}
+{% block body %}
+<main>
+    <h1>Orders</h1>
+    {% for message in app.flashes('success') %}<p role="status">{{ message }}</p>{% endfor %}
+    {% for message in app.flashes('error') %}<p role="alert">{{ message }}</p>{% endfor %}
+    <p><a href="{{ path('staff_order_new') }}">Create order</a></p>
+    {% for order in orders %}
+        <article>
+            <h2>Order #{{ order.id }} — {{ order.product.name }}</h2>
+            <p>{{ order.user.firstName }} {{ order.user.lastName }} · {{ order.quantity }} × ₱{{ order.unitPrice|default(order.product.price) }} · {{ order.status }}</p>
+            <form method="post" action="{{ path('staff_order_status_update', {id: order.id}) }}"><input type="hidden" name="_token" value="{{ csrf_token('staff_order_status_' ~ order.id) }}"><select name="status">{% for status in ['Pending','Processing','Shipped','Completed','Cancelled'] %}<option {{ (order.customerOrder ? order.customerOrder.status : order.status) == status ? 'selected' : '' }}>{{ status }}</option>{% endfor %}</select><label>Cancellation reason <input name="cancellationReason" maxlength="500"></label><button>Update</button></form>
+            <form method="post" action="{{ path('staff_order_delete', {id: order.id}) }}"><input type="hidden" name="_token" value="{{ csrf_token('staff_order_delete_' ~ order.id) }}"><label>Cancellation reason <input name="reason" maxlength="500" required></label><button>Cancel order</button></form>
+        </article>
+    {% else %}<p>No orders.</p>{% endfor %}
+</main>
+{% endblock %}

@@ -1,0 +1,26 @@
+{% extends 'base.html.twig' %}
+{% block site_header %}{% include 'admin/_sidebar.html.twig' %}{% endblock %}
+{% block title %}Products | Admin{% endblock %}
+{% block body %}
+<main>
+    <h1>Products</h1>
+    {% for message in app.flashes('success') %}<p role="status">{{ message }}</p>{% endfor %}
+    {% for message in app.flashes('error') %}<p role="alert">{{ message }}</p>{% endfor %}
+    <p><a href="{{ path('admin_product_new') }}">Create product</a></p>
+    <table><thead><tr><th>Name</th><th>Price</th><th>Stock</th><th>Active</th><th>Actions</th></tr></thead><tbody>
+    {% for product in products %}
+        <tr><td>{{ product.name }}</td><td>₱{{ product.price }}</td><td>{{ product.stock }}</td><td>{{ product.active ? 'Yes' : 'No' }}</td><td>
+            <a href="{{ path('admin_product_edit', {id: product.id}) }}">Edit</a>
+            <form method="post" action="{{ path('admin_stock_update', {id: product.id}) }}">
+                <input type="hidden" name="_token" value="{{ csrf_token('admin_stock_update_' ~ product.id) }}">
+                <label>Stock <input name="stock" type="number" min="0" value="{{ product.stock }}" required></label>
+                <button type="submit">Update stock</button>
+            </form>
+            <form method="post" action="{{ path('admin_product_delete', {id: product.id}) }}">
+                <input type="hidden" name="_token" value="{{ csrf_token('admin_product_delete_' ~ product.id) }}"><button type="submit">Delete / deactivate</button>
+            </form>
+        </td></tr>
+    {% else %}<tr><td colspan="5">No products.</td></tr>{% endfor %}
+    </tbody></table>
+</main>
+{% endblock %}

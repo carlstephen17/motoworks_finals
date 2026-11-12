@@ -1,0 +1,105 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Checkout - Bencalo MotoWorks{% endblock %}
+
+{% block stylesheets %}
+    {{ parent() }}
+    <link rel="stylesheet" href="{{ asset('styles/shop.css') }}">
+    <link rel="stylesheet" href="{{ asset('styles/cart.css') }}">
+{% endblock %}
+
+{% block body %}
+    {% set total = 0 %}
+    <main class="container cart-container checkout-page">
+        <h2>Checkout</h2>
+        <a href="{{ path('cart_index') }}" class="cart-continue">
+            <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
+            Back to cart
+        </a>
+
+        {% for message in app.flashes('error') %}
+            <p class="alert alert-danger" role="alert">{{ message }}</p>
+        {% endfor %}
+
+        {% if items is empty %}
+            <div class="empty-cart">
+                <i class="fa-solid fa-cart-shopping" aria-hidden="true"></i>
+                <p>There are no available items to check out.</p>
+                <a href="{{ path('shop_index') }}" class="btn btn-primary">Browse Shop</a>
+            </div>
+        {% else %}
+            <div class="cart-table-wrapper checkout-order-summary">
+                <table class="cart-table">
+                    <thead>
+                        <tr>
+                            <th>Product</th>
+                            <th>Quantity</th>
+                            <th>Subtotal</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in items %}
+                            {% set total = total + item.total %}
+                            <tr>
+                                <td>
+                                    <div class="cart-product">
+                                        {% if item.product.image %}
+                                            <img
+                                                src="{{ asset(item.product.image) }}"
+                                                alt="{{ item.product.name }}"
+                                                class="cart-item-img"
+                                            >
+                                        {% endif %}
+                                        <span class="cart-product-name">{{ item.product.name }}</span>
+                                    </div>
+                                </td>
+                                <td>{{ item.quantity }}</td>
+                                <td class="cart-subtotal">₱{{ item.total|number_format(2) }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="checkout-direct-panel">
+                <h3>Delivery and Payment</h3>
+                <p>Your account phone number will be used to contact you about the order.</p>
+
+                {{ form_start(form, {attr: {id: 'checkout-form', action: path('checkout')}}) }}
+                    {{ form_widget(form.checkoutType) }}
+
+                    <div class="checkout-form-group">
+                        <label for="checkout-full-name">Full Name</label>
+                        <input id="checkout-full-name" type="text" value="{{ checkoutFullName }}" readonly>
+                    </div>
+
+                    <div class="checkout-form-group">
+                        <label for="checkout-phone">Phone Number</label>
+                        {{ form_widget(form.phone) }}
+                    </div>
+
+                    <div class="checkout-form-group">
+                        <label for="checkout-address">Delivery Address</label>
+                        {{ form_widget(form.address) }}
+                        {{ form_errors(form.address) }}
+                    </div>
+
+                    <div class="checkout-form-group">
+                        <label for="checkout-payment">Payment Method</label>
+                        {{ form_widget(form.paymentMethod) }}
+                    </div>
+
+                    <div class="checkout-total-box">
+                        <span>Total:</span>
+                        <strong>₱{{ total|number_format(2) }}</strong>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary checkout-submit-btn">
+                        <i class="fa-solid fa-check" aria-hidden="true"></i>
+                        Place Order
+                    </button>
+                {{ form_end(form) }}
+            </div>
+        {% endif %}
+    </main>
+{% endblock %}

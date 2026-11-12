@@ -1,0 +1,130 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}About Us - Bencalo MotoWorks{% endblock %}
+
+{% block stylesheets %}
+    {{ parent() }}
+    <style>
+        .about-hero {
+            background: linear-gradient(135deg, #181818 0%, #222222 100%);
+            color: #fff;
+            padding: 60px 20px;
+            text-align: center;
+            border-radius: 12px;
+            margin-bottom: 40px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            border: 1px solid var(--color-border, #2a2a2a);
+        }
+        .about-hero h1 {
+            font-size: 2.5rem;
+            font-weight: 800;
+            margin-bottom: 15px;
+            color: var(--color-border, #00bcd4);
+        }
+        .about-hero p {
+            color: var(--color-text-muted, #a0a0a0);
+            font-size: 1.1rem;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        .about-content-card {
+            background: var(--color-card-bg, #1e1e1e);
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.2);
+            border-top: 4px solid var(--color-primary, #00bcd4);
+            border-left: 1px solid var(--color-border, #2a2a2a);
+            border-right: 1px solid var(--color-border, #2a2a2a);
+            border-bottom: 1px solid var(--color-border, #2a2a2a);
+            margin-bottom: 60px;
+            line-height: 1.8;
+            color: var(--color-text-muted, #ccc);
+            font-size: 1.05rem;
+        }
+        .about-content-card h3 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--color-text, #fff);
+            margin-bottom: 20px;
+        }
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 25px;
+            margin-top: 40px;
+        }
+        @media (max-width: 768px) {
+            .features-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        .feature-box {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--color-border, #2a2a2a);
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            text-align: center;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s ease;
+        }
+        .feature-box:hover {
+            transform: translateY(-5px);
+            border-bottom-color: var(--color-primary, #00bcd4);
+            background: rgba(0, 188, 212, 0.03);
+        }
+        .feature-box i {
+            font-size: 2.5rem;
+            color: var(--color-border, #00bcd4);
+            margin-bottom: 20px;
+        }
+        .feature-box h4 {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: var(--color-text, #fff);
+            margin-bottom: 10px;
+        }
+        .feature-box p {
+            color: var(--color-text-muted, #a0a0a0);
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+    </style>
+{% endblock %}
+
+{% block body %}
+    <main class="container" style="padding-top: 40px;">
+        <div class="about-hero">
+            <h1>Engineered for Performance</h1>
+            <p>Learn more about Bencalo MotoWorks, our passion for motorcycles, and our commitment to riders.</p>
+        </div>
+
+        <div class="about-content-card">
+            <h3>Who We Are</h3>
+            <p style="margin-bottom: 20px;">
+                Located right at Bollos Street, Boyco, Bayawan City, <strong>Bencalo MotoWorks</strong> is your premier destination for high-grade motorcycle parts, premium lubricants, and dependable riding gear. We live and breathe two wheels, understanding firsthand what every rider needs to maintain safety, peak engine efficiency, and unmatched street style.
+            </p>
+            <p>
+                Whether you are servicing a daily commuter or fine-tuning a performance build, our shop bridges the gap between top-tier global brands and local riders looking for trusted reliability.
+            </p>
+
+            <div class="features-grid">
+                <div class="feature-box">
+                    <i class="fa-solid fa-shield-halved"></i>
+                    <h4>Genuine Quality</h4>
+                    <p>We source only authentic, high-performance parts and certified lubricants for your motorcycle.</p>
+                </div>
+                <div class="feature-box">
+                    <i class="fa-solid fa-bolt"></i>
+                    <h4>Expert Assistance</h4>
+                    <p>Our team is equipped to help you find the exact specifications and components you need.</p>
+                </div>
+                <div class="feature-box">
+                    <i class="fa-solid fa-face-smile"></i>
+                    <h4>Rider Focused</h4>
+                    <p>Dedicated to fostering a solid local community of passionate motorcycle enthusiasts.</p>
+                </div>
+            </div>
+        </div>
+    </main>
+{% endblock %}

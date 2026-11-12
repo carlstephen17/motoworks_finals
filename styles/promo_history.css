@@ -1,0 +1,330 @@
+/* styles/promo_history.css - Promo History Styles */
+
+/* =========================
+   Base
+   ========================= */
+
+body {
+    background-color: #0d1117;
+    color: #c9d1d9;
+    font-family: sans-serif;
+    margin: 0;
+    padding: 0;
+}
+
+
+/* =========================
+   Toast Alerts
+   ========================= */
+
+.alert-toast {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 9999;
+    display: none;
+    padding: 15px 20px;
+    border-radius: 6px;
+    color: #fff;
+    font-weight: 500;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.alert-success {
+    background-color: #2ed573;
+}
+
+.alert-error {
+    background-color: #ff4757;
+}
+
+
+/* =========================
+   Modal Details
+   ========================= */
+
+.modal-details p {
+    margin-bottom: 10px;
+    font-size: 0.95rem;
+    color: #ddd;
+}
+
+.modal-details strong {
+    color: #fff;
+}
+
+
+/* =========================
+   History Layout
+   ========================= */
+
+.history-wrapper {
+    width: 100%;
+    min-height: calc(100vh - 200px);
+    display: flex;
+    justify-content: center;
+    padding: 40px 20px;
+    background-color: #0d1117;
+    box-sizing: border-box;
+}
+
+.history-container {
+    width: 100%;
+    max-width: 1500px;
+    box-sizing: border-box;
+    background-color: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 12px;
+    padding: 30px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.history-title {
+    margin: 0 0 8px;
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: #f0f6fc;
+}
+
+.back-link {
+    display: inline-block;
+    margin-bottom: 20px;
+    color: #58a6ff;
+    text-decoration: none;
+    font-size: 0.95rem;
+    font-weight: 500;
+    transition: color 0.2s ease;
+}
+
+.back-link:hover {
+    color: #79c0ff;
+    text-decoration: underline;
+}
+
+
+/* =========================
+   Alerts / Empty State
+   ========================= */
+
+.success-alert {
+    margin-bottom: 20px;
+    padding: 12px 16px;
+    background-color: rgba(46, 160, 67, 0.15);
+    border: 1px solid rgba(46, 160, 67, 0.4);
+    border-radius: 8px;
+    color: #3fb950;
+    font-size: 0.95rem;
+}
+
+.empty-state {
+    padding: 40px 0;
+    color: #8b949e;
+    font-size: 1rem;
+    text-align: center;
+}
+
+
+/* =========================
+   Table
+   ========================= */
+
+.order-table-wrapper {
+    width: 100%;
+    overflow-x: auto;
+}
+
+.styled-table {
+    width: 100%;
+    border-collapse: collapse;
+    text-align: left;
+    font-size: 0.95rem;
+    color: #c9d1d9;
+}
+
+.styled-table th {
+    padding: 14px 16px;
+    background-color: #21262d;
+    color: var(--color-border, #c9d1d9);
+    font-weight: 600;
+    border-bottom: 1px solid #30363d;
+    white-space: nowrap;
+}
+
+.styled-table td {
+    padding: 16px;
+    border-bottom: 1px solid #21262d;
+    vertical-align: middle;
+}
+
+.styled-table tbody tr:hover {
+    background-color: rgba(177, 186, 196, 0.04);
+}
+
+.bundle-name {
+    color: #f0f6fc;
+    font-weight: 600;
+}
+
+.appointment-meta {
+    display: block;
+    margin-top: 4px;
+    color: #8b949e;
+    font-size: 0.85rem;
+}
+
+
+/* =========================
+   Badges
+   ========================= */
+
+.badge {
+    box-sizing: border-box;
+    min-width: 95px;
+    height: 36px;
+    padding: 0 14px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-align: center;
+    white-space: nowrap;
+}
+
+.badge-pending {
+    background-color: transparent;
+    color: #ff9f43;
+    border: 1px solid #ff9f43;
+}
+
+.badge-completed {
+    background-color: transparent;
+    color: #2ed573;
+    border: 1px solid #2ed573;
+}
+
+
+/* =========================
+   Table Actions
+   ========================= */
+
+.table-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+
+/* Shared action-button styling */
+.table-actions .btn-view,
+.table-actions .btn-edit,
+.table-actions .btn-cancel {
+    box-sizing: border-box;
+    min-width: 95px;
+    height: 36px;
+    padding: 0 14px;
+
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+
+    border-radius: 6px;
+    border: none;
+    font-size: 0.85rem;
+    font-weight: 600;
+    line-height: 1;
+    text-decoration: none;
+    white-space: nowrap;
+    cursor: pointer;
+
+    transition:
+        opacity 0.2s ease,
+        filter 0.2s ease;
+}
+
+
+/* View */
+.table-actions .btn-view {
+    background-color: #2b2f38;
+    border: 1px solid #3f4451;
+    color: #fff;
+}
+
+
+/* Edit */
+.table-actions .btn-edit {
+    background-color: #0b5ed7;
+    color: #fff;
+}
+
+
+/* Cancel */
+.table-actions .btn-cancel {
+    background-color: #dc3545;
+    color: #fff;
+}
+
+
+/* Hover */
+.table-actions .btn-view:hover,
+.table-actions .btn-edit:hover,
+.table-actions .btn-cancel:hover {
+    opacity: 0.85;
+}
+
+
+/* =========================
+   Generic Row Action
+   ========================= */
+
+.btn-row-action {
+    box-sizing: border-box;
+    padding: 6px 12px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+
+    border: none;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    text-decoration: none;
+    cursor: pointer;
+
+    transition: filter 0.2s ease;
+}
+
+.btn-row-action:hover {
+    filter: brightness(1.15);
+}
+
+
+/* =========================
+   Responsive
+   ========================= */
+
+@media (max-width: 768px) {
+    .history-wrapper {
+        padding: 20px 10px;
+    }
+
+    .history-container {
+        padding: 20px 15px;
+    }
+
+    .history-title {
+        font-size: 1.4rem;
+    }
+
+    .styled-table {
+        min-width: 900px;
+    }
+
+    .table-actions {
+        flex-wrap: nowrap;
+    }
+}

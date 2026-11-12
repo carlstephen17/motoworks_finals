@@ -1,0 +1,26 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}{{ product.name }} | Bencalo MotoWorks{% endblock %}
+
+{% block body %}
+    <main>
+        <h1>{{ product.name }}</h1>
+        {% for message in app.flashes('success') %}<p role="status">{{ message }}</p>{% endfor %}
+        {% for message in app.flashes('error') %}<p role="alert">{{ message }}</p>{% endfor %}
+        {% if product.image %}<img src="{{ asset(product.image) }}" alt="{{ product.name }}">{% endif %}
+        <p>₱{{ product.price|number_format(2) }}</p>
+        <p>{{ product.stock > 0 ? product.stock ~ ' in stock' : 'Out of stock' }}</p>
+        {% if product.stock > 0 %}
+            <form method="post" action="{{ path('cart_add', {id: product.id}) }}">
+                <input type="hidden" name="_token" value="{{ csrf_token('cart_add_' ~ product.id) }}">
+                <label>Quantity <input type="number" name="quantity" min="1" max="{{ product.stock }}" value="1" required></label>
+                <button type="submit">Add to cart</button>
+            </form>
+            <form method="post" action="{{ path('checkout_buy_now', {id: product.id}) }}">
+                <input type="hidden" name="_token" value="{{ csrf_token('buy_now_' ~ product.id) }}">
+                <label>Quantity <input type="number" name="quantity" min="1" max="{{ product.stock }}" value="1" required></label>
+                <button type="submit">Buy now</button>
+            </form>
+        {% endif %}
+    </main>
+{% endblock %}

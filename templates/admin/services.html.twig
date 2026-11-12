@@ -1,0 +1,17 @@
+{% extends 'base.html.twig' %}
+{% block site_header %}{% include 'admin/_sidebar.html.twig' %}{% endblock %}
+{% block title %}Services | Admin{% endblock %}
+{% block body %}
+<main>
+    <h1>Services</h1>
+    {% for message in app.flashes('success') %}<p role="status">{{ message }}</p>{% endfor %}
+    {% for message in app.flashes('error') %}<p role="alert">{{ message }}</p>{% endfor %}
+    <p><a href="{{ path('admin_service_new') }}">Create service</a></p>
+    {% for service in services %}
+        <article><h2>{{ service.name }}</h2><p>{{ service.description }}</p><p>₱{{ service.price }} · {{ service.active ? 'Active' : 'Inactive' }}</p>
+            <a href="{{ path('admin_service_edit', {id: service.id}) }}">Edit</a>
+            <form method="post" action="{{ path('admin_service_delete', {id: service.id}) }}"><input type="hidden" name="_token" value="{{ csrf_token('admin_service_delete_' ~ service.id) }}"><button type="submit">Delete / deactivate</button></form>
+        </article>
+    {% else %}<p>No services.</p>{% endfor %}
+</main>
+{% endblock %}

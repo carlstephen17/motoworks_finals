@@ -1,0 +1,24 @@
+{% extends 'base.html.twig' %}
+{% block site_header %}{% include 'staff/_nav.html.twig' %}{% endblock %}
+{% block title %}Appointments | Staff{% endblock %}
+{% block body %}
+<main>
+    <h1>Appointments</h1>
+    {% for message in app.flashes('success') %}<p role="status">{{ message }}</p>{% endfor %}
+    {% for message in app.flashes('error') %}<p role="alert">{{ message }}</p>{% endfor %}
+    <p><a href="{{ path('staff_appointment_new') }}">Create appointment</a></p>
+    {% for booking in bookings %}
+        <article>
+            <h2>{{ booking.service.name }} — {{ booking.bookingDate|date('M j, Y') }} {{ booking.bookingTime|date('g:i A') }}</h2>
+            <p>{{ booking.user.firstName }} {{ booking.user.lastName }} · {{ booking.vehicleModel }} · {{ booking.status }}</p>
+            <a href="{{ path('staff_appointment_edit', {id: booking.id}) }}">Edit appointment details</a>
+            <form method="post" action="{{ path('staff_appointment_update', {id: booking.id}) }}">
+                <input type="hidden" name="_token" value="{{ csrf_token('staff_appointment_update_' ~ booking.id) }}">
+                <select name="status">{% for status in ['Pending','Confirmed','Completed','Cancelled','Rejected'] %}<option {{ booking.status == status ? 'selected' : '' }}>{{ status }}</option>{% endfor %}</select>
+                <button>Update</button>
+            </form>
+            <form method="post" action="{{ path('staff_appointment_delete', {id: booking.id}) }}"><input type="hidden" name="_token" value="{{ csrf_token('staff_appointment_delete_' ~ booking.id) }}"><button>Delete</button></form>
+        </article>
+    {% else %}<p>No appointments.</p>{% endfor %}
+</main>
+{% endblock %}

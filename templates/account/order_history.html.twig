@@ -1,0 +1,30 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Order history | Bencalo MotoWorks{% endblock %}
+
+{% block body %}
+    <main>
+        <p><a href="{{ path('customer_profile') }}">My account</a></p>
+        <h1>Order history</h1>
+        {% for message in app.flashes('success') %}<p role="status">{{ message }}</p>{% endfor %}
+        {% for message in app.flashes('error') %}<p role="alert">{{ message }}</p>{% endfor %}
+        {% for order in orders %}
+            <article>
+                <h2>{{ order.product.name }}</h2>
+                <p>{{ order.quantity }} × ₱{{ order.unitPrice|default(order.product.price)|number_format(2) }}</p>
+                <p>Total: ₱{{ order.totalAmount|number_format(2) }}</p>
+                <p>Order #{{ order.id }} — {{ order.createdAt ? order.createdAt|date('M j, Y') : '' }}</p>
+                <p>Status: {{ order.customerOrder ? order.customerOrder.status : order.status }}</p>
+                {% if (order.customerOrder ? order.customerOrder.status : order.status) in ['Pending', 'Processing'] %}
+                    <form method="post" action="{{ path('order_cancel', {id: order.id}) }}">
+                        <input type="hidden" name="_token" value="{{ csrf_token('order_cancel_' ~ order.id) }}">
+                        <label>Cancellation reason <input name="reason" required maxlength="1000"></label>
+                        <button type="submit">Cancel checkout order</button>
+                    </form>
+                {% endif %}
+            </article>
+        {% else %}
+            <p>You have no orders yet.</p>
+        {% endfor %}
+    </main>
+{% endblock %}

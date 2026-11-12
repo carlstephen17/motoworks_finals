@@ -1,0 +1,78 @@
+<section id="products" class="container section-padding-top">
+    <div class="section-title">
+        <h2>Featured Products</h2>
+    </div>
+    {% if products is not empty %}
+        <div class="card-grid product-grid" id="featured-product-grid">
+            {% for product in products %}
+                <div
+                    class="product-card"
+                    data-name="{{ product.name|lower }}"
+                    style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; padding: 25px; display: flex; flex-direction: column; justify-content: space-between;"
+                >
+                    <div class="product-image" style="height: 160px; display: flex; align-items: center; justify-content: center; margin-bottom: 15px;">
+                        {% if product.image %}
+                            <img src="{{ asset(product.image) }}" alt="{{ product.name }}" style="max-width: 100%; max-height: 160px; object-fit: contain;">
+                        {% else %}
+                            <i class="fa-solid fa-box-open" aria-hidden="true" style="font-size: 3rem; color: var(--color-text-muted, #a0a0a0);"></i>
+                        {% endif %}
+                    </div>
+
+                    <h3 class="product-name" style="color: #fff; margin-bottom: 8px;">{{ product.name }}</h3>
+
+                    <div class="product-price" style="color: #fff; font-size: 1.1rem; font-weight: 600; margin-bottom: 5px;">
+                        ₱{{ product.price|number_format(2) }}
+                    </div>
+
+                    <div class="product-stock" style="font-size: 0.85rem; margin: 5px 0 15px 0; color: {{ product.stock > 0 ? '#2e7d32' : '#c62828' }};">
+                        Stock: <strong>{{ product.stock }}</strong> available
+                    </div>
+
+                    <div class="product-card-actions" style="display: flex; gap: 10px;">
+                        {% if product.stock > 0 %}
+                            <button
+                                type="button"
+                                class="btn btn-outline btn-cart-add"
+                                title="Add to Cart"
+                                onclick='openCartModal({{ product.id }}, {{ product.name|json_encode|e('html_attr') }}, {{ product.price|json_encode|e('html_attr') }}, {{ product.stock }}, {{ csrf_token('cart_add_' ~ product.id)|json_encode|e('html_attr') }})'
+                                style="flex: 0 0 50px; width: 50px;"
+                            >
+                                <i class="fa-solid fa-cart-plus"></i>
+                            </button>
+                            <button
+                                type="button"
+                                class="btn btn-primary btn-block"
+                                onclick='openBuyModal({{ product.id }}, {{ product.name|json_encode|e('html_attr') }}, {{ product.price|json_encode|e('html_attr') }}, {{ product.stock }}, {{ csrf_token('buy_now_' ~ product.id)|json_encode|e('html_attr') }})'
+                                style="flex: 1;"
+                            >
+                                Buy Now
+                            </button>
+                        {% else %}
+                            <button
+                                type="button"
+                                class="btn btn-outline"
+                                disabled
+                                title="Out of Stock"
+                                style="flex: 0 0 50px; width: 50px; opacity: 0.5; cursor: not-allowed;"
+                            >
+                                <i class="fa-solid fa-cart-plus"></i>
+                            </button>
+                            <button
+                                type="button"
+                                class="btn btn-secondary btn-block"
+                                disabled
+                                style="flex: 1; background: #ccc; cursor: not-allowed; border-color: #ccc;"
+                            >
+                                Out of Stock
+                            </button>
+                        {% endif %}
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p style="text-align: center; color: rgba(255, 255, 255, 0.6); padding: 30px;">
+            No featured products available at the moment.
+        </p>
+    {% endif %}
+</section>

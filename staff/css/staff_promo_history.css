@@ -1,0 +1,143 @@
+.staff-promo-list,
+.promo-claim-create {
+    margin-bottom: 24px;
+}
+
+.promo-claim-create > summary {
+    cursor: pointer;
+    list-style: none;
+}
+
+.promo-claim-create > summary::-webkit-details-marker {
+    display: none;
+}
+
+.promo-claim-form-body {
+    padding: 18px;
+}
+
+.promo-claim-form {
+    padding: 20px;
+}
+
+.promo-claim-form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0 16px;
+    margin-bottom: 12px;
+}
+
+.promo-claim-form-grid > * {
+    min-width: 0;
+}
+
+.promo-claim-form-grid label {
+    display: block;
+    margin-bottom: 14px;
+    color: #475569;
+    font-size: 0.88rem;
+    font-weight: 500;
+}
+
+.promo-claim-form-grid .form-control {
+    display: block;
+    margin-top: 6px;
+}
+
+.staff-promo-filters {
+    display: grid;
+    grid-template-columns: minmax(220px, 2fr) minmax(160px, 1fr) auto;
+    align-items: end;
+    gap: 12px;
+    padding: 18px;
+}
+
+.staff-promo-filters > * {
+    min-width: 0;
+}
+
+.staff-promo-filters label {
+    display: block;
+    margin-bottom: 0;
+    color: #475569;
+    font-size: 0.88rem;
+    font-weight: 500;
+}
+
+.staff-promo-filter-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding-bottom: 16px;
+}
+
+.badge-info {
+    color: #075985;
+    background: #e0f2fe;
+}
+
+.badge-warning {
+    color: #92400e;
+    background: #fef3c7;
+}
+
+.promo-claim-dialog {
+    position: fixed;
+    inset: 0;
+    margin: auto;
+    width: min(760px, calc(100vw - 32px));
+    max-height: 90vh;
+    max-height: 90dvh;
+    padding: 0;
+    overflow: auto;
+    border: 0;
+    border-radius: 10px;
+    box-shadow: 0 20px 60px rgba(15, 23, 42, 0.3);
+}
+
+.promo-claim-dialog::backdrop {
+    background: rgba(15, 23, 42, 0.58);
+}
+
+.promo-claim-dialog-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.promo-claim-dialog-header h3 {
+    margin: 0;
+    color: #181c32;
+}
+
+.promo-claim-detail-body {
+    padding: 20px;
+    background: #f8fafc;
+}
+
+.promo-claim-stats {
+    grid-template-columns: repeat(auto-fit, minmax(155px, 1fr));
+    margin-bottom: 24px;
+}
+
+@media (max-width: 700px) {
+    .staff-promo-filters,
+    .promo-claim-form-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .staff-promo-filter-actions {
+        padding-bottom: 0;
+    }
+
+    .promo-claim-dialog {
+        width: calc(100vw - 20px);
+    }
+
+    .promo-claim-form,
+    .promo-claim-form-body {
+        padding: 14px;
+    }
+}

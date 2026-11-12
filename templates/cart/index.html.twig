@@ -1,0 +1,240 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Your Shopping Cart - Bencalo MotoWorks{% endblock %}
+
+{% block stylesheets %}
+    {{ parent() }}
+    <link rel="stylesheet" href="{{ asset('styles/shop.css') }}">
+    <link rel="stylesheet" href="{{ asset('styles/cart.css') }}">
+{% endblock %}
+
+{% block body %}
+    <main class="container cart-container">
+        <h2>Your Shopping Cart</h2>
+
+        {% for message in app.flashes('error') %}
+            <p class="alert alert-danger" role="alert">{{ message }}</p>
+        {% endfor %}
+
+        {% if items is empty %}
+            <div class="empty-cart">
+                <i class="fa-solid fa-cart-shopping" aria-hidden="true"></i>
+                <p>Your cart is currently empty.</p>
+                <a href="{{ path('shop_index') }}" class="btn btn-primary">Browse Shop</a>
+            </div>
+        {% else %}
+            <div class="cart-table-wrapper">
+                <table class="cart-table">
+                    <thead>
+                        <tr>
+                            <th>Product</th>
+                            <th>Price</th>
+                            <th>Quantity</th>
+                            <th>Subtotal</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in items %}
+                            <tr>
+                                <td>
+                                    <div class="cart-product">
+                                        {% if item.product.image %}
+                                            <img
+                                                src="{{ asset(item.product.image) }}"
+                                                alt="{{ item.product.name }}"
+                                                class="cart-item-img"
+                                            >
+                                        {% else %}
+                                            <i class="fa-solid fa-box-open cart-item-img" aria-hidden="true"></i>
+                                        {% endif %}
+                                        <span class="cart-product-name">{{ item.product.name }}</span>
+                                    </div>
+                                </td>
+                                <td class="cart-price">₱{{ item.product.price|number_format(2) }}</td>
+                                <td>
+                                    <form method="post" action="{{ path('cart_update', {id: item.product.id}) }}">
+                                        <input type="hidden" name="_token" value="{{ csrf_token('cart_update_' ~ item.product.id) }}">
+                                        <input
+                                            type="number"
+                                            name="quantity"
+                                            class="qty-input"
+                                            value="{{ item.quantity }}"
+                                            min="1"
+                                            max="{{ item.product.stock }}"
+                                            onchange="this.form.submit()"
+                                            aria-label="Quantity for {{ item.product.name }}"
+                                        >
+                                    </form>
+                                </td>
+                                <td class="cart-subtotal">₱{{ item.total|number_format(2) }}</td>
+                                <td>
+                                    <form
+                                        method="post"
+                                        action="{{ path('cart_remove', {id: item.product.id}) }}"
+                                        onsubmit="return confirm('Remove this product from your cart?');"
+                                    >
+                                        <input type="hidden" name="_token" value="{{ csrf_token('cart_remove_' ~ item.product.id) }}">
+                                        <button type="submit" class="btn-remove" title="Remove item" aria-label="Remove {{ item.product.name }}">
+                                            <i class="fa-solid fa-trash" aria-hidden="true"></i>
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="cart-actions-row">
+                <div>
+                    <a href="{{ path('shop_index') }}" class="cart-continue">
+                        <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
+                        Continue Shopping
+                    </a>
+                </div>
+                <div class="cart-summary">
+                    <div>
+                        <span class="cart-summary-label">Subtotal:</span>
+                        <span class="cart-summary-price">₱{{ total|number_format(2) }}</span>
+                    </div>
+                    <button type="button" class="checkout-btn" onclick="openCheckoutModal()">
+                        Proceed to Checkout
+                        <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div id="checkout-modal" class="auth-modal">
+                <div class="checkout-modal-content">
+                    <button type="button" class="checkout-close" onclick="closeCheckoutModal()" aria-label="Close checkout">
+                        &times;
+                    </button>
+
+                    <div class="checkout-modal-header">
+                        <h2>Checkout</h2>
+                        <p>Review your information and enter your delivery address.</p>
+                    </div>
+
+                    {{ form_start(checkoutForm, {attr: {id: 'checkout-form', action: path('checkout')}}) }}
+                        {{ form_widget(checkoutForm.checkoutType) }}
+
+                        <div class="checkout-form-group">
+                            <label for="checkout-full-name">Full Name</label>
+                            <input id="checkout-full-name" type="text" value="{{ checkoutFullName }}" readonly>
+                        </div>
+
+                        <div class="checkout-form-group">
+                            <label for="checkout-phone">Phone Number</label>
+                            {{ form_widget(checkoutForm.phone) }}
+                        </div>
+
+                        <div class="checkout-form-group">
+                            <label for="checkout-address">Delivery Address</label>
+                            {{ form_widget(checkoutForm.address) }}
+                        </div>
+
+                        <div class="checkout-form-group">
+                            <label for="checkout-payment">Payment Method</label>
+                            {{ form_widget(checkoutForm.paymentMethod) }}
+                        </div>
+
+                        <div class="checkout-total-box">
+                            <span>Total:</span>
+                            <strong>₱{{ total|number_format(2) }}</strong>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary checkout-submit-btn">
+                            <i class="fa-solid fa-check" aria-hidden="true"></i>
+                            Confirm Checkout
+                        </button>
+                    {{ form_end(checkoutForm) }}
+                </div>
+            </div>
+        {% endif %}
+
+        {% if checkoutReceipt %}
+            <div
+                id="payment-receipt-modal"
+                class="payment-receipt-modal active"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="payment-receipt-title"
+            >
+                <div class="payment-receipt-card">
+                    <button
+                        type="button"
+                        class="payment-receipt-close"
+                        onclick="closePaymentReceiptModal()"
+                        aria-label="Close payment receipt"
+                    >&times;</button>
+
+                    <div class="payment-receipt-icon">
+                        <i class="fa-solid fa-circle-check" aria-hidden="true"></i>
+                    </div>
+                    <h2 id="payment-receipt-title">Order Receipt</h2>
+                    <p>Your order was recorded. Review the receipt details below.</p>
+                    <div class="receipt-detail-list">
+                        <div><span>Customer</span><strong>{{ checkoutReceipt.customer_name }}</strong></div>
+                        <div>
+                            <span>Order</span>
+                            <strong>
+                                {% for item in checkoutReceipt.items %}
+                                    {{ item.name }} (x{{ item.quantity }}){% if not loop.last %}, {% endif %}
+                                {% endfor %}
+                            </strong>
+                        </div>
+                        <div><span>Phone</span><strong>{{ checkoutReceipt.phone }}</strong></div>
+                        <div><span>Address</span><strong>{{ checkoutReceipt.address }}</strong></div>
+                        <div><span>Payment method</span><strong>{{ checkoutReceipt.payment_method }}</strong></div>
+                    </div>
+                    <div class="payment-reference-box">
+                        <span>Reference number</span>
+                        <strong>{{ checkoutReceipt.reference }}</strong>
+                    </div>
+                    <p class="payment-receipt-method">Method: {{ checkoutReceipt.payment_method }}</p>
+                    <a href="{{ path('order_history') }}" class="btn btn-primary payment-receipt-history">
+                        <i class="fa-solid fa-receipt" aria-hidden="true"></i>
+                        View receipt history
+                    </a>
+                </div>
+            </div>
+        {% endif %}
+    </main>
+
+    <script>
+        function openCheckoutModal() {
+            const modal = document.getElementById('checkout-modal');
+            if (!modal) return;
+            modal.classList.add('active');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeCheckoutModal() {
+            const modal = document.getElementById('checkout-modal');
+            if (!modal) return;
+            modal.classList.remove('active');
+            document.body.style.overflow = '';
+        }
+
+        function closePaymentReceiptModal() {
+            const modal = document.getElementById('payment-receipt-modal');
+            if (!modal) return;
+            modal.classList.remove('active');
+            document.body.style.overflow = '';
+        }
+
+        window.addEventListener('click', function(event) {
+            const checkoutModal = document.getElementById('checkout-modal');
+            const receiptModal = document.getElementById('payment-receipt-modal');
+            if (event.target === checkoutModal) closeCheckoutModal();
+            if (event.target === receiptModal) closePaymentReceiptModal();
+        });
+
+        {% if checkoutReceipt %}
+            window.addEventListener('load', function() {
+                document.body.style.overflow = 'hidden';
+            });
+        {% endif %}
+    </script>
+{% endblock %}

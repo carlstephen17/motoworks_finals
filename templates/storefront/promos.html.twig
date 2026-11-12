@@ -1,0 +1,225 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Active Promos & Bundles - Bencalo MotoWorks{% endblock %}
+
+{% block stylesheets %}
+    {{ parent() }}
+    <link rel="stylesheet" href="{{ asset('styles/promos.css') }}">
+    <link rel="stylesheet" href="{{ asset('styles/index/modals.css') }}">
+    <style>
+        .alert-toast {
+            position: fixed; top: 20px; right: 20px; z-index: 9999;
+            padding: 15px 20px; border-radius: 6px; color: #fff; font-weight: 500;
+            display: none; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+        .alert-success { background-color: #2ed573; }
+        .alert-error { background-color: #ff4757; }
+    </style>
+{% endblock %}
+
+{% block body %}
+    <div id="alertToast" class="alert-toast"></div>
+
+    <div class="promos-wrapper">
+        <div class="promos-container">
+            <h2><i class="fa-solid fa-tags"></i> Active Moto Promos &amp; Bundles</h2>
+            <p class="promos-subtitle">Combine product purchases with expert shop services to automatically unlock exclusive package discounts.</p>
+
+            <div class="promo-grid">
+                {% for promo in promos %}
+                    <div class="promo-card">
+                        <div class="promo-image-showcase">
+                            <div class="showcase-img-box">
+                                {% if promo.productImage %}
+                                    <img src="{{ asset(promo.productImage) }}" alt="Product" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                    <i class="{{ promo.productIcon }}" style="display:none; position:absolute; font-size: 1.8rem; color: #00d2d3;"></i>
+                                {% else %}
+                                    <i class="{{ promo.productIcon }}" style="font-size: 1.8rem; color: #00d2d3;"></i>
+                                {% endif %}
+                                <span class="img-label">Product</span>
+                            </div>
+                            <div class="showcase-plus"><i class="fa-solid fa-plus"></i></div>
+                            <div class="showcase-img-box">
+                                {% if promo.serviceImage %}
+                                    <img src="{{ asset(promo.serviceImage) }}" alt="Service" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                    <i class="{{ promo.serviceIcon }}" style="display:none; position:absolute; font-size: 1.8rem; color: #00d2d3;"></i>
+                                {% else %}
+                                    <i class="{{ promo.serviceIcon }}" style="font-size: 1.8rem; color: #00d2d3;"></i>
+                                {% endif %}
+                                <span class="img-label">Service</span>
+                            </div>
+                        </div>
+
+                        <div class="promo-card-header" style="margin-top: 15px;">
+                            <span class="promo-title"><i class="fa-solid fa-circle-dot" style="color: #00d2d3;"></i> {{ promo.title }}</span>
+                            <span class="badge badge-pending">{{ promo.badge }}</span>
+                        </div>
+
+                        <div class="promo-card-body">
+                            <p>{{ promo.description }}</p>
+                            <div class="promo-details-list">
+                                {% for perk in promo.perksList %}
+                                    <div><i class="fa-solid fa-check" style="color: #2ed573;"></i> {{ perk }}</div>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        <div class="promo-card-footer">
+                            <button
+                                type="button"
+                                class="btn-avail-bundle"
+                                onclick='openClaimModal({{ promo.slug|json_encode|e('html_attr') }}, {{ promo.title|json_encode|e('html_attr') }}, {{ promo.itemLabel|json_encode|e('html_attr') }}, {{ promo.itemOptions|json_encode|e('html_attr') }})'
+                            >
+                                <i class="fa-solid fa-cart-shopping"></i> Avail This Bundle
+                            </button>
+                        </div>
+                    </div>
+                {% else %}
+                    <p style="grid-column: 1 / -1; text-align: center; color: var(--color-text-muted, #a0a0a0);">No active promotions are available.</p>
+                {% endfor %}
+            </div>
+
+            <div style="margin-top: 30px;">
+                <a href="{{ path('promo_history') }}" class="back-link"><i class="fa-solid fa-clock-rotate-left"></i> View My Promo Redemptions History</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Claim Modal Structure -->
+    <div id="claimModal" class="modal-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); justify-content:center; align-items:center; z-index:1000;">
+        <div class="modal-content" style="background:#1e2124; padding:30px; border-radius:8px; width:450px; color:#fff; position:relative; max-height: 90vh; overflow-y: auto;">
+            <h3 id="modalBundleTitle" style="margin-bottom: 15px; color:#00FFFF;">Avail Promo Bundle</h3>
+            <form id="claimForm" onsubmit="submitClaim(event)">
+                <input type="hidden" name="form[_token]" value="{{ csrf_token('form') }}">
+                <input type="hidden" id="modalBundleSlug" name="form[promoSlug]">
+
+                <div style="margin-bottom: 15px;">
+                    <label style="display:block; margin-bottom:5px; font-size:0.9rem;">Service</label>
+                    <select name="form[serviceId]" required style="width:100%; padding:10px; background:#111; border:1px solid #333; color:#fff; border-radius:4px;">
+                        <option value="">Select Service</option>
+                        {% for bookingService in bookingServices %}
+                            <option value="{{ bookingService.id }}">{{ bookingService.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div style="margin-bottom: 15px;">
+                    <label style="display:block; margin-bottom:5px; font-size:0.9rem;">Vehicle Model</label>
+                    <input type="text" name="form[vehicleModel]" maxlength="255" required placeholder="e.g., Yamaha NMAX / Honda Click" style="width:100%; padding:10px; background:#111; border:1px solid #333; color:#fff; border-radius:4px;">
+                </div>
+
+                <div style="margin-bottom: 15px;">
+                    <label id="modalItemLabel" style="display:block; margin-bottom:5px; font-size:0.9rem;">Select Option</label>
+                    <select id="modalItemOptions" name="form[promoOption]" required style="width:100%; padding:10px; background:#111; border:1px solid #333; color:#fff; border-radius:4px;"></select>
+                </div>
+
+                <div style="margin-bottom: 15px;">
+                    <label style="display:block; margin-bottom:5px; font-size:0.9rem;">Appointment Date</label>
+                    <input type="date" name="form[bookingDate]" required min="{{ 'now'|date('Y-m-d') }}" style="width:100%; padding:10px; background:#111; border:1px solid #333; color:#fff; color-scheme:dark; border-radius:4px;">
+                </div>
+
+                <div style="margin-bottom: 20px;">
+                    <label style="display:block; margin-bottom:5px; font-size:0.9rem;">Preferred Time Slot</label>
+                    <select name="form[bookingTime]" required style="width:100%; padding:10px; background:#111; border:1px solid #333; color:#fff; border-radius:4px;">
+                        <option value="09:00">09:00 AM - 10:30 AM</option>
+                        <option value="10:30">10:30 AM - 12:00 PM</option>
+                        <option value="13:00">01:00 PM - 02:30 PM</option>
+                        <option value="14:30">02:30 PM - 04:00 PM</option>
+                        <option value="16:00">04:00 PM - 05:30 PM</option>
+                    </select>
+                </div>
+
+                <div style="margin-bottom: 20px;">
+                    <label style="display:block; margin-bottom:5px; font-size:0.9rem;">Notes (optional)</label>
+                    <textarea name="form[notes]" rows="3" placeholder="Any special requests or instructions..." style="width:100%; padding:10px; background:#111; border:1px solid #333; color:#fff; border-radius:4px; resize:vertical;"></textarea>
+                </div>
+
+                <div style="display:flex; justify-content:flex-end; gap:10px;">
+                    <button type="button" onclick="closeClaimModal()" style="padding:10px 20px; background:#333; border:none; color:#fff; border-radius:4px; cursor:pointer;">Cancel</button>
+                    <button type="submit" id="submitClaimBtn" style="padding:10px 20px; background:#00FFFF; border:none; color:#000; font-weight:bold; border-radius:4px; cursor:pointer;">Confirm &amp; Avail</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        function openClaimModal(slug, title, itemLabel, options) {
+            if (!isLoggedIn) {
+                openModal('login-modal');
+                showModalAlert('login-modal', 'Please log in to claim a promotion bundle.', 'error');
+                return;
+            }
+
+            document.getElementById('modalBundleSlug').value = slug;
+            document.getElementById('modalBundleTitle').textContent = title;
+            document.getElementById('modalItemLabel').textContent = itemLabel;
+
+            const selectDropdown = document.getElementById('modalItemOptions');
+            selectDropdown.innerHTML = '';
+
+            if (Array.isArray(options)) {
+                options.forEach(function(option) {
+                    let opt = document.createElement('option');
+                    opt.value = option;
+                    opt.textContent = option;
+                    selectDropdown.appendChild(opt);
+                });
+            }
+
+            document.getElementById('claimModal').style.display = 'flex';
+        }
+
+        function closeClaimModal() {
+            document.getElementById('claimModal').style.display = 'none';
+        }
+
+        function showAlert(message, type) {
+            const toast = document.getElementById('alertToast');
+            toast.textContent = message;
+            toast.className = 'alert-toast ' + (type === 'success' ? 'alert-success' : 'alert-error');
+            toast.style.display = 'block';
+            setTimeout(() => { toast.style.display = 'none'; }, 4000);
+        }
+
+        function submitClaim(event) {
+            event.preventDefault();
+            const btn = document.getElementById('submitClaimBtn');
+            btn.disabled = true;
+            btn.textContent = 'Processing...';
+
+            const formData = new FormData(document.getElementById('claimForm'));
+
+            fetch('{{ path('booking_new') }}', {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                btn.disabled = false;
+                btn.textContent = 'Confirm & Avail';
+                if (data.success) {
+                    showAlert(data.message || 'Promotion successfully claimed.', 'success');
+                    closeClaimModal();
+                    setTimeout(() => { window.location.href = '{{ path('promo_history') }}'; }, 1500);
+                } else {
+                    showAlert(data.message || 'Unable to claim promotion.', 'error');
+                }
+            })
+            .catch(() => {
+                btn.disabled = false;
+                btn.textContent = 'Confirm & Avail';
+                showAlert('An unexpected network error occurred.', 'error');
+            });
+        }
+
+        window.addEventListener('click', function(event) {
+            let modal = document.getElementById('claimModal');
+            if (event.target === modal) {
+                closeClaimModal();
+            }
+        });
+    </script>
+{% endblock %}

@@ -1,0 +1,24 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Bencalo MotoWorks{% endblock %}
+
+{% block stylesheets %}
+    {{ parent() }}
+    <link rel="stylesheet" href="{{ asset('styles/index/modals.css') }}">
+{% endblock %}
+
+{% block site_header %}
+    <a class="skip-link" href="#main-content">Skip to main content</a>
+    {{ parent() }}
+{% endblock %}
+
+{% block body %}
+    <main id="main-content">
+        {% include 'storefront/_hero.html.twig' %}
+        {% include 'storefront/_featured_products.html.twig' %}
+        {% include 'storefront/_featured_services.html.twig' %}
+        {% include 'storefront/_featured_promos.html.twig' %}
+        {% include 'storefront/_get_started.html.twig' %}
+    </main>
+    {% include 'storefront/_testimonials.html.twig' %}
+{% endblock %}

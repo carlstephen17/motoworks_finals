@@ -1,0 +1,10 @@
+{% extends 'base.html.twig' %}
+{% block site_header %}{% include 'staff/_nav.html.twig' %}{% endblock %}
+{% block site_footer %}{% endblock %}
+{% block title %}Staff dashboard | Bencalo MotoWorks{% endblock %}
+{% block body %}
+<main>
+    <h1>Staff dashboard</h1>
+    {% for label, count in counts %}<article><h2>{{ label|replace({'_': ' '})|title }}</h2><p>{{ count }}</p></article>{% endfor %}
+</main>
+{% endblock %}

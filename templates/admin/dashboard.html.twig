@@ -1,0 +1,17 @@
+{% extends 'base.html.twig' %}
+
+{% block site_header %}{% endblock %}
+{% block site_footer %}{% endblock %}
+{% block title %}Admin dashboard | Bencalo MotoWorks{% endblock %}
+
+{% block body %}
+    <main>
+        <h1>Admin dashboard</h1>
+        {% include 'admin/_sidebar.html.twig' %}
+        <section>
+            {% for label, count in counts %}
+                <article><h2>{{ label|replace({'_': ' '})|title }}</h2><p>{{ count }}</p></article>
+            {% endfor %}
+        </section>
+    </main>
+{% endblock %}

@@ -1,0 +1,20 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Promotion history | Bencalo MotoWorks{% endblock %}
+
+{% block body %}
+    <main>
+        <p><a href="{{ path('promo_index') }}">Promotions</a></p>
+        <h1>Promotion booking history</h1>
+        {% for booking in bookings %}
+            <article>
+                <h2>{{ booking.bundleSlug }}</h2>
+                <p>{{ booking.bundleOption }}</p>
+                <p>{{ booking.bookingDate|date('M j, Y') }} at {{ booking.bookingTime|date('g:i A') }} — {{ booking.status }}</p>
+                <a href="{{ path('get_claim', {id: booking.id}) }}">View or edit claim</a>
+            </article>
+        {% else %}
+            <p>You have no promotion bookings.</p>
+        {% endfor %}
+    </main>
+{% endblock %}

@@ -1,0 +1,69 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Create Account - Bencalo MotoWorks{% endblock %}
+
+{% block stylesheets %}
+    {{ parent() }}
+    <link rel="stylesheet" href="{{ asset('styles/register_style.css') }}">
+{% endblock %}
+
+{% block body %}
+    <main class="container" style="display: flex; justify-content: center; align-items: center; min-height: 75vh; padding: 40px 20px;">
+        <div class="auth-card">
+            <h2 style="text-align: center; margin-bottom: 24px; color: #fff;">Create Your Account</h2>
+
+            {% for message in app.flashes('error') %}
+                <div class="error-box">
+                    <p style="color: #ff6b6b; margin: 0; font-size: 0.9rem;">{{ message }}</p>
+                </div>
+            {% endfor %}
+
+            {{ form_start(form, {'attr': {'class': 'auth-form'}}) }}
+                {{ form_errors(form) }}
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                    <div>
+                        <label for="{{ form.firstName.vars.id }}" style="display: block; margin-bottom: 4px; font-size: 0.85rem; color: #94a3b8;">First Name</label>
+                        {{ form_widget(form.firstName, {'attr': {'class': 'auth-input', 'placeholder': 'First name'}}) }}
+                        {{ form_errors(form.firstName) }}
+                    </div>
+                    <div>
+                        <label for="{{ form.lastName.vars.id }}" style="display: block; margin-bottom: 4px; font-size: 0.85rem; color: #94a3b8;">Last Name</label>
+                        {{ form_widget(form.lastName, {'attr': {'class': 'auth-input', 'placeholder': 'Last name'}}) }}
+                        {{ form_errors(form.lastName) }}
+                    </div>
+                </div>
+
+                <div>
+                    <label for="{{ form.username.vars.id }}" style="display: block; margin-bottom: 4px; font-size: 0.85rem; color: #94a3b8;">Username</label>
+                    {{ form_widget(form.username, {'attr': {'class': 'auth-input', 'placeholder': 'Choose username'}}) }}
+                    {{ form_errors(form.username) }}
+                </div>
+
+                <div>
+                    <label for="{{ form.email.vars.id }}" style="display: block; margin-bottom: 4px; font-size: 0.85rem; color: #94a3b8;">Email Address</label>
+                    {{ form_widget(form.email, {'attr': {'class': 'auth-input', 'placeholder': 'you@example.com'}}) }}
+                    {{ form_errors(form.email) }}
+                </div>
+
+                <div>
+                    <label for="{{ form.phone.vars.id }}" style="display: block; margin-bottom: 4px; font-size: 0.85rem; color: #94a3b8;">Phone Number</label>
+                    {{ form_widget(form.phone, {'attr': {'class': 'auth-input', 'placeholder': 'e.g., 09123456789'}}) }}
+                    {{ form_errors(form.phone) }}
+                </div>
+
+                <div>
+                    <label for="{{ form.plainPassword.vars.id }}" style="display: block; margin-bottom: 4px; font-size: 0.85rem; color: #94a3b8;">Password</label>
+                    {{ form_widget(form.plainPassword, {'attr': {'class': 'auth-input', 'placeholder': 'At least 8 characters'}}) }}
+                    {{ form_errors(form.plainPassword) }}
+                </div>
+
+                <button type="submit" class="btn btn-primary auth-btn" style="width: 100%; padding: 12px; font-weight: 600; cursor: pointer; margin-top: 10px;">Register Account</button>
+            {{ form_end(form) }}
+
+            <div style="text-align: center; margin-top: 20px; font-size: 0.9rem; color: #94a3b8;">
+                Already have an account? <a href="{{ path('app_login') }}" style="color: var(--color-primary, #00bcd4); text-decoration: none;">Sign in here</a>
+            </div>
+        </div>
+    </main>
+{% endblock %}

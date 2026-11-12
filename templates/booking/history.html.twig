@@ -1,0 +1,29 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Appointment history | Bencalo MotoWorks{% endblock %}
+
+{% block body %}
+    <main>
+        <p><a href="{{ path('booking_new') }}">Book a service</a></p>
+        <h1>Appointment history</h1>
+        {% for message in app.flashes('success') %}<p role="status">{{ message }}</p>{% endfor %}
+        {% for message in app.flashes('error') %}<p role="alert">{{ message }}</p>{% endfor %}
+        {% for booking in bookings %}
+            <article>
+                <h2>{{ booking.service.name }}</h2>
+                <p>{{ booking.bookingDate|date('M j, Y') }} at {{ booking.bookingTime|date('g:i A') }}</p>
+                <p>{{ booking.vehicleModel }} · {{ booking.status }}</p>
+                {% if booking.bundleSlug %}<p>Promotion: {{ booking.bundleSlug }} — {{ booking.bundleOption }}</p>{% endif %}
+                {% if booking.notes %}<p>{{ booking.notes }}</p>{% endif %}
+                {% if booking.status in ['Pending', 'Confirmed'] %}
+                    <form method="post" action="{{ path('appointment_cancel', {id: booking.id}) }}">
+                        <input type="hidden" name="_token" value="{{ csrf_token('appointment_cancel_' ~ booking.id) }}">
+                        <button type="submit">Cancel appointment</button>
+                    </form>
+                {% endif %}
+            </article>
+        {% else %}
+            <p>You have no service appointments.</p>
+        {% endfor %}
+    </main>
+{% endblock %}

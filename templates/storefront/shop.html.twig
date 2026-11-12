@@ -1,0 +1,117 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}All Products & Genuine Parts - Bencalo MotoWorks{% endblock %}
+
+{% block stylesheets %}
+    {{ parent() }}
+    <link rel="stylesheet" href="{{ asset('styles/services.css') }}">
+    <link rel="stylesheet" href="{{ asset('styles/shop.css') }}">
+    <link rel="stylesheet" href="{{ asset('styles/index/modals.css') }}">
+{% endblock %}
+
+{% block body %}
+    <main id="main-content" class="container main-content-shop">
+        <div class="section-title">
+            <h2>All Products & Genuine Parts</h2>
+        </div>
+
+        <!-- SEARCH -->
+        <div class="search-bar-container">
+            <input
+                type="text"
+                id="product-search-input"
+                class="search-input-field"
+                placeholder="Search catalog..."
+                autocomplete="off"
+            >
+        </div>
+
+        <!-- PRODUCT GRID -->
+        <div class="card-grid product-grid" id="product-grid-container">
+            {% for productEntry in products %}
+                {% set product = productEntry.product %}
+                {% set stockLevel = product.stock %}
+                <div class="product-card" data-name="{{ product.name|lower }}">
+                    <!-- IMAGE -->
+                    <div class="product-image">
+                        {% if productEntry.image %}
+                            <img src="{{ asset(productEntry.image) }}" alt="{{ product.name }}">
+                        {% else %}
+                            <i class="fa-solid fa-box-open" aria-hidden="true"></i>
+                        {% endif %}
+                    </div>
+
+                    <!-- NAME -->
+                    <h3 class="product-name">{{ product.name }}</h3>
+
+                    <!-- PRICE -->
+                    <div class="product-price">₱{{ product.price|number_format(2) }}</div>
+
+                    <!-- STOCK -->
+                    <div
+                        class="product-stock"
+                        style="font-size: 0.85rem; margin: 5px 0 10px 0; color: {{ stockLevel > 0 ? '#2e7d32' : '#c62828' }};"
+                    >
+                        {% if stockLevel > 0 %}
+                            Stock: <strong>{{ stockLevel }}</strong> available
+                        {% else %}
+                            Out of Stock
+                        {% endif %}
+                    </div>
+
+                    <!-- ACTIONS -->
+                    <div class="product-card-actions">
+                        <!-- ADD TO CART -->
+                        <button
+                            type="button"
+                            onclick='openCartModal({{ product.id }}, {{ product.name|json_encode|e('html_attr') }}, {{ product.price|json_encode|e('html_attr') }}, {{ stockLevel }}, {{ csrf_token('cart_add_' ~ product.id)|json_encode|e('html_attr') }})'
+                            class="btn btn-outline btn-block btn-cart-add"
+                            aria-label="Add to cart"
+                            {{ stockLevel <= 0 ? 'disabled style="opacity: 0.5; cursor: not-allowed;"' : '' }}
+                        >
+                            <i class="fa-solid fa-cart-plus"></i>
+                        </button>
+
+                        <!-- BUY NOW -->
+                        {% if stockLevel > 0 %}
+                            <button
+                                type="button"
+                                onclick='openBuyModal({{ product.id }}, {{ product.name|json_encode|e('html_attr') }}, {{ product.price|json_encode|e('html_attr') }}, {{ stockLevel }}, {{ csrf_token('buy_now_' ~ product.id)|json_encode|e('html_attr') }})'
+                                class="btn btn-primary btn-block"
+                            >
+                                Buy Now
+                            </button>
+                        {% else %}
+                            <button
+                                type="button"
+                                class="btn btn-secondary btn-block"
+                                disabled
+                                style="background: #ccc; cursor: not-allowed; border-color: #ccc;"
+                            >
+                                Out of Stock
+                            </button>
+                        {% endif %}
+                    </div>
+                </div>
+            {% else %}
+                <p style="grid-column: 1 / -1; text-align: center; color: var(--color-text-muted, #a0a0a0);">No products are currently available.</p>
+            {% endfor %}
+        </div>
+    </main>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const searchInput = document.getElementById('product-search-input');
+            if (searchInput) {
+                searchInput.addEventListener('input', function(e) {
+                    const query = e.target.value.toLowerCase().trim();
+                    const cards = document.querySelectorAll('#product-grid-container .product-card');
+                    cards.forEach(card => {
+                        const name = card.getAttribute('data-name') || '';
+                        card.style.display = name.includes(query) ? '' : 'none';
+                    });
+                });
+            }
+        });
+    </script>
+{% endblock %}

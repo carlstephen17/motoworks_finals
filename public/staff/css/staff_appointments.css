@@ -1,0 +1,129 @@
+.appointment-stats {
+    grid-template-columns: repeat(auto-fit, minmax(175px, 1fr));
+    margin-bottom: 24px;
+}
+
+.appointment-card-body {
+    padding: 22px;
+}
+
+.appointment-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    gap: 0 16px;
+}
+
+.appointment-full-width {
+    grid-column: 1 / -1;
+}
+
+.form-help,
+.appointment-table small,
+.optional-label {
+    color: #64748b;
+    font-size: 0.8rem;
+}
+
+.form-help {
+    display: block;
+    margin: -4px 0 16px;
+}
+
+.appointment-filter {
+    display: grid;
+    grid-template-columns: minmax(220px, 2fr) repeat(3, minmax(140px, 1fr)) auto;
+    align-items: end;
+    gap: 12px;
+    margin-bottom: 18px;
+}
+
+.appointment-filter > *,
+.appointment-grid > * {
+    min-width: 0;
+}
+
+.appointment-filter .form-group {
+    margin-bottom: 0;
+}
+
+.filter-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding-bottom: 16px;
+}
+
+.appointment-table {
+    min-width: 1150px;
+}
+
+.appointment-table td {
+    vertical-align: top;
+}
+
+.appointment-manage-cell {
+    min-width: 230px;
+}
+
+.appointment-edit-form {
+    display: grid;
+    gap: 10px;
+    min-width: 220px;
+    margin-top: 12px;
+    padding: 14px;
+    background: #f8fafc;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+}
+
+.appointment-edit-form label {
+    display: grid;
+    gap: 5px;
+    color: #475569;
+    font-size: 0.82rem;
+    font-weight: 600;
+}
+
+.rejection-reason {
+    display: block;
+    max-width: 220px;
+    margin-top: 5px;
+    white-space: normal;
+}
+
+.badge-info {
+    color: #1565c0;
+    background: #e3f2fd;
+}
+
+[hidden] {
+    display: none !important;
+}
+
+@media (max-width: 900px) {
+    .appointment-filter {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 576px) {
+    .appointment-card-body {
+        padding: 16px;
+    }
+
+    .appointment-filter {
+        grid-template-columns: 1fr;
+    }
+
+    .filter-actions {
+        padding-bottom: 0;
+    }
+
+    .appointment-filter {
+        gap: 8px;
+    }
+
+    .appointment-filter .form-control {
+        min-width: 0;
+    }
+}

@@ -1,0 +1,54 @@
+<?php
+require_once __DIR__ . '/includes/auth.php';
+$configFile = __DIR__ . 'includes/config.php';
+if (file_exists($configFile)) {
+    require_once $configFile;
+}
+?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Proper Tire Inflation Guide - Bencalo MotoWorks</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="styles/index/style.css">
+    <link rel="stylesheet" href="styles/index/layout.css">
+    <link rel="stylesheet" href="styles/index/components.css">
+    <link rel="stylesheet" href="styles/index/modals.css">
+    <style>
+        body { background-color: var(--color-bg, #121212); color: var(--color-text, #ffffff); font-family: 'Poppins', sans-serif; }
+        .guide-hero { background: linear-gradient(135deg, #181818 0%, #222222 100%); padding: 60px 20px; text-align: center; border-radius: 12px; margin-bottom: 40px; border: 1px solid var(--color-border, #2a2a2a); }
+        .guide-hero h1 { font-size: 2.3rem; font-weight: 800; color: var(--color-border); margin-bottom: 10px; }
+        .guide-content { background: var(--color-card-bg, #1e1e1e); padding: 40px; border-radius: 12px; border: 1px solid var(--color-border, #2a2a2a); margin-bottom: 60px; line-height: 1.8; }
+        .guide-content h3 { color: var(--color-border); margin-top: 25px; margin-bottom: 10px; font-size: 1.3rem; }
+        .guide-content p { color: var(--color-text-muted, #b0b0b0); margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+    <?php require_once 'components/header.php'; ?>
+    <main class="container" style="padding-top: 40px;">
+        <div class="guide-hero">
+            <h1>Proper Tire Inflation Guide</h1>
+            <p>Enhance safety, optimize handling, and maximize tire longevity.</p>
+        </div>
+        <div class="guide-content">
+            <p>Maintaining correct tire pressure is one of the easiest yet most critical aspects of vehicle ownership.</p>
+            
+            <h3>1. Enhanced Road Safety</h3>
+            <p>Properly inflated tires provide optimal braking performance, predictable cornering grip, and reduced risk of sudden tread separation or blowouts.</p>
+
+            <h3>2. Better Fuel Economy</h3>
+            <p>Under-inflated tires create excessive rolling resistance, forcing your engine to burn extra fuel to maintain speed. Correct PSI keeps your vehicle rolling efficiently.</p>
+
+            <h3>3. Balanced Tread Wear</h3>
+            <p>Over-inflation wears out the center tread prematurely, while under-inflation ruins the outer shoulders. Correct inflation ensures even contact patches across the road.</p>
+
+            <h3>4. When to Check</h3>
+            <p>Always inspect your tire pressure at least once a month and before long trips using the manufacturer's recommended PSI specified on the driver's side door placard.</p>
+        </div>
+    </main>
+    <?php require_once 'components/footer.php'; require_once 'components/modals.php'; ?>
+</body>
+</html>

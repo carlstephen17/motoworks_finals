@@ -1,25 +1,33 @@
+  services:
+    webdev-mysql:
+      image: mysql:8.0
+      container_name: bencalo_motoworks_finals_mysql
+      restart: unless-stopped
+      environment:
+        MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+        MYSQL_DATABASE: ${MYSQL_DATABASE}
+        MYSQL_USER: ${MYSQL_USER}
+        MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      ports:
+        - "3311:3306"
+      volumes:
+        - bencalo_motoworks_finals_db_data:/var/lib/mysql
+      networks:
+        - bencalo_motoworks_finals_network
 
-services:
-###> doctrine/doctrine-bundle ###
-  database:
-    image: postgres:${POSTGRES_VERSION:-16}-alpine
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB:-app}
-      # You should definitely change the password in production
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-!ChangeMe!}
-      POSTGRES_USER: ${POSTGRES_USER:-app}
-    healthcheck:
-      test: ["CMD", "pg_isready", "-d", "${POSTGRES_DB:-app}", "-U", "${POSTGRES_USER:-app}"]
-      timeout: 5s
-      retries: 5
-      start_period: 60s
-    volumes:
-      - database_data:/var/lib/postgresql/data:rw
-      # You may use a bind-mounted host directory instead, so that it is harder to accidentally remove the volume and lose all your data!
-      # - ./docker/db/data:/var/lib/postgresql/data:rw
-###< doctrine/doctrine-bundle ###
+    webdev-phpmyadmin:
+      image: phpmyadmin
+      container_name: bencalo_motoworks_finals_phpmyadmin
+      restart: unless-stopped
+      environment:
+        PMA_HOST: bencalo_motoworks_finals_mysql
+      ports:
+        - "8084:80"
+      networks:
+        - bencalo_motoworks_finals_network
 
-volumes:
-###> doctrine/doctrine-bundle ###
-  database_data:
-###< doctrine/doctrine-bundle ###
+  volumes:
+    bencalo_motoworks_finals_db_data:
+
+  networks:
+    bencalo_motoworks_finals_network:

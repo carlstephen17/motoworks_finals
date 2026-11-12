@@ -1,10 +1,25 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
     <head>
         <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
         <title>{% block title %}Welcome!{% endblock %}</title>
         <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 128 128%22><text y=%221.2em%22 font-size=%2296%22>⚫️</text><text y=%221.3em%22 x=%220.2em%22 font-size=%2276%22 fill=%22%23fff%22>sf</text></svg>">
+        <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
         {% block stylesheets %}
+            <link rel="stylesheet" href="{{ asset('styles/index/style.css') }}">
+            <link rel="stylesheet" href="{{ asset('styles/index/layout.css') }}">
+            <link rel="stylesheet" href="{{ asset('styles/index/components.css') }}">
+            <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+            {% if app.request.pathinfo starts with '/admin' %}
+                <link rel="stylesheet" href="{{ asset('admin/css/admin_layout.css') }}">
+                <link rel="stylesheet" href="{{ asset('admin/css/admin_products.css') }}">
+            {% elseif app.request.pathinfo starts with '/staff' %}
+                <link rel="stylesheet" href="{{ asset('staff/css/staff_layout.css') }}">
+                <link rel="stylesheet" href="{{ asset('staff/css/staff_dashboard.css') }}">
+                <link rel="stylesheet" href="{{ asset('staff/css/staff_tables.css') }}">
+                <link rel="stylesheet" href="{{ asset('staff/css/staff_forms.css') }}">
+            {% endif %}
         {% endblock %}
 
         {% block javascripts %}
@@ -19,6 +34,340 @@
         {% endif %}
     </head>
     <body>
+        {% block site_header %}{% include 'shared/_header.html.twig' %}{% endblock %}
         {% block body %}{% endblock %}
+        {% block site_footer %}{% include 'shared/_footer.html.twig' %}{% endblock %}
+        {% block modals %}{% include 'shared/_modals.html.twig' %}{% endblock %}
+        <script>
+            let isLoggedIn = {{ app.user ? 'true' : 'false' }};
+
+            function openModal(modalId) {
+                const modal = document.getElementById(modalId);
+                if (!modal) return;
+                modal.style.display = 'flex';
+                modal.classList.add('active');
+            }
+
+            function closeModal(modalId) {
+                const modal = document.getElementById(modalId);
+                if (!modal) return;
+                modal.style.display = 'none';
+                modal.classList.remove('active');
+                const alertBox = document.getElementById(modalId + '-alert');
+                if (alertBox) {
+                    alertBox.className = 'modal-alert';
+                    alertBox.textContent = '';
+                }
+            }
+
+            function switchModal(fromId, toId) {
+                closeModal(fromId);
+                openModal(toId);
+            }
+
+            function showModalAlert(modalId, message, type = 'error') {
+                const alertBox = document.getElementById(modalId + '-alert');
+                if (!alertBox) return;
+                alertBox.textContent = message;
+                alertBox.className = 'modal-alert ' + type;
+            }
+
+            function togglePasswordVisibility(fieldId, button) {
+                const field = document.getElementById(fieldId);
+                const icon = button.querySelector('i');
+                if (!field || !icon) return;
+                const visible = field.type === 'password';
+                field.type = visible ? 'text' : 'password';
+                icon.classList.toggle('fa-eye', !visible);
+                icon.classList.toggle('fa-eye-slash', visible);
+            }
+
+            function toggleUserDropdownMenu() {
+                document.getElementById('userMenuDropdown')?.classList.toggle('show');
+            }
+
+            function openServiceBookingModal(serviceId, serviceName) {
+                if (!isLoggedIn) {
+                    openModal('login-modal');
+                    showModalAlert('login-modal', 'Please log in to book a service appointment.', 'error');
+                    return;
+                }
+
+                const form = document.getElementById('ajax-service-booking-form');
+                if (!form) return;
+                form.reset();
+                form.dataset.submitting = 'false';
+                form.style.display = '';
+                document.getElementById('booking-confirmation-panel').style.display = 'none';
+                document.getElementById('booking-service-id').value = serviceId;
+                document.getElementById('booking-service-name').textContent = serviceName || 'Selected service';
+                openModal('service-booking-modal');
+            }
+
+            function openCartModal(productId, productName, productPrice, stockLimit, csrfToken) {
+                if (!isLoggedIn) {
+                    openModal('login-modal');
+                    showModalAlert('login-modal', 'Please log in to add items to your cart.', 'error');
+                    return;
+                }
+
+                const form = document.getElementById('ajax-cart-form');
+                if (!form) return;
+                form.action = form.dataset.actionTemplate.replace(/\/0$/, '/' + productId);
+                form.dataset.submitting = 'false';
+                document.getElementById('cart-product-id').value = productId;
+                document.getElementById('cart-csrf-token').value = csrfToken;
+                document.getElementById('cart-product-name').textContent = productName;
+                document.getElementById('cart-product-price').textContent = '₱' + (parseFloat(productPrice) || 0).toFixed(2);
+                const quantity = document.getElementById('cart-quantity');
+                quantity.value = '1';
+                quantity.min = '1';
+                quantity.max = stockLimit;
+                quantity.dataset.maxStock = stockLimit;
+                const warning = document.getElementById('cart-stock-warning');
+                warning.style.display = 'none';
+                warning.textContent = '';
+                openModal('cart-modal');
+            }
+
+            function openBuyModal(productId, productName, productPrice, stockLimit, csrfToken) {
+                if (!isLoggedIn) {
+                    openModal('login-modal');
+                    showModalAlert('login-modal', 'Please log in to make a purchase.', 'error');
+                    return;
+                }
+
+                const form = document.getElementById('ajax-buy-form');
+                if (!form) return;
+                form.action = form.dataset.actionTemplate.replace(/\/0$/, '/' + productId);
+                form.dataset.submitting = 'false';
+                form.style.display = '';
+                document.getElementById('buy-product-id').value = productId;
+                document.getElementById('buy-csrf-token').value = csrfToken;
+                document.getElementById('buy-product-name').textContent = productName;
+                document.getElementById('buy-product-price').textContent = '₱' + (parseFloat(productPrice) || 0).toFixed(2);
+                const quantity = document.getElementById('buy-quantity');
+                quantity.value = '1';
+                quantity.min = '1';
+                quantity.max = stockLimit;
+                quantity.dataset.maxStock = stockLimit;
+                document.getElementById('buy-address').value = '';
+                document.getElementById('buy-payment-method').selectedIndex = 0;
+                document.getElementById('order-confirmation-panel').style.display = 'none';
+                document.getElementById('buy-modal-product-summary').style.display = '';
+                const warning = document.getElementById('buy-stock-warning');
+                warning.style.display = 'none';
+                warning.textContent = '';
+                openModal('buy-modal');
+            }
+
+            async function submitModalForm(event, form, modalId, onSuccess) {
+                event.preventDefault();
+                if (form.dataset.submitting === 'true') return;
+                form.dataset.submitting = 'true';
+                const submitButton = form.querySelector('button[type="submit"]');
+                const originalLabel = submitButton ? submitButton.textContent : '';
+                if (submitButton) {
+                    submitButton.disabled = true;
+                    submitButton.textContent = modalId === 'cart-modal' ? 'Adding...' : 'Processing...';
+                }
+
+                try {
+                    const response = await fetch(form.action, {
+                        method: 'POST',
+                        body: new FormData(form),
+                        headers: {'X-Requested-With': 'XMLHttpRequest'},
+                    });
+                    const data = await response.json();
+                    if (!response.ok || !data.success) {
+                        showModalAlert(modalId, data.message || 'The request could not be completed.', 'error');
+                        return;
+                    }
+                    onSuccess(data);
+                } catch (error) {
+                    showModalAlert(modalId, 'Unable to contact the server. Please try again.', 'error');
+                } finally {
+                    form.dataset.submitting = 'false';
+                    if (submitButton) {
+                        submitButton.disabled = false;
+                        submitButton.textContent = originalLabel;
+                    }
+                }
+            }
+
+            async function submitPageModalForm(event, form, modalId) {
+                event.preventDefault();
+                if (form.dataset.submitting === 'true') return;
+                form.dataset.submitting = 'true';
+                const submitButton = form.querySelector('button[type="submit"]');
+                const originalLabel = submitButton ? submitButton.textContent : '';
+                if (submitButton) {
+                    submitButton.disabled = true;
+                    submitButton.textContent = 'Please wait...';
+                }
+
+                try {
+                    const response = await fetch(form.action, {
+                        method: 'POST',
+                        body: new FormData(form),
+                        headers: {'X-Requested-With': 'XMLHttpRequest'},
+                    });
+                    const html = await response.text();
+                    const resultPage = new DOMParser().parseFromString(html, 'text/html');
+                    const finalPath = new URL(response.url).pathname;
+                    const alertText = resultPage.querySelector('[role="alert"]')?.textContent.trim();
+                    const validationMessages = Array.from(resultPage.querySelectorAll('form ul li, form .form-error-message'))
+                        .map((message) => message.textContent.trim())
+                        .filter(Boolean);
+                    const errorMessage = alertText || validationMessages.join(' ');
+
+                    if (modalId === 'login-modal') {
+                        if (!response.ok || finalPath === new URL(form.action).pathname) {
+                            showModalAlert(modalId, errorMessage || 'Invalid username or password.', 'error');
+                        } else {
+                            window.location.assign(response.url);
+                            return;
+                        }
+                    } else if (modalId === 'register-modal') {
+                        if (!response.ok || finalPath === new URL(form.action).pathname) {
+                            showModalAlert(modalId, errorMessage || 'Check the registration details and try again.', 'error');
+                        } else {
+                            window.location.assign(response.url);
+                            return;
+                        }
+                    } else if (modalId === 'forgot-modal') {
+                        if (!response.ok) {
+                            showModalAlert(modalId, alertText || 'Unable to request a password reset.', 'error');
+                        } else {
+                            showModalAlert(modalId, alertText || 'If that email exists, reset instructions have been sent.', 'success');
+                        }
+                    }
+                } catch (error) {
+                    showModalAlert(modalId, 'Unable to contact the server. Please try again.', 'error');
+                } finally {
+                    form.dataset.submitting = 'false';
+                    if (submitButton) {
+                        submitButton.disabled = false;
+                        submitButton.textContent = originalLabel;
+                    }
+                }
+            }
+
+            function validateStockLimit(inputId, warningId, formId) {
+                const input = document.getElementById(inputId);
+                const warning = document.getElementById(warningId);
+                const button = document.querySelector('#' + formId + ' button[type="submit"]');
+                const maximum = parseInt(input.dataset.maxStock, 10) || 0;
+                const quantity = parseInt(input.value, 10) || 0;
+                if (maximum > 0 && quantity > maximum) {
+                    warning.textContent = 'Requested quantity exceeds available stock (' + maximum + ' left).';
+                    warning.style.display = 'block';
+                    if (button) button.disabled = true;
+                } else {
+                    warning.textContent = '';
+                    warning.style.display = 'none';
+                    if (button) button.disabled = false;
+                }
+            }
+
+            document.addEventListener('DOMContentLoaded', () => {
+                const navToggle = document.getElementById('nav-toggle-btn');
+                const mainNav = document.getElementById('main-nav');
+                if (navToggle && mainNav) {
+                    navToggle.addEventListener('click', () => {
+                        const isOpen = navToggle.classList.toggle('open');
+                        mainNav.classList.toggle('open', isOpen);
+                        mainNav.classList.toggle('active', isOpen);
+                        navToggle.setAttribute('aria-expanded', String(isOpen));
+                    });
+                    mainNav.querySelectorAll('a').forEach((link) => {
+                        link.addEventListener('click', () => {
+                            navToggle.classList.remove('open');
+                            mainNav.classList.remove('open', 'active');
+                            navToggle.setAttribute('aria-expanded', 'false');
+                        });
+                    });
+                }
+
+                const currentPage = window.location.pathname.split('/').pop() || 'index.php';
+                document.querySelectorAll('.main-nav a').forEach((link) => {
+                    const linkPage = new URL(link.href, window.location.origin).pathname.split('/').pop();
+                    link.classList.toggle('active', linkPage === currentPage || (currentPage === 'index.php' && linkPage === ''));
+                });
+
+                if (new URLSearchParams(window.location.search).get('admin_login') === '1') {
+                    openModal('login-modal');
+                    window.history.replaceState({}, document.title, window.location.pathname);
+                }
+
+                document.addEventListener('keydown', (event) => {
+                    if (event.key === 'Escape') {
+                        const activeModal = document.querySelector('.modal-overlay.active, .auth-modal.active');
+                        if (activeModal) closeModal(activeModal.id);
+                    }
+                });
+                document.querySelectorAll('.modal-overlay, .auth-modal').forEach((modal) => {
+                    modal.addEventListener('click', (event) => {
+                        if (event.target === modal) closeModal(modal.id);
+                    });
+                });
+                document.addEventListener('click', (event) => {
+                    if (!event.target.closest('#nav-user-dropdown')) {
+                        document.getElementById('userMenuDropdown')?.classList.remove('show');
+                    }
+                });
+
+                const loginForm = document.getElementById('ajax-login-form');
+                const registerForm = document.getElementById('ajax-register-form');
+                const forgotForm = document.getElementById('ajax-forgot-form');
+                if (loginForm) loginForm.addEventListener('submit', (event) => submitPageModalForm(event, loginForm, 'login-modal'));
+                if (registerForm) registerForm.addEventListener('submit', (event) => submitPageModalForm(event, registerForm, 'register-modal'));
+                if (forgotForm) forgotForm.addEventListener('submit', (event) => submitPageModalForm(event, forgotForm, 'forgot-modal'));
+
+                const cartForm = document.getElementById('ajax-cart-form');
+                const buyForm = document.getElementById('ajax-buy-form');
+                const bookingForm = document.getElementById('ajax-service-booking-form');
+                if (bookingForm) {
+                    bookingForm.addEventListener('submit', (event) => submitModalForm(event, bookingForm, 'service-booking-modal', (data) => {
+                        document.getElementById('booking-confirmation-customer').textContent = data.customer_name || '';
+                        document.getElementById('booking-confirmation-service').textContent = data.service_name || '';
+                        document.getElementById('booking-confirmation-vehicle').textContent = data.vehicle || '';
+                        document.getElementById('booking-confirmation-schedule').textContent = [data.booking_date, data.booking_time].filter(Boolean).join(' / ');
+                        document.getElementById('booking-confirmation-phone').textContent = data.phone || '';
+                        document.getElementById('booking-confirmation-notes').textContent = data.notes || 'None';
+                        document.getElementById('booking-confirmation-reference').textContent = data.booking_reference || data.booking_id || 'Pending';
+                        bookingForm.style.display = 'none';
+                        document.getElementById('booking-confirmation-panel').style.display = 'block';
+                    }));
+                }
+                if (cartForm) {
+                    cartForm.addEventListener('submit', (event) => submitModalForm(event, cartForm, 'cart-modal', (data) => {
+                        showModalAlert('cart-modal', data.message || 'Product added to cart successfully!', 'success');
+                        const badge = document.getElementById('cart-count-badge');
+                        if (badge && data.cart_count !== undefined) badge.textContent = data.cart_count;
+                        window.setTimeout(() => {
+                            closeModal('cart-modal');
+                            cartForm.reset();
+                        }, 1000);
+                    }));
+                    document.getElementById('cart-quantity').addEventListener('input', () => validateStockLimit('cart-quantity', 'cart-stock-warning', 'ajax-cart-form'));
+                }
+                if (buyForm) {
+                    buyForm.addEventListener('submit', (event) => submitModalForm(event, buyForm, 'buy-modal', (data) => {
+                        const items = (data.items || []).map((item) => item.name + ' (x' + item.quantity + ')').join(', ');
+                        document.getElementById('order-confirmation-customer').textContent = data.customer_name || '';
+                        document.getElementById('order-confirmation-item').textContent = items;
+                        document.getElementById('order-confirmation-phone').textContent = data.phone || '';
+                        document.getElementById('order-confirmation-address').textContent = data.address || '';
+                        document.getElementById('order-confirmation-payment').textContent = data.payment_method || '';
+                        document.getElementById('order-confirmation-reference').textContent = data.payment_reference || '';
+                        document.getElementById('buy-modal-alert').style.display = 'none';
+                        buyForm.style.display = 'none';
+                        document.getElementById('order-confirmation-panel').style.display = 'block';
+                    }));
+                    document.getElementById('buy-quantity').addEventListener('input', () => validateStockLimit('buy-quantity', 'buy-stock-warning', 'ajax-buy-form'));
+                }
+            });
+        </script>
     </body>
 </html>

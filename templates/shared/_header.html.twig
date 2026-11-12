@@ -1,0 +1,73 @@
+<header class="site-header">
+    <div class="container header-inner">
+        <a class="logo" href="{{ path('app_home') }}" aria-label="Bencalo MotoWorks home">
+            <img class="logo-img" src="{{ asset('images/header/Bencalo MotoWorks Logo.svg') }}" alt="Bencalo MotoWorks">
+        </a>
+        <nav class="main-nav" id="main-nav" aria-label="Main navigation">
+            <ul>
+                <li><a href="{{ path('app_home') }}">Home</a></li>
+                <li><a href="{{ path('shop_index') }}">Shop</a></li>
+                <li><a href="{{ path('service_index') }}">Services</a></li>
+                <li><a href="{{ path('promo_index') }}">Promos</a></li>
+                <li><a href="{{ path('page_about') }}">About Us</a></li>
+                <li><a href="{{ path('page_contact') }}">Contact</a></li>
+            </ul>
+        </nav>
+        <div class="header-cta-group">
+            <a class="header-cart-link cart-link-icon" href="{{ path('cart_index') }}" aria-label="View shopping cart" style="position: relative;">
+                <i class="fa-solid fa-cart-shopping" aria-hidden="true"></i>
+                {% set cartTotal = 0 %}
+                {% if app.session and app.session.get('cart') is iterable %}
+                    {% for qty in app.session.get('cart') %}
+                        {% set cartTotal = cartTotal + qty %}
+                    {% endfor %}
+                {% endif %}
+                <span class="cart-count-badge" id="cart-count-badge" style="{{ cartTotal > 0 ? '' : 'display: none;' }}">{{ cartTotal }}</span>
+            </a>
+            {% if app.user %}
+                <a class="btn btn-primary" href="{{ path('service_index') }}">Book Appointment</a>
+                {% if is_granted('ROLE_ADMIN') %}
+                    <a class="btn btn-primary" href="{{ path('admin_dashboard') }}">Dashboard</a>
+                {% elseif is_granted('ROLE_STAFF') %}
+                    <a class="btn btn-primary" href="{{ path('staff_dashboard') }}">Staff Dashboard</a>
+                {% endif %}
+                <div id="nav-user-dropdown" class="user-dropdown">
+                    <button class="btn-signup-header user-dropdown-toggle" type="button" onclick="toggleUserDropdownMenu()">
+                        Hello, {{ app.user.firstName|default('User') }} <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
+                    </button>
+                    <div class="user-menu" id="userMenuDropdown">
+                        <a href="{{ path('customer_profile') }}"><i class="fa-solid fa-user" aria-hidden="true"></i> My Profile</a>
+                        <a href="{{ path('appointment_history') }}"><i class="fa-solid fa-calendar-check" aria-hidden="true"></i> Appointments</a>
+                        <a href="{{ path('order_history') }}"><i class="fa-solid fa-box" aria-hidden="true"></i> Order History</a>
+                        <a href="{{ path('promo_history') }}"><i class="fa-solid fa-ticket" aria-hidden="true"></i> Promo History</a>
+                        <form method="post" action="{{ path('app_logout') }}">
+                            <input type="hidden" name="_csrf_token" value="{{ csrf_token('logout') }}">
+                            <button type="submit" class="logout-link" style="border: 0; background: none; cursor: pointer; font: inherit;"><i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i> Log Out</button>
+                        </form>
+                    </div>
+                </div>
+            {% else %}
+                <a class="btn btn-primary" href="{{ path('service_index') }}">Book Appointment</a>
+                {% if app.request.attributes.get('_route') in ['app_home', 'shop_index'] %}
+                    <button type="button" onclick="openModal('login-modal')" class="btn-login-header" style="background:none; border:none; cursor:pointer;">Log In</button>
+                    <button type="button" onclick="openModal('register-modal')" class="btn-signup-header" style="cursor:pointer;">Sign Up</button>
+                {% else %}
+                    <a class="btn-login-header" href="{{ path('app_login') }}">Log In</a>
+                    <a class="btn-signup-header" href="{{ path('app_register') }}">Sign Up</a>
+                {% endif %}
+            {% endif %}
+        </div>
+        <button
+            type="button"
+            class="nav-toggle"
+            id="nav-toggle-btn"
+            aria-label="Toggle navigation"
+            aria-expanded="false"
+            aria-controls="main-nav"
+        >
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+    </div>
+</header>

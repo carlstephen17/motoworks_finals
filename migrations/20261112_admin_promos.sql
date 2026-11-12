@@ -1,0 +1,53 @@
+-- Separate editable promo offers from customer promo_claim history.
+CREATE TABLE IF NOT EXISTS `promo` (
+  `promoId` INT(11) NOT NULL AUTO_INCREMENT,
+  `promoSlug` VARCHAR(100) NOT NULL,
+  `promoTitle` VARCHAR(255) NOT NULL,
+  `promoBadge` VARCHAR(50) NOT NULL,
+  `promoDescription` TEXT NOT NULL,
+  `promoItemLabel` VARCHAR(255) NOT NULL,
+  `promoItemOptions` TEXT NOT NULL,
+  `promoPerks` TEXT DEFAULT NULL,
+  `promoProductImage` VARCHAR(255) DEFAULT NULL,
+  `promoServiceImage` VARCHAR(255) DEFAULT NULL,
+  `promoProductIcon` VARCHAR(100) DEFAULT NULL,
+  `promoServiceIcon` VARCHAR(100) DEFAULT NULL,
+  `promoActive` TINYINT(1) NOT NULL DEFAULT 1,
+  `promoCreatedAt` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`promoId`),
+  UNIQUE KEY `uq_promo_slug` (`promoSlug`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+INSERT IGNORE INTO `promo`
+  (`promoId`, `promoSlug`, `promoTitle`, `promoBadge`, `promoDescription`, `promoItemLabel`,
+   `promoItemOptions`, `promoPerks`, `promoProductImage`, `promoServiceImage`,
+   `promoProductIcon`, `promoServiceIcon`, `promoActive`)
+VALUES
+  (1, 'tire_service', 'Tire + Mounting Service Bundle', '15% OFF',
+   'Purchase any eligible motorcycle tire and pair it with a professional mounting, balancing, and alignment service at the same time.',
+   'Select Tire Model / Size',
+   'Michelin Pilot Street 2 (90/80-14 Tubeless)\nPirelli Diablo Rosso Sport (100/80-14 Tubeless)\nIRC NR73 Tubeless Tire (80/90-17)',
+   'Eligible on all standard and tubeless tires\nIncludes labor and wheel balancing adjustment',
+   'images/featured_products/tire.webp', 'images/featured_services/wheel_and_tire_service.png',
+   'fa-solid fa-circle-dot', 'fa-solid fa-screwdriver-wrench', 1),
+  (2, 'oil_tuneup', 'Synthetic Oil Change + Tune-Up', '20% OFF',
+   'Keep your engine running smoothly with high-grade synthetic oil paired with a complete carb/FI diagnostic tune-up service.',
+   'Select Oil Viscosity & Type',
+   'Motul 7100 4T 10W-40 Synthetic (1L)\nShell Advance Ultra 10W-40 Fully Synthetic (1L)\nCastrol Power1 Ultimate 10W-50 (1L)',
+   'Includes 1L high-performance synthetic oil\nFull engine diagnostic & idle tuning',
+   'images/featured_products/synthetic_oil.png', 'images/featured_services/premium_oil_and_change_service.png',
+   'fa-solid fa-oil-can', 'fa-solid fa-gauge-high', 1),
+  (3, 'chain_sprocket', 'Heavy Duty Chain Kit + Install', '10% OFF',
+   'Upgrade your drive train with a heavy-duty chain and sprocket set bundled together with precision professional installation.',
+   'Select Chain & Sprocket Set',
+   'SSS Heavy Duty Chain & Sprocket Set (428H x 14T/38T)\nDID O-Ring Heavy Duty Chain Combo (520V)\nRK Racing Gold Chain & Steel Sprocket Kit',
+   'O-ring or X-ring heavy duty durability\nIncludes chain cleaning and tension adjustment',
+   'images/products/chain.png', 'images/services/chain.png',
+   'fa-solid fa-link', 'fa-solid fa-gear', 1),
+  (4, 'brake_overhaul', 'Brake Pad Set + Fluid Bleeding', '15% OFF',
+   'Ensure maximum stopping power by bundling front/rear ceramic brake pads with a complete hydraulic fluid flush and bleed service.',
+   'Select Brake Pad Compound',
+   'Brembo Ceramic Front/Rear Brake Pads\nEBC FA Series Sintered Brake Pads\nBendix Heavy Duty Street Moto Pads',
+   'High-friction ceramic compound pads\nComplete DOT-4 brake fluid replacement',
+   'images/products/brake.png', 'images/services/brake.png',
+   'fa-solid fa-compact-disc', 'fa-solid fa-droplet', 1);

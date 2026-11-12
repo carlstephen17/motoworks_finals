@@ -1,0 +1,29 @@
+{% extends 'base.html.twig' %}
+{% block site_header %}{% include 'staff/_nav.html.twig' %}{% endblock %}
+{% block title %}Service records | Staff{% endblock %}
+{% block body %}
+<main>
+    <h1>Service records</h1>
+    {% for message in app.flashes('success') %}<p role="status">{{ message }}</p>{% endfor %}
+    {% for message in app.flashes('error') %}<p role="alert">{{ message }}</p>{% endfor %}
+    <p><a href="{{ path('staff_service_record_new') }}">Create service record</a></p>
+    {% for record in records %}
+        <article>
+            <h2>{{ record.customer.firstName }} {{ record.customer.lastName }} — {{ record.service.name }}</h2>
+            <p>{{ record.motorcycleModel }} · {{ record.serviceDate|date('M j, Y') }}</p>
+            <p>{{ record.workDescription }}</p><p>{{ record.status }}</p>
+            {% if is_granted('ROLE_ADMIN') or record.createdByStaff.id == app.user.id %}
+                <a href="{{ path('staff_service_record_edit', {id: record.id}) }}">Edit record details</a>
+            {% endif %}
+            <form method="post" action="{{ path('staff_service_record_update', {id: record.id}) }}">
+                <input type="hidden" name="_token" value="{{ csrf_token('staff_service_record_' ~ record.id) }}">
+                <select name="status">{% for status in ['In Progress','On Hold','Completed','Cancelled'] %}<option {{ record.status == status ? 'selected' : '' }}>{{ status }}</option>{% endfor %}</select>
+                <button>Update</button>
+            </form>
+            {% if is_granted('ROLE_ADMIN') or record.createdByStaff.id == app.user.id %}
+                <form method="post" action="{{ path('staff_service_record_delete', {id: record.id}) }}"><input type="hidden" name="_token" value="{{ csrf_token('staff_service_record_delete_' ~ record.id) }}"><button>Delete</button></form>
+            {% endif %}
+        </article>
+    {% else %}<p>No service records.</p>{% endfor %}
+</main>
+{% endblock %}

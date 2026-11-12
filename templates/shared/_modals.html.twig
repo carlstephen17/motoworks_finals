@@ -1,0 +1,271 @@
+{% if registrationForm is defined and forgotPasswordForm is defined %}
+    <div id="login-modal" class="auth-modal" style="display: none;">
+        <div class="auth-modal-content">
+            <button type="button" class="auth-modal-close" onclick="closeModal('login-modal')">&times;</button>
+            <h2 class="modal-heading-lg">Log In</h2>
+            <div id="login-modal-alert" class="modal-alert"></div>
+            <form id="ajax-login-form" class="auth-form" action="{{ path('app_login') }}" method="post">
+                <input type="hidden" name="_csrf_token" value="{{ csrf_token('authenticate') }}">
+                <input type="text" name="username" placeholder="Username or Email" required autocomplete="username" class="auth-input auth-input-padded">
+                <div class="password-container mb-sm">
+                    <input type="password" id="login-password" name="password" placeholder="Password" required autocomplete="current-password" class="auth-input auth-input-padded-r">
+                    <button type="button" class="toggle-password" onclick="togglePasswordVisibility('login-password', this)">
+                        <i class="fa-solid fa-eye"></i>
+                    </button>
+                </div>
+                <div class="auth-options">
+                    <label class="checkbox-label">
+                        <input type="checkbox" name="_remember_me">
+                        Remember Me
+                    </label>
+                    <a href="#" onclick="switchModal('login-modal', 'forgot-modal'); return false;" class="auth-link auth-link-primary">Forgot Password?</a>
+                </div>
+                <button type="submit" class="btn btn-primary btn-block auth-btn btn-full-width">Log In</button>
+            </form>
+            <p class="auth-modal-footer">
+                Don't have an account?
+                <a href="#" onclick="switchModal('login-modal', 'register-modal'); return false;" class="auth-link">Register</a>
+            </p>
+        </div>
+    </div>
+
+    <div id="register-modal" class="auth-modal" style="display: none;">
+        <div class="auth-modal-content">
+            <button type="button" class="auth-modal-close" onclick="closeModal('register-modal')">&times;</button>
+            <h2 class="modal-heading-lg">Create Account</h2>
+            <div id="register-modal-alert" class="modal-alert"></div>
+            {{ form_start(registrationForm, {action: path('app_register'), attr: {id: 'ajax-register-form', class: 'auth-form'}}) }}
+                {{ form_widget(registrationForm.username, {attr: {placeholder: 'Username', autocomplete: 'username', class: 'auth-input auth-input-mb'}}) }}
+                <div class="form-row-2col">
+                    {{ form_widget(registrationForm.firstName, {attr: {placeholder: 'First Name', class: 'auth-input auth-input-half'}}) }}
+                    {{ form_widget(registrationForm.lastName, {attr: {placeholder: 'Last Name', class: 'auth-input auth-input-half'}}) }}
+                </div>
+                {{ form_widget(registrationForm.email, {attr: {placeholder: 'Email Address', autocomplete: 'email', class: 'auth-input auth-input-mb'}}) }}
+                {{ form_widget(registrationForm.phone, {attr: {placeholder: 'Phone Number', autocomplete: 'tel', class: 'auth-input auth-input-mb'}}) }}
+                <div class="password-container mb-md">
+                    {{ form_widget(registrationForm.plainPassword.first, {attr: {id: 'register-password', placeholder: 'Password', autocomplete: 'new-password', class: 'auth-input auth-input-padded-r'}}) }}
+                    <button type="button" class="toggle-password" onclick="togglePasswordVisibility('{{ registrationForm.plainPassword.first.vars.id }}', this)">
+                        <i class="fa-solid fa-eye"></i>
+                    </button>
+                </div>
+                {{ form_widget(registrationForm.plainPassword.second, {attr: {placeholder: 'Confirm Password', autocomplete: 'new-password', class: 'auth-input auth-input-mb'}}) }}
+                <button type="submit" class="btn btn-primary btn-block auth-btn btn-full-width">Sign Up</button>
+            {{ form_end(registrationForm) }}
+            <p class="auth-modal-footer">
+                Already have an account?
+                <a href="#" onclick="switchModal('register-modal', 'login-modal'); return false;" class="auth-link">Log In</a>
+            </p>
+        </div>
+    </div>
+
+    <div id="forgot-modal" class="auth-modal" style="display: none;">
+        <div class="auth-modal-content">
+            <button type="button" class="auth-modal-close" onclick="closeModal('forgot-modal')">&times;</button>
+            <h2 class="modal-heading">Reset Password</h2>
+            <p class="modal-subtitle">Enter your email address to receive password reset instructions.</p>
+            <div id="forgot-modal-alert" class="modal-alert"></div>
+            {{ form_start(forgotPasswordForm, {action: path('password_forgot'), attr: {id: 'ajax-forgot-form', class: 'auth-form'}}) }}
+                {{ form_widget(forgotPasswordForm.email, {attr: {placeholder: 'Enter your email address', class: 'auth-input auth-input-padded'}}) }}
+                <button type="submit" class="btn btn-primary btn-block auth-btn btn-full-width">Send Reset Link</button>
+            {{ form_end(forgotPasswordForm) }}
+            <p class="auth-modal-footer">
+                <a href="#" onclick="switchModal('forgot-modal', 'login-modal'); return false;" class="auth-link">Back to Log In</a>
+            </p>
+        </div>
+    </div>
+
+    <div id="service-booking-modal" class="auth-modal" style="display: none;">
+        <div class="auth-modal-content" style="max-width: 550px;">
+            <span class="auth-close-btn" onclick="closeModal('service-booking-modal')">&times;</span>
+            <div class="auth-modal-header">
+                <h2>Book Service Appointment</h2>
+                <p>Schedule your vehicle maintenance with Bencalo MotoWorks</p>
+            </div>
+            <div id="service-booking-modal-alert" class="modal-alert"></div>
+            <form id="ajax-service-booking-form" action="{{ path('booking_new') }}" method="post">
+                <input type="hidden" name="form[_token]" value="{{ csrf_token('form') }}">
+                <input type="hidden" id="booking-service-id" name="form[serviceId]">
+                <div style="background: rgba(255,255,255,0.05); padding: 12px 15px; border-radius: 6px; margin-bottom: 20px; border: 1px solid rgba(255,255,255,0.1);">
+                    <span style="font-size: 12px; color: var(--text-muted); display: block; text-transform: uppercase; letter-spacing: 0.5px;">Selected Service</span>
+                    <span id="booking-service-name" style="font-size: 16px; font-weight: 600; color: var(--primary-accent);">Select a service</span>
+                </div>
+                <div style="font-size: 14px; font-weight: 600; color: var(--text-main); margin-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 6px;">1. Personal Information</div>
+                <div class="auth-form-group">
+                    <label for="booking-fullname">Full Name</label>
+                    <div class="auth-input-wrapper">
+                        <i class="fa-solid fa-user"></i>
+                        <input type="text" id="booking-fullname" placeholder="Enter your full name" value="{{ app.user ? app.user.firstName ~ ' ' ~ app.user.lastName : '' }}" readonly required>
+                    </div>
+                </div>
+                <div class="auth-form-group">
+                    <label for="booking-contact">Contact Number</label>
+                    <div class="auth-input-wrapper">
+                        <i class="fa-solid fa-phone"></i>
+                        <input type="tel" id="booking-contact" placeholder="e.g., 09123456789" value="{{ app.user ? app.user.phone|default('') : '' }}" readonly required>
+                    </div>
+                </div>
+                <div style="font-size: 14px; font-weight: 600; color: var(--text-main); margin: 20px 0 12px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 6px;">2. Vehicle Details</div>
+                <div class="auth-form-group">
+                    <label for="booking-vehicle">Vehicle Model / Type</label>
+                    <div class="auth-input-wrapper">
+                        <i class="fa-solid fa-motorcycle"></i>
+                        <input type="text" id="booking-vehicle" name="form[vehicleModel]" placeholder="e.g., Yamaha NMAX / Honda Click" required>
+                    </div>
+                </div>
+                <div style="font-size: 14px; font-weight: 600; color: var(--text-main); margin: 20px 0 12px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 6px;">3. Schedule Preference</div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                    <div class="auth-form-group">
+                        <label for="booking-date">Preferred Date</label>
+                        <div class="auth-input-wrapper">
+                            <i class="fa-solid fa-calendar-days"></i>
+                            <input type="date" id="booking-date" name="form[bookingDate]" required min="{{ 'now'|date('Y-m-d') }}">
+                        </div>
+                    </div>
+                    <div class="auth-form-group">
+                        <label for="booking-time">Preferred Time Slot</label>
+                        <div class="auth-input-wrapper">
+                            <i class="fa-solid fa-clock"></i>
+                            <select id="booking-time" name="form[bookingTime]" required style="width: 100%; background: transparent; border: none; color: inherit; outline: none; padding-left: 35px; font-family: inherit; font-size: 14px;">
+                                <option value="" disabled selected style="background: #1e1e1e; color: #fff;">Select time slot</option>
+                                <option value="09:00" style="background: #1e1e1e; color: #fff;">09:00 AM - 10:30 AM</option>
+                                <option value="10:30" style="background: #1e1e1e; color: #fff;">10:30 AM - 12:00 PM</option>
+                                <option value="13:00" style="background: #1e1e1e; color: #fff;">01:00 PM - 02:30 PM</option>
+                                <option value="14:30" style="background: #1e1e1e; color: #fff;">02:30 PM - 04:00 PM</option>
+                                <option value="16:00" style="background: #1e1e1e; color: #fff;">04:00 PM - 05:30 PM</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="auth-form-group" style="margin-top: 15px;">
+                    <label for="booking-notes">Additional Notes / Special Requests (Optional)</label>
+                    <textarea id="booking-notes" name="form[notes]" placeholder="Describe any specific issues or custom requests..." style="width: 100%; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; padding: 10px; color: inherit; font-family: inherit; font-size: 14px; resize: vertical; min-height: 80px;"></textarea>
+                </div>
+                <button type="submit" class="auth-submit-btn" style="width: 100%; margin-top: 10px;">Confirm Service Appointment</button>
+            </form>
+            <div id="booking-confirmation-panel" style="display: none; text-align: center; padding: 12px 4px 4px;">
+                <div style="font-size: 3rem; color: #2ed573;"><i class="fa-solid fa-circle-check"></i></div>
+                <h3 style="margin: 12px 0 8px;">Booking Confirmed</h3>
+                <p style="color: var(--text-muted, #aaa); margin-bottom: 18px;">Your booking has been recorded. Keep this reference number for your appointment.</p>
+                <div class="confirmation-detail-list">
+                    <div><span>Customer</span><strong id="booking-confirmation-customer"></strong></div>
+                    <div><span>Service</span><strong id="booking-confirmation-service"></strong></div>
+                    <div><span>Vehicle</span><strong id="booking-confirmation-vehicle"></strong></div>
+                    <div><span>Date &amp; time</span><strong id="booking-confirmation-schedule"></strong></div>
+                    <div><span>Phone</span><strong id="booking-confirmation-phone"></strong></div>
+                    <div><span>Notes</span><strong id="booking-confirmation-notes"></strong></div>
+                </div>
+                <div style="padding: 14px; border: 1px dashed #2ed573; border-radius: 6px; background: rgba(46, 213, 115, 0.08);">
+                    <span style="display: block; color: #9ae6b4; font-size: 12px; text-transform: uppercase;">Booking Reference</span>
+                    <strong id="booking-confirmation-reference" style="display: block; margin-top: 5px; font-size: 1.15rem; letter-spacing: 1px;"></strong>
+                </div>
+                <div style="display: flex; gap: 10px; justify-content: center; margin-top: 20px; flex-wrap: wrap;">
+                    <a href="{{ path('appointment_history') }}" class="btn btn-primary" style="text-decoration: none;"><i class="fa-solid fa-calendar-check"></i> View bookings</a>
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('service-booking-modal')">Done</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="cart-modal" class="auth-modal" style="display: none;">
+        <div class="auth-modal-content">
+            <button type="button" class="auth-modal-close" onclick="closeModal('cart-modal')">&times;</button>
+            <h3>Add to Cart</h3>
+            <div id="cart-modal-alert" class="modal-alert"></div>
+            <form id="ajax-cart-form" class="auth-form" method="post" data-action-template="{{ path('cart_add', {id: 0}) }}">
+                <input type="hidden" name="action" value="add">
+                <input type="hidden" id="cart-product-id" name="product_id">
+                <input type="hidden" id="cart-csrf-token" name="_token">
+                <div class="modal-product-info" style="margin-bottom: 15px;">
+                    <p><strong id="cart-product-name">Product Name</strong></p>
+                    <p id="cart-product-price" style="color: #2e7d32; font-weight: 600;">₱0.00</p>
+                </div>
+                <div class="form-group" style="margin-bottom: 15px;">
+                    <label for="cart-quantity">Quantity:</label>
+                    <input type="number" id="cart-quantity" name="quantity" class="form-control" value="1" min="1" step="1" required>
+                    <small id="cart-stock-warning" style="color: #c62828; display: none; margin-top: 5px;"></small>
+                </div>
+                <button type="submit" class="btn btn-primary btn-block">Add to Cart</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="buy-modal" class="auth-modal" style="display: none;">
+        <div class="auth-modal-content modal-sm">
+            <button type="button" class="auth-modal-close" onclick="closeModal('buy-modal')">&times;</button>
+            <h2 class="modal-heading">Complete Your Order</h2>
+            <div id="buy-modal-alert" class="modal-alert"></div>
+            <div id="buy-modal-product-summary" class="product-summary-box" style="margin-bottom: 15px;">
+                <div class="buy-product-name" id="buy-product-name">Product Name</div>
+                <div class="buy-product-price" id="buy-product-price">₱0.00</div>
+            </div>
+            <form
+                id="ajax-buy-form"
+                class="auth-form"
+                method="post"
+                data-action-template="{{ path('checkout_buy_now', {id: 0}) }}"
+            >
+                <input type="hidden" name="_token" id="buy-csrf-token">
+                <input type="hidden" name="product_id" id="buy-product-id">
+                <input type="hidden" name="checkout_type" value="buy_now">
+                <div class="form-group">
+                    <label for="buy-quantity">Quantity</label>
+                    <input type="number" id="buy-quantity" name="quantity" min="1" value="1" required>
+                    <div id="buy-stock-warning" class="stock-warning" style="display: none;"></div>
+                </div>
+                <div class="form-group">
+                    <label>Full Name &amp; Phone Number</label>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                        <input type="text" name="full_name" id="buy-full-name" placeholder="Full Name" value="{{ app.user ? app.user.firstName ~ ' ' ~ app.user.lastName : '' }}" readonly required>
+                        <input
+                            type="tel"
+                            name="phone"
+                            id="buy-phone"
+                            placeholder="Phone Number"
+                            inputmode="numeric"
+                            pattern="09[0-9]{9}"
+                            minlength="11"
+                            maxlength="11"
+                            title="Enter an 11-digit Philippine mobile number starting with 09"
+                            style="background: var(--color-bg-alt, #1e272e); color: var(--color-text, #fff); border: 1px solid var(--color-primary, #00d2d3);"
+                            value="{{ app.user ? app.user.phone|default('') : '' }}"
+                            required
+                        >
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="buy-address">Shipping Address</label>
+                    <textarea id="buy-address" name="address" rows="3" placeholder="Shipping Address" required></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="buy-payment-method">Payment Method:</label>
+                    <select id="buy-payment-method" name="payment_method" required style="width: 100%; padding: 10px; background: var(--color-bg-alt, #1e272e); border: 1px solid var(--color-primary, #00d2d3); color: var(--color-text, #fff); border-radius: 4px;">
+                        <option value="Cash on Delivery">Cash on Delivery (COD)</option>
+                        <option value="GCash">GCash</option>
+                        <option value="Card">Credit/Debit Card</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-primary btn-block">Place Order</button>
+            </form>
+            <div id="order-confirmation-panel" style="display: none; text-align: center; padding: 12px 4px 4px;">
+                <div style="font-size: 3rem; color: #2ed573;"><i class="fa-solid fa-circle-check"></i></div>
+                <h3 style="margin: 12px 0 8px;">Order Confirmed</h3>
+                <p style="color: var(--color-text-muted, #aaa); margin-bottom: 18px;">Your order was recorded. Keep this reference number for your receipt.</p>
+                <div class="confirmation-detail-list">
+                    <div><span>Customer</span><strong id="order-confirmation-customer"></strong></div>
+                    <div><span>Order</span><strong id="order-confirmation-item"></strong></div>
+                    <div><span>Phone</span><strong id="order-confirmation-phone"></strong></div>
+                    <div><span>Address</span><strong id="order-confirmation-address"></strong></div>
+                    <div><span>Payment method</span><strong id="order-confirmation-payment"></strong></div>
+                </div>
+                <div style="padding: 14px; border: 1px dashed #2ed573; border-radius: 6px; background: rgba(46, 213, 115, 0.08);">
+                    <span style="display: block; color: #9ae6b4; font-size: 12px; text-transform: uppercase;">Order Reference</span>
+                    <strong id="order-confirmation-reference" style="display: block; margin-top: 5px; font-size: 1.15rem; letter-spacing: 1px;"></strong>
+                </div>
+                <div style="display: flex; gap: 10px; justify-content: center; margin-top: 20px; flex-wrap: wrap;">
+                    <a href="{{ path('order_history') }}" class="btn btn-primary" style="text-decoration: none;"><i class="fa-solid fa-receipt"></i> View order history</a>
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('buy-modal')">Done</button>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endif %}

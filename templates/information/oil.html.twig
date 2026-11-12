@@ -1,0 +1,65 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Importance of Oil Changes - Bencalo MotoWorks{% endblock %}
+
+{% block stylesheets %}
+    {{ parent() }}
+    <style>
+        .guide-hero {
+            background: linear-gradient(135deg, #181818 0%, #222222 100%);
+            padding: 60px 20px;
+            text-align: center;
+            border-radius: 12px;
+            margin-bottom: 40px;
+            border: 1px solid var(--color-border, #2a2a2a);
+        }
+        .guide-hero h1 {
+            font-size: 2.3rem;
+            font-weight: 800;
+            color: var(--color-border, #00bcd4);
+            margin-bottom: 10px;
+        }
+        .guide-content {
+            background: var(--color-card-bg, #1e1e1e);
+            padding: 40px;
+            border-radius: 12px;
+            border: 1px solid var(--color-border, #2a2a2a);
+            margin-bottom: 60px;
+            line-height: 1.8;
+        }
+        .guide-content h3 {
+            color: var(--color-border, #00bcd4);
+            margin-top: 25px;
+            margin-bottom: 10px;
+            font-size: 1.3rem;
+        }
+        .guide-content p {
+            color: var(--color-text-muted, #b0b0b0);
+            margin-bottom: 20px;
+        }
+    </style>
+{% endblock %}
+
+{% block body %}
+    <main class="container" style="padding-top: 40px;">
+        <div class="guide-hero">
+            <h1>Importance of Regular Oil Changes</h1>
+            <p>Protect your engine, improve fuel economy, and extend vehicle lifespan.</p>
+        </div>
+        <div class="guide-content">
+            <p>Engine oil is the lifeblood of your vehicle. Over time, heat, friction, and debris break down engine oil, reducing its ability to lubricate vital components.</p>
+
+            <h3>1. Reduces Friction and Wear</h3>
+            <p>Clean oil forms a protective film between moving metal parts, preventing internal components from grinding against each other and causing catastrophic engine wear.</p>
+
+            <h3>2. Keeps Engine Cool</h3>
+            <p>Friction within an engine generates massive amounts of heat. Fresh oil circulates properly to disperse heat away from combustion chambers and tight tolerances.</p>
+
+            <h3>3. Improves Fuel Efficiency</h3>
+            <p>Old, sludgy oil increases engine drag, forcing your engine to work harder and burn more fuel. Fresh oil keeps performance smooth and maximizes kilometers per liter.</p>
+
+            <h3>4. Removes Engine Debris</h3>
+            <p>As oil flows through your engine, it collects dirt, carbon particles, and metal shavings, trapping them safely in the oil filter for clean circulation.</p>
+        </div>
+    </main>
+{% endblock %}

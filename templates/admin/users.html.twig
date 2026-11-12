@@ -1,0 +1,19 @@
+{% extends 'base.html.twig' %}
+{% block site_header %}{% include 'admin/_sidebar.html.twig' %}{% endblock %}
+{% block title %}Users | Admin{% endblock %}
+{% block body %}
+<main>
+    <h1>Users</h1>
+    {% for message in app.flashes('success') %}<p role="status">{{ message }}</p>{% endfor %}
+    {% for message in app.flashes('error') %}<p role="alert">{{ message }}</p>{% endfor %}
+    <p><a href="{{ path('admin_user_new') }}">Create user</a></p>
+    <table><thead><tr><th>Name</th><th>Username</th><th>Email</th><th>Role</th><th>Actions</th></tr></thead><tbody>
+    {% for user in users %}
+        <tr><td>{{ user.firstName }} {{ user.lastName }}</td><td>{{ user.username }}</td><td>{{ user.email }}</td><td>{{ user.role }}</td><td>
+            <a href="{{ path('admin_user_edit', {id: user.id}) }}">Edit</a>
+            <form method="post" action="{{ path('admin_user_delete', {id: user.id}) }}"><input type="hidden" name="_token" value="{{ csrf_token('admin_user_delete_' ~ user.id) }}"><button type="submit">Delete</button></form>
+        </td></tr>
+    {% else %}<tr><td colspan="5">No users.</td></tr>{% endfor %}
+    </tbody></table>
+</main>
+{% endblock %}

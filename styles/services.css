@@ -1,0 +1,599 @@
+/* ==========================================================
+   BENCALO MOTOWORKS - UNIFIED STYLESHEET
+   ========================================================== */
+
+/* Toast Notifications */
+.toast-container {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.toast {
+  min-width: 280px;
+  padding: 14px 18px;
+  border-radius: 6px;
+  color: #fff;
+  font-weight: 600;
+  font-size: 0.9rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  animation: slideIn 0.3s ease-out forwards;
+}
+
+.toast.success {
+  background-color: #2ed573;
+}
+
+.toast.error {
+  background-color: #ff4757;
+}
+
+.toast.info {
+  background-color: #1e90ff;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* Header & Cart Elements */
+.header-cta-group {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.cart-link-icon {
+  position: relative;
+  color: var(--color-text, #fff);
+  font-size: 1.2rem;
+  margin-right: 10px;
+  text-decoration: none;
+}
+
+.cart-badge {
+  position: absolute;
+  top: -8px;
+  right: -10px;
+  background: #ff4757;
+  color: white;
+  font-size: 0.7rem;
+  padding: 2px 6px;
+  border-radius: 50%;
+  font-weight: 700;
+}
+
+/* User Dropdown Menu */
+.user-dropdown {
+  position: relative;
+  display: inline-block;
+}
+
+.user-dropdown-btn {
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  color: inherit;
+}
+
+.user-dropdown-icon {
+  font-size: 0.75rem;
+}
+
+.user-menu {
+  display: none;
+  position: absolute;
+  right: 0;
+  top: 100%;
+  background: #1e272e;
+  border: 1px solid #333;
+  border-radius: 6px;
+  min-width: 160px;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+  z-index: 100;
+}
+
+.user-menu a {
+  display: block;
+  padding: 10px 15px;
+  color: #fff;
+  text-decoration: none;
+  font-size: 0.85rem;
+}
+
+.user-menu a:hover {
+  background: #2c3e50;
+}
+
+.user-menu a.logout-link {
+  color: #ff6b6b;
+}
+
+.user-dropdown:hover .user-menu {
+  display: block;
+}
+
+/* Main Content & Search */
+.main-content-shop,
+.main-content-services {
+  padding-top: 100px;
+  padding-bottom: 60px;
+}
+
+.search-bar-container {
+  margin-bottom: 25px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.search-input-field {
+  padding: 10px 16px;
+  width: 100%;
+  max-width: 320px;
+  border-radius: 20px;
+  border: 1px solid var(--color-primary, #00d2d3);
+  background: var(--color-bg-alt, #1e272e);
+  color: #fff;
+  outline: none;
+}
+
+/* Grid & Card Layouts */
+.products-grid,
+.services-grid,
+.service-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 24px;
+  align-items: stretch;
+}
+
+.product-card,
+.service-card {
+  background: #15181c;
+  border: 1px solid #2b2f38;
+  border-radius: var(--radius-sm, 12px);
+  padding: 20px;
+  min-height: 380px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  box-sizing: border-box;
+  transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.product-card:hover,
+.service-card:hover {
+  border-color: #00FFFF;
+  transform: translateY(-4px);
+}
+
+.product-image,
+.product-card-image-container,
+.service-card-image-container,
+.service-card .service-icon {
+  width: 100%;
+  height: 160px;
+  overflow: hidden;
+  border-radius: var(--radius-sm, 6px);
+  margin-bottom: 15px;
+  background: #121212;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.product-image img,
+.product-card-image-container img,
+.service-card-image-container img,
+.service-card .service-icon img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.product-card-info,
+.service-card-info,
+.service-info-content {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+}
+
+.product-name,
+.service-card .service-name {
+  font-size: 1rem;
+  color: #fff;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.product-description,
+.service-card .service-desc {
+  font-size: 0.85rem;
+  color: #9aa0a6;
+  margin-bottom: 15px;
+  line-height: 1.4;
+}
+
+.product-price {
+  color: var(--color-text);
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin-bottom: 12px;
+}
+
+.service-action-wrapper {
+  margin-top: auto;
+  width: 100%;
+}
+
+/* Action Buttons (Equal 50/50 Split Side-by-Side) */
+.product-card-actions {
+  display: flex !important;
+  gap: 10px !important;
+  margin-top: auto !important;
+  width: 100% !important;
+  align-items: center !important;
+}
+
+/* Cart Button: Outline Only */
+.product-card-actions .btn-cart-add,
+.product-card-actions a.btn-cart-add,
+.product-card-actions button.btn-cart-add {
+  background: transparent !important;
+  color: #fff !important;
+  border: 1px solid #ffffff !important;
+  border-radius: 50px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  height: 42px !important;
+  flex: 1 1 0% !important;
+  min-width: 0 !important;
+  box-sizing: border-box !important;
+  cursor: pointer !important;
+  padding: 0 !important;
+  transition: all 0.2s ease !important;
+}
+
+.product-card-actions .btn-cart-add i,
+.product-card-actions a.btn-cart-add i,
+.product-card-actions button.btn-cart-add i {
+  color: inherit !important;
+  font-size: 1rem !important;
+  transition: color 0.2s ease !important;
+}
+
+.product-card-actions .btn-cart-add:hover,
+.product-card-actions a.btn-cart-add:hover,
+.product-card-actions button.btn-cart-add:hover {
+  background: transparent !important;
+  border-color: #00b4d8 !important;
+  color: #00b4d8 !important;
+}
+
+.product-card-actions .btn-cart-add:hover i,
+.product-card-actions a.btn-cart-add:hover i,
+.product-card-actions button.btn-cart-add:hover i {
+  color: #00b4d8 !important;
+}
+
+/* Book / Buy Now Button */
+.product-card-actions .btn-book-appointment,
+.product-card-actions .btn-buy-now,
+.service-action-wrapper .btn {
+  background: #08234e !important;
+  color: #f3f4e4 !important;
+  border: 1px solid #08234e !important;
+  border-radius: 50px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  height: 42px !important;
+  flex: 1 1 0% !important;
+  min-width: 0 !important;
+  box-sizing: border-box !important;
+  font-weight: 600 !important;
+  font-size: 0.9rem !important;
+  text-decoration: none !important;
+  cursor: pointer !important;
+  padding: 0 16px !important;
+  transition: all 0.2s ease !important;
+  width: 100%;
+}
+
+.product-card-actions .btn-book-appointment:hover,
+.product-card-actions .btn-buy-now:hover,
+.service-action-wrapper .btn:hover {
+  background: #00b4d8 !important;
+  color: #121212 !important;
+  border-color: #00b4d8 !important;
+}
+
+/* Modal Form Styles */
+.auth-modal-content.buy-modal-width {
+  max-width: 480px;
+}
+
+.modal-header-title {
+  margin-bottom: 16px;
+  text-align: center;
+}
+
+.modal-header-title-lg {
+  margin-bottom: 24px;
+  text-align: center;
+}
+
+.buy-product-summary {
+  background: var(--color-bg-alt, #1e272e);
+  padding: 12px;
+  border-radius: 6px;
+  margin-bottom: 16px;
+  font-size: 0.9rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.buy-product-name {
+  font-weight: 600;
+}
+
+.buy-product-price {
+  color: var(--color-primary, #00d2d3);
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin-top: 4px;
+}
+
+.form-row {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.auth-input {
+  width: 100%;
+  padding: 10px;
+  background: var(--color-bg-alt, #1e272e);
+  border: 1px solid var(--color-primary, #00d2d3);
+  color: var(--color-text, #fff);
+  border-radius: var(--radius-sm, 6px);
+  outline: none;
+}
+
+.auth-input.half-width {
+  width: 50%;
+}
+
+.auth-input.full-width-padded {
+  padding: 12px;
+  margin-bottom: 16px;
+}
+
+.auth-input.full-width-mb {
+  margin-bottom: 12px;
+}
+
+.auth-textarea {
+  width: 100%;
+  padding: 10px;
+  margin-bottom: 12px;
+  background: var(--color-bg-alt, #1e272e);
+  border: 1px solid var(--color-primary, #00d2d3);
+  color: var(--color-text, #fff);
+  border-radius: var(--radius-sm, 6px);
+  resize: vertical;
+  min-height: 60px;
+  outline: none;
+}
+
+.form-group-mb {
+  margin-bottom: 16px;
+}
+
+.form-label-subtle {
+  display: block;
+  font-size: 0.85rem;
+  margin-bottom: 6px;
+  color: #aaa;
+}
+
+.btn-full-width {
+  width: 100%;
+}
+
+.password-container {
+  position: relative;
+  width: 100%;
+  margin-bottom: 12px;
+}
+
+.password-container.mb-lg {
+  margin-bottom: 16px;
+}
+
+.password-input-padded {
+  padding: 12px 40px 12px 12px;
+}
+
+.password-input-padded-sm {
+  padding: 10px 40px 10px 10px;
+}
+
+.toggle-password {
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  color: var(--color-text-muted, #aaa);
+  cursor: pointer;
+}
+
+.auth-options {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  font-size: 0.85rem;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.auth-modal-footer-text {
+  text-align: center;
+  margin-top: 15px;
+}
+
+main .auth-submit-btn,
+.auth-modal-content .auth-submit-btn {
+  background: #08234e !important;
+  color: #f3f4e4 !important;
+  font-weight: 600;
+  padding: 12px;
+  border: 1px solid #08234e !important;
+  border-radius: var(--radius-sm, 6px);
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-block;
+  text-align: center;
+  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+main .auth-submit-btn:hover,
+.auth-modal-content .auth-submit-btn:hover {
+  background: #00b4d8 !important;
+  color: #121212 !important;
+  border-color: #00b4d8 !important;
+}
+
+.modal-description {
+  font-size: 0.85rem;
+  text-align: center;
+  margin-bottom: 20px;
+  color: var(--color-text-muted, #aaa);
+}
+
+/* Service Booking Modal Styles */
+#service-booking-modal .auth-modal-content {
+  background: var(--color-bg-alt, #1e272e);
+  color: var(--color-text, #fff);
+  border: 1px solid #333;
+  border-radius: var(--radius-sm, 6px);
+  padding: 30px;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+  max-height: 90vh;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #08234e var(--color-bg-alt, #1e272e);
+}
+
+#service-booking-modal .auth-modal-content::-webkit-scrollbar {
+  width: 8px;
+}
+
+#service-booking-modal .auth-modal-content::-webkit-scrollbar-track {
+  background: var(--color-bg-alt, #1e272e);
+  border-radius: var(--radius-sm, 6px);
+}
+
+#service-booking-modal .auth-modal-content::-webkit-scrollbar-thumb {
+  background: #08234e;
+  border-radius: var(--radius-sm, 6px);
+}
+
+#service-booking-modal .auth-modal-header h2 {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--color-text, #fff);
+  margin-bottom: 5px;
+}
+
+#service-booking-modal .auth-modal-header p {
+  font-size: 14px;
+  color: var(--color-text-muted, #aaa);
+  margin-bottom: 20px;
+}
+
+#service-booking-modal .auth-form-group {
+  margin-bottom: 15px;
+}
+
+#service-booking-modal .auth-form-group label {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text, #fff);
+  margin-bottom: 6px;
+}
+
+#service-booking-modal .auth-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  background: var(--color-bg-alt, #1e272e);
+  border: 1px solid var(--color-primary, #00d2d3);
+  border-radius: var(--radius-sm, 6px);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+#service-booking-modal .auth-input-wrapper:focus-within {
+  border-color: var(--color-primary, #00d2d3);
+  box-shadow: 0 0 0 2px rgba(0, 210, 211, 0.15);
+}
+
+#service-booking-modal .auth-input-wrapper i {
+  position: absolute;
+  left: 14px;
+  color: var(--color-text-muted, #aaa);
+  font-size: 14px;
+  pointer-events: none;
+}
+
+#service-booking-modal .auth-input-wrapper input,
+#service-booking-modal .auth-input-wrapper select {
+  width: 100%;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--color-text, #fff);
+  padding: 12px 14px 12px 40px;
+  font-family: inherit;
+  font-size: 14px;
+}
+
+#service-booking-modal .auth-input-wrapper input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+  cursor: pointer;
+}
+
+#service-booking-modal select option {
+  background-color: var(--color-bg-alt, #1e272e);
+  color: var(--color-text, #fff);
+}
+
+#service-booking-modal textarea::placeholder,
+#service-booking-modal input::placeholder {
+  color: var(--color-text-muted, #aaa);
+}
