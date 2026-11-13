@@ -106,6 +106,16 @@ class ServiceBooking
         return $this->vehicleModel;
     }
 
+    public function getMotorcycle(): ?Motorcycle
+    {
+        return $this->motorcycle;
+    }
+
+    public function setMotorcycle(?Motorcycle $motorcycle): void
+    {
+        $this->motorcycle = $motorcycle;
+    }
+
     public function setVehicleModel(?string $vehicleModel): void
     {
         $this->vehicleModel = $vehicleModel;
@@ -158,16 +168,26 @@ class ServiceBooking
 
     public function setSource(string $source): void
     {
-        if (!in_array($source, ['customer_online', 'staff'], true)) {
+        if (!in_array($source, ['customer_online', 'staff', 'admin'], true)) {
             throw new \InvalidArgumentException('Unsupported booking source.');
         }
 
         $this->source = $source;
     }
 
+    public function getSource(): string
+    {
+        return $this->source;
+    }
+
     public function setCreatedByStaff(User $staff): void
     {
         $this->createdByStaff = $staff;
+    }
+
+    public function getCreatedByStaff(): ?User
+    {
+        return $this->createdByStaff;
     }
 
     public function getNotes(): ?string

@@ -6,6 +6,7 @@ use App\Entity\Service;
 use App\Validator\ImageFile;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\CheckboxType;
+use Symfony\Component\Form\Extension\Core\Type\ChoiceType;
 use Symfony\Component\Form\Extension\Core\Type\FileType;
 use Symfony\Component\Form\Extension\Core\Type\TextareaType;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
@@ -33,8 +34,10 @@ class ServiceType extends AbstractType
                 'required' => false,
                 'constraints' => [new File(maxSize: '5M'), new ImageFile()],
             ])
-            ->add('status', TextType::class, ['required' => false, 'constraints' => [new Length(max: 50)]])
-            ->add('active', CheckboxType::class, ['required' => false])
+            ->add('active', ChoiceType::class, [
+                'label' => 'Status',
+                'choices' => ['Active' => true, 'Inactive' => false],
+            ])
             ->add('featured', CheckboxType::class, ['required' => false]);
     }
 

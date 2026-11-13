@@ -18,6 +18,9 @@ use Symfony\Component\Mailer\MailerInterface;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
+use Symfony\Component\Validator\Constraints\Email;
+use Symfony\Component\Validator\Constraints\Length;
+use Symfony\Component\Validator\Constraints\NotBlank;
 
 class PasswordResetController extends AbstractController
 {
@@ -33,14 +36,17 @@ class PasswordResetController extends AbstractController
         MailerInterface $mailer,
     ): Response {
         $form = $this->createFormBuilder()
-            ->add('email', EmailType::class, ['label' => 'Email address'])
+            ->add('email', EmailType::class, [
+                'label' => 'Email address',
+                'constraints' => [new NotBlank(), new Email(), new Length(max: 100)],
+            ])
             ->add('submit', SubmitType::class, ['label' => 'Send reset link'])
             ->getForm();
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
             $email = strtolower(trim((string) $form->get('email')->getData()));
-            $user = $users->findOneBy(['email' => $email]);
+            $user = $users->findByEmailInsensitive($email);
             if ($user) {
                 $token = bin2hex(random_bytes(32));
                 $user->setResetToken(hash('sha256', $token));

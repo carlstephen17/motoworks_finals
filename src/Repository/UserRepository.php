@@ -24,4 +24,13 @@ class UserRepository extends ServiceEntityRepository
             ->getQuery()
             ->getOneOrNullResult();
     }
+
+    public function findByEmailInsensitive(string $email): ?User
+    {
+        return $this->createQueryBuilder('user')
+            ->andWhere('LOWER(user.email) = :email')
+            ->setParameter('email', strtolower($email))
+            ->getQuery()
+            ->getOneOrNullResult();
+    }
 }

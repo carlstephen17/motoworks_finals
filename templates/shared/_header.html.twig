@@ -19,7 +19,7 @@
                 {% set cartTotal = 0 %}
                 {% if app.session and app.session.get('cart') is iterable %}
                     {% for qty in app.session.get('cart') %}
-                        {% set cartTotal = cartTotal + qty %}
+                        {% set cartTotal = cartTotal + (qty is iterable ? qty.quantity|default(0) : qty) %}
                     {% endfor %}
                 {% endif %}
                 <span class="cart-count-badge" id="cart-count-badge" style="{{ cartTotal > 0 ? '' : 'display: none;' }}">{{ cartTotal }}</span>

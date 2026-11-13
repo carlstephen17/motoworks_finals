@@ -3,17 +3,112 @@
 {% block title %}Users | Admin{% endblock %}
 {% block body %}
 <main>
-    <h1>Users</h1>
+    <h1>Users &amp; Customers Management</h1>
     {% for message in app.flashes('success') %}<p role="status">{{ message }}</p>{% endfor %}
     {% for message in app.flashes('error') %}<p role="alert">{{ message }}</p>{% endfor %}
     <p><a href="{{ path('admin_user_new') }}">Create user</a></p>
-    <table><thead><tr><th>Name</th><th>Username</th><th>Email</th><th>Role</th><th>Actions</th></tr></thead><tbody>
-    {% for user in users %}
-        <tr><td>{{ user.firstName }} {{ user.lastName }}</td><td>{{ user.username }}</td><td>{{ user.email }}</td><td>{{ user.role }}</td><td>
-            <a href="{{ path('admin_user_edit', {id: user.id}) }}">Edit</a>
-            <form method="post" action="{{ path('admin_user_delete', {id: user.id}) }}"><input type="hidden" name="_token" value="{{ csrf_token('admin_user_delete_' ~ user.id) }}"><button type="submit">Delete</button></form>
-        </td></tr>
-    {% else %}<tr><td colspan="5">No users.</td></tr>{% endfor %}
-    </tbody></table>
+
+    <section aria-label="Filter users">
+        <label for="userSearch">Search username, name, email, or phone</label>
+        <input id="userSearch" type="search">
+        <label for="userRole">Role</label>
+        <select id="userRole">
+            <option value="">All roles</option>
+            <option value="admin">Admin</option>
+            <option value="staff">Staff</option>
+            <option value="customer">Customer</option>
+        </select>
+    </section>
+
+    <div class="table-responsive">
+        <table>
+            <thead>
+                <tr><th>ID</th><th>Username</th><th>Name</th><th>Email</th><th>Phone</th><th>Role</th><th>Joined date</th><th>Actions</th></tr>
+            </thead>
+            <tbody id="userRows">
+            {% for user in users %}
+                {% set userDetails = {
+                    id: user.id,
+                    firstName: user.firstName,
+                    lastName: user.lastName,
+                    username: user.username,
+                    email: user.email,
+                    phone: user.phone,
+                    role: user.role,
+                    createdAt: user.createdAt|date('Y-m-d H:i')
+                } %}
+                <tr class="user-row" data-role="{{ user.role }}" data-search="{{ [user.username, user.firstName, user.lastName, user.email, user.phone]|join(' ')|lower|e('html_attr') }}">
+                    <td>{{ user.id }}</td>
+                    <td>{{ user.username }}</td>
+                    <td>{{ user.firstName }} {{ user.lastName }}</td>
+                    <td>{{ user.email }}</td>
+                    <td>{{ user.phone|default('N/A') }}</td>
+                    <td>{{ user.role|capitalize }}</td>
+                    <td>{{ user.createdAt|date('Y-m-d H:i') }}</td>
+                    <td>
+                        <button type="button" class="view-user" data-user="{{ userDetails|json_encode|e('html_attr') }}">View</button>
+                        <a href="{{ path('admin_user_edit', {id: user.id}) }}">Edit</a>
+                        <form method="post" action="{{ path('admin_user_delete', {id: user.id}) }}">
+                            <input type="hidden" name="_token" value="{{ csrf_token('admin_user_delete_' ~ user.id) }}">
+                            <button type="submit">Delete</button>
+                        </form>
+                    </td>
+                </tr>
+            {% else %}
+                <tr><td colspan="8">No users found.</td></tr>
+            {% endfor %}
+                <tr id="noFilteredUsers" hidden><td colspan="8">No users match these filters.</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <dialog id="userDetails">
+        <h2>User Profile Details</h2>
+        <dl>
+            <dt>User ID</dt><dd data-detail="id"></dd>
+            <dt>First name</dt><dd data-detail="firstName"></dd>
+            <dt>Last name</dt><dd data-detail="lastName"></dd>
+            <dt>Username</dt><dd data-detail="username"></dd>
+            <dt>Email</dt><dd data-detail="email"></dd>
+            <dt>Phone</dt><dd data-detail="phone"></dd>
+            <dt>Role</dt><dd data-detail="role"></dd>
+            <dt>Joined date</dt><dd data-detail="createdAt"></dd>
+        </dl>
+        <button type="button" id="closeUserDetails">Close</button>
+    </dialog>
 </main>
+<script>
+    const userSearch = document.getElementById('userSearch');
+    const userRole = document.getElementById('userRole');
+    const userRows = [...document.querySelectorAll('.user-row')];
+    const noFilteredUsers = document.getElementById('noFilteredUsers');
+
+    function filterUsers() {
+        const query = userSearch.value.trim().toLowerCase();
+        const role = userRole.value;
+        let visibleCount = 0;
+
+        userRows.forEach((row) => {
+            const visible = row.dataset.search.includes(query) && (!role || row.dataset.role === role);
+            row.hidden = !visible;
+            visibleCount += Number(visible);
+        });
+        noFilteredUsers.hidden = visibleCount > 0;
+    }
+
+    userSearch.addEventListener('input', filterUsers);
+    userRole.addEventListener('change', filterUsers);
+
+    const userDetails = document.getElementById('userDetails');
+    document.querySelectorAll('.view-user').forEach((button) => {
+        button.addEventListener('click', () => {
+            const details = JSON.parse(button.dataset.user);
+            Object.entries(details).forEach(([key, value]) => {
+                userDetails.querySelector(`[data-detail="${key}"]`).textContent = value || 'N/A';
+            });
+            userDetails.showModal();
+        });
+    });
+    document.getElementById('closeUserDetails').addEventListener('click', () => userDetails.close());
+</script>
 {% endblock %}

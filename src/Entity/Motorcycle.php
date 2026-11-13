@@ -2,9 +2,10 @@
 
 namespace App\Entity;
 
+use App\Repository\MotorcycleRepository;
 use Doctrine\ORM\Mapping as ORM;
 
-#[ORM\Entity]
+#[ORM\Entity(repositoryClass: MotorcycleRepository::class)]
 #[ORM\Table(name: 'motorcycle')]
 class Motorcycle
 {
@@ -37,6 +38,11 @@ class Motorcycle
     public function getId(): ?int
     {
         return $this->id;
+    }
+
+    public function getUser(): User
+    {
+        return $this->user;
     }
 
     public function getModel(): string

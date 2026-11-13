@@ -19,6 +19,11 @@ class CustomerAppointmentUpdateType extends AbstractType
 {
     public function buildForm(FormBuilderInterface $builder, array $options): void
     {
+        $booking = $options['data'];
+        if (!$booking instanceof ServiceBooking) {
+            throw new \LogicException('An existing service booking is required for customer appointment edits.');
+        }
+
         $builder
             ->add('service', EntityType::class, [
                 'class' => Service::class,
@@ -27,11 +32,15 @@ class CustomerAppointmentUpdateType extends AbstractType
                 'placeholder' => 'Select service',
                 'constraints' => [new NotBlank()],
                 'attr' => ['class' => 'form-control'],
+                'mapped' => false,
+                'data' => $booking->getService(),
             ])
             ->add('vehicleModel', TextType::class, [
                 'label' => 'Vehicle model',
                 'constraints' => [new NotBlank(), new Length(max: 255)],
                 'attr' => ['class' => 'form-control'],
+                'mapped' => false,
+                'data' => $booking->getVehicleModel() ?? '',
             ])
             ->add('bookingDate', DateType::class, [
                 'label' => 'Booking date',
@@ -39,6 +48,8 @@ class CustomerAppointmentUpdateType extends AbstractType
                 'input' => 'datetime_immutable',
                 'constraints' => [new NotBlank()],
                 'attr' => ['class' => 'form-control', 'min' => (new \DateTimeImmutable('today'))->format('Y-m-d')],
+                'mapped' => false,
+                'data' => $booking->getBookingDate(),
             ])
             ->add('bookingTime', TimeType::class, [
                 'label' => 'Time slot',
@@ -46,11 +57,15 @@ class CustomerAppointmentUpdateType extends AbstractType
                 'input' => 'datetime_immutable',
                 'constraints' => [new NotBlank()],
                 'attr' => ['class' => 'form-control'],
+                'mapped' => false,
+                'data' => $booking->getBookingTime(),
             ])
             ->add('notes', TextareaType::class, [
                 'required' => false,
                 'constraints' => [new Length(max: 2000)],
                 'attr' => ['class' => 'form-control', 'rows' => 3],
+                'mapped' => false,
+                'data' => $booking->getNotes() ?? '',
             ]);
     }
 

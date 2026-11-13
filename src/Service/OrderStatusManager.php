@@ -17,7 +17,7 @@ class OrderStatusManager
     ) {
     }
 
-    public function updateStatus(OrderItem $selectedItem, string $nextStatus, string $cancellationReason = ''): void
+    public function updateStatus(OrderItem|CustomerOrder $selectedOrder, string $nextStatus, string $cancellationReason = ''): void
     {
         if (!in_array($nextStatus, ['Pending', 'Processing', 'Shipped', 'Completed', 'Cancelled'], true)) {
             throw new \DomainException('Invalid order status.');
@@ -30,15 +30,15 @@ class OrderStatusManager
         }
 
         try {
-            $orderGroup = $selectedItem->getCustomerOrder();
+            $orderGroup = $selectedOrder instanceof CustomerOrder ? $selectedOrder : $selectedOrder->getCustomerOrder();
             if ($orderGroup instanceof CustomerOrder) {
                 $this->entityManager->lock($orderGroup, LockMode::PESSIMISTIC_WRITE);
             } else {
-                $this->entityManager->lock($selectedItem, LockMode::PESSIMISTIC_WRITE);
+                $this->entityManager->lock($selectedOrder, LockMode::PESSIMISTIC_WRITE);
             }
 
-            $items = $this->orders->findItemsInGroup($selectedItem);
-            $currentStatus = $orderGroup?->getStatus() ?? $selectedItem->getStatus() ?? 'Pending';
+            $items = $this->orders->findItemsInGroup($orderGroup ?? $selectedOrder);
+            $currentStatus = $orderGroup?->getStatus() ?? ($selectedOrder instanceof OrderItem ? $selectedOrder->getStatus() : null) ?? 'Pending';
             if ($currentStatus === 'Completed') {
                 throw new \DomainException('Completed orders cannot be updated.');
             }

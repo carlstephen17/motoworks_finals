@@ -3,16 +3,109 @@
 {% block title %}Promotions | Admin{% endblock %}
 {% block body %}
 <main>
-    <h1>Promotions</h1>
+    <h1>Promo Management</h1>
     {% for message in app.flashes('success') %}<p role="status">{{ message }}</p>{% endfor %}
     {% for message in app.flashes('error') %}<p role="alert">{{ message }}</p>{% endfor %}
-    <p><a href="{{ path('admin_promo_new') }}">Create promotion</a></p>
+    <p><a href="{{ path('admin_promo_new') }}">Add promo</a></p>
+    <section aria-label="Filter promotions">
+        <label for="promoSearch">Search promos</label>
+        <input id="promoSearch" type="search">
+        <label for="promoStatus">Status</label>
+        <select id="promoStatus">
+            <option value="">All statuses</option>
+            <option value="1">Active</option>
+            <option value="0">Inactive</option>
+        </select>
+    </section>
+    <table>
+        <thead><tr><th>ID</th><th>Promo</th><th>Discount</th><th>Status</th><th>Actions</th></tr></thead>
+        <tbody>
     {% for promo in promos %}
-        <article><h2>{{ promo.title }} — {{ promo.badge }}</h2><p>{{ promo.description }}</p><p>{{ promo.active ? 'Active' : 'Inactive' }}</p>
-            <a href="{{ path('admin_promo_edit', {id: promo.id}) }}">Edit</a>
-            <form method="post" action="{{ path('admin_promo_status', {id: promo.id}) }}"><input type="hidden" name="_token" value="{{ csrf_token('admin_promo_status_' ~ promo.id) }}"><input type="hidden" name="active" value="{{ promo.active ? '0' : '1' }}"><button>{{ promo.active ? 'Deactivate' : 'Activate' }}</button></form>
-            <form method="post" action="{{ path('admin_promo_delete', {id: promo.id}) }}"><input type="hidden" name="_token" value="{{ csrf_token('admin_promo_delete_' ~ promo.id) }}"><button type="submit">Deactivate</button></form>
-        </article>
-    {% else %}<p>No promotions.</p>{% endfor %}
+        {% set details = {
+            title: promo.title,
+            slug: promo.slug,
+            badge: promo.badge,
+            description: promo.description,
+            itemLabel: promo.itemLabel,
+            itemOptions: promo.itemOptionsText,
+            perks: promo.perks,
+            productImage: promo.productImage,
+            serviceImage: promo.serviceImage,
+            productIcon: promo.storedProductIcon,
+            serviceIcon: promo.storedServiceIcon,
+            active: promo.active ? 'Active' : 'Inactive'
+        } %}
+        <tr class="promo-row" data-status="{{ promo.active ? '1' : '0' }}" data-search="{{ [promo.title, promo.slug, promo.description]|join(' ')|lower|e('html_attr') }}">
+            <td>{{ promo.id }}</td>
+            <td><strong>{{ promo.title }}</strong><br><small>{{ promo.slug }}</small></td>
+            <td>{{ promo.badge }}</td>
+            <td>
+                {{ promo.active ? 'Active' : 'Inactive' }}
+                <form method="post" action="{{ path('admin_promo_status', {id: promo.id}) }}">
+                    <input type="hidden" name="_token" value="{{ csrf_token('admin_promo_status_' ~ promo.id) }}">
+                    <input type="hidden" name="active" value="{{ promo.active ? '0' : '1' }}">
+                    <button type="submit">{{ promo.active ? 'Deactivate' : 'Activate' }}</button>
+                </form>
+            </td>
+            <td>
+                <button type="button" class="view-promo" data-promo="{{ details|json_encode|e('html_attr') }}">View</button>
+                <a href="{{ path('admin_promo_edit', {id: promo.id}) }}">Edit</a>
+                <form method="post" action="{{ path('admin_promo_delete', {id: promo.id}) }}" onsubmit="return confirm('Deactivate this promo and retain its claim history?')">
+                    <input type="hidden" name="_token" value="{{ csrf_token('admin_promo_delete_' ~ promo.id) }}">
+                    <button type="submit">Deactivate</button>
+                </form>
+            </td>
+        </tr>
+    {% else %}
+        <tr><td colspan="5">No promotions.</td></tr>
+    {% endfor %}
+        <tr id="noPromoMatch" hidden><td colspan="5">No promos match your search.</td></tr>
+        </tbody>
+    </table>
+    <dialog id="promoDetails">
+        <h2>Promo details</h2>
+        <dl id="promoDetailsList"></dl>
+        <button type="button" id="closePromoDetails">Close</button>
+    </dialog>
 </main>
+<script>
+    const promoSearch = document.getElementById('promoSearch');
+    const promoStatus = document.getElementById('promoStatus');
+    const promoRows = [...document.querySelectorAll('.promo-row')];
+    const noPromoMatch = document.getElementById('noPromoMatch');
+
+    function filterPromos() {
+        const query = promoSearch.value.trim().toLowerCase();
+        let visibleCount = 0;
+
+        promoRows.forEach((row) => {
+            const visible = row.dataset.search.includes(query)
+                && (!promoStatus.value || row.dataset.status === promoStatus.value);
+            row.hidden = !visible;
+            visibleCount += Number(visible);
+        });
+        noPromoMatch.hidden = visibleCount > 0;
+    }
+
+    promoSearch.addEventListener('input', filterPromos);
+    promoStatus.addEventListener('change', filterPromos);
+
+    const promoDetails = document.getElementById('promoDetails');
+    const promoDetailsList = document.getElementById('promoDetailsList');
+    document.querySelectorAll('.view-promo').forEach((button) => {
+        button.addEventListener('click', () => {
+            const promo = JSON.parse(button.dataset.promo);
+            promoDetailsList.replaceChildren();
+            Object.entries(promo).forEach(([label, value]) => {
+                const term = document.createElement('dt');
+                const detail = document.createElement('dd');
+                term.textContent = label.replace(/[A-Z]/g, (letter) => ` ${letter.toLowerCase()}`);
+                detail.textContent = value || '—';
+                promoDetailsList.append(term, detail);
+            });
+            promoDetails.showModal();
+        });
+    });
+    document.getElementById('closePromoDetails').addEventListener('click', () => promoDetails.close());
+</script>
 {% endblock %}

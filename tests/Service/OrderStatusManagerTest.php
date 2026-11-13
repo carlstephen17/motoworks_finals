@@ -57,6 +57,23 @@ class OrderStatusManagerTest extends TestCase
         $manager->updateStatus($items[0], 'Cancelled');
     }
 
+    public function testCustomerOrderGroupCanBeUpdatedWithoutLineItems(): void
+    {
+        $orderGroup = new CustomerOrder(new User(), 'Bayawan City', 'Cash on Delivery', 'MWO-EMPTY-GROUP');
+        $connection = $this->createStub(Connection::class);
+        $connection->method('isTransactionActive')->willReturn(true);
+        $entityManager = $this->createStub(EntityManagerInterface::class);
+        $entityManager->method('getConnection')->willReturn($connection);
+        $orderRepository = $this->createStub(OrderItemRepository::class);
+        $orderRepository->method('findItemsInGroup')->willReturn([]);
+        $manager = new OrderStatusManager($entityManager, $orderRepository);
+
+        $manager->updateStatus($orderGroup, 'Cancelled', 'Staff cancellation');
+
+        self::assertSame('Cancelled', $orderGroup->getStatus());
+        self::assertSame('Staff cancellation', $orderGroup->getCancellationReason());
+    }
+
     /**
      * @param list<OrderItem> $items
      * @param array<int, Product> $products

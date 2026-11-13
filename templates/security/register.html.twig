@@ -13,7 +13,7 @@
             <h2 style="text-align: center; margin-bottom: 24px; color: #fff;">Create Your Account</h2>
 
             {% for message in app.flashes('error') %}
-                <div class="error-box">
+                <div class="error-box" role="alert">
                     <p style="color: #ff6b6b; margin: 0; font-size: 0.9rem;">{{ message }}</p>
                 </div>
             {% endfor %}

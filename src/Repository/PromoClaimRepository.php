@@ -23,9 +23,60 @@ class PromoClaimRepository extends ServiceEntityRepository
         return $this->createQueryBuilder('claim')
             ->andWhere('claim.user = :user')
             ->setParameter('user', $user)
-            ->orderBy('claim.appointmentDate', 'DESC')
+            ->orderBy('claim.appointmentDate', 'ASC')
+            ->addOrderBy('claim.appointmentTime', 'ASC')
             ->addOrderBy('claim.id', 'DESC')
             ->getQuery()
             ->getResult();
+    }
+
+    /** @return list<PromoClaim> */
+    public function findForStaff(string $search, string $status): array
+    {
+        $query = $this->createQueryBuilder('claim')
+            ->leftJoin('claim.user', 'user')
+            ->addSelect('user')
+            ->orderBy('claim.id', 'DESC');
+
+        if ($search !== '') {
+            $term = '%'.mb_strtolower($search).'%';
+            $query->andWhere(
+                'LOWER(claim.fullName) LIKE :term
+                OR LOWER(claim.phone) LIKE :term
+                OR LOWER(claim.bundleSlug) LIKE :term
+                OR LOWER(claim.selectedOption) LIKE :term
+                OR LOWER(user.username) LIKE :term'
+            )->setParameter('term', $term);
+        }
+
+        if ($status === 'Pending') {
+            $query->andWhere('(claim.status = :status OR claim.status IS NULL)')->setParameter('status', 'Pending');
+        } elseif (in_array($status, ['Confirmed', 'Completed', 'Cancelled'], true)) {
+            $query->andWhere('claim.status = :status')->setParameter('status', $status);
+        }
+
+        return $query->getQuery()->getResult();
+    }
+
+    /** @return array{total: int, pending: int, confirmed: int, completed: int, cancelled: int} */
+    public function getStaffStatusCounts(): array
+    {
+        $counts = ['total' => 0, 'pending' => 0, 'confirmed' => 0, 'completed' => 0, 'cancelled' => 0];
+        $rows = $this->createQueryBuilder('claim')
+            ->select('claim.status AS status, COUNT(claim.id) AS statusCount')
+            ->groupBy('claim.status')
+            ->getQuery()
+            ->getArrayResult();
+
+        foreach ($rows as $row) {
+            $count = (int) $row['statusCount'];
+            $counts['total'] += $count;
+            $status = $row['status'] ?? 'Pending';
+            if (isset($counts[strtolower($status)])) {
+                $counts[strtolower($status)] += $count;
+            }
+        }
+
+        return $counts;
     }
 }

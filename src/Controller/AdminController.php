@@ -16,10 +16,13 @@ use App\Form\PromoType;
 use App\Form\ServiceBookingType;
 use App\Form\ServiceType;
 use App\Repository\OrderItemRepository;
+use App\Repository\CustomerOrderRepository;
+use App\Repository\MotorcycleRepository;
 use App\Repository\PromoClaimRepository;
 use App\Repository\PromoRepository;
 use App\Repository\ProductRepository;
 use App\Repository\ServiceBookingRepository;
+use App\Repository\ServiceRecordRepository;
 use App\Repository\ServiceRepository;
 use App\Repository\UserRepository;
 use App\Service\ImageUploader;
@@ -31,6 +34,7 @@ use Symfony\Component\Form\Extension\Core\Type\DateType;
 use Symfony\Component\Form\Extension\Core\Type\TextareaType;
 use Symfony\Component\Form\Extension\Core\Type\TimeType;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
+use Symfony\Component\Form\FormInterface;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -46,7 +50,7 @@ class AdminController extends AbstractController
         ProductRepository $products,
         ServiceRepository $services,
         ServiceBookingRepository $bookings,
-        OrderItemRepository $orders,
+        CustomerOrderRepository $orders,
         PromoClaimRepository $claims,
     ): Response {
         return $this->render('admin/dashboard.html.twig', [
@@ -64,7 +68,12 @@ class AdminController extends AbstractController
     #[Route('/products', name: 'admin_products', methods: ['GET'])]
     public function products(ProductRepository $products): Response
     {
-        return $this->render('admin/products.html.twig', ['products' => $products->findBy([], ['id' => 'DESC'])]);
+        $productForm = $this->createForm(ProductType::class, new Product());
+
+        return $this->render('admin/products.html.twig', [
+            'products' => $products->findBy([], ['id' => 'ASC']),
+            'productForm' => $productForm->createView(),
+        ]);
     }
 
     #[Route('/products/new', name: 'admin_product_new', methods: ['GET', 'POST'])]
@@ -150,7 +159,12 @@ class AdminController extends AbstractController
     #[Route('/services', name: 'admin_services', methods: ['GET'])]
     public function services(ServiceRepository $services): Response
     {
-        return $this->render('admin/services.html.twig', ['services' => $services->findBy([], ['id' => 'DESC'])]);
+        $serviceForm = $this->createForm(ServiceType::class, new Service());
+
+        return $this->render('admin/services.html.twig', [
+            'services' => $services->findBy([], ['id' => 'ASC']),
+            'serviceForm' => $serviceForm->createView(),
+        ]);
     }
 
     #[Route('/services/new', name: 'admin_service_new', methods: ['GET', 'POST'])]
@@ -224,11 +238,17 @@ class AdminController extends AbstractController
     }
 
     #[Route('/promos/new', name: 'admin_promo_new', methods: ['GET', 'POST'])]
-    public function promoNew(Request $request, EntityManagerInterface $entityManager): Response
+    public function promoNew(Request $request, PromoRepository $promos, EntityManagerInterface $entityManager): Response
     {
         $promo = new Promo();
         $form = $this->createForm(PromoType::class, $promo)->handleRequest($request);
         if ($form->isSubmitted() && $form->isValid()) {
+            $this->applyPromoFormData($form, $promo);
+            if ($promos->findOneBy(['slug' => $promo->getSlug()])) {
+                $this->addFlash('error', 'That promo slug is already in use.');
+
+                return $this->render('admin/form.html.twig', ['title' => 'Create promotion', 'form' => $form]);
+            }
             $entityManager->persist($promo);
             $entityManager->flush();
             $this->addFlash('success', 'Promotion created.');
@@ -240,11 +260,22 @@ class AdminController extends AbstractController
     }
 
     #[Route('/promos/{id}/edit', name: 'admin_promo_edit', requirements: ['id' => '\d+'], methods: ['GET', 'POST'])]
-    public function promoEdit(int $id, Request $request, \App\Repository\PromoRepository $promos, EntityManagerInterface $entityManager): Response
+    public function promoEdit(int $id, Request $request, PromoRepository $promos, EntityManagerInterface $entityManager): Response
     {
         $promo = $promos->find($id) ?? throw $this->createNotFoundException('Promotion not found.');
-        $form = $this->createForm(PromoType::class, $promo)->handleRequest($request);
+        $form = $this->createForm(PromoType::class, $promo, [
+            'item_options_text' => $promo->getItemOptionsText(),
+            'product_icon' => $promo->getStoredProductIcon() ?? '',
+            'service_icon' => $promo->getStoredServiceIcon() ?? '',
+        ])->handleRequest($request);
         if ($form->isSubmitted() && $form->isValid()) {
+            $this->applyPromoFormData($form, $promo);
+            $slugOwner = $promos->findOneBy(['slug' => $promo->getSlug()]);
+            if ($slugOwner !== null && $slugOwner->getId() !== $promo->getId()) {
+                $this->addFlash('error', 'That promo slug is already in use.');
+
+                return $this->render('admin/form.html.twig', ['title' => 'Edit promotion', 'form' => $form]);
+            }
             $entityManager->flush();
             $this->addFlash('success', 'Promotion updated.');
 
@@ -284,7 +315,7 @@ class AdminController extends AbstractController
     #[Route('/users', name: 'admin_users', methods: ['GET'])]
     public function users(UserRepository $users): Response
     {
-        return $this->render('admin/users.html.twig', ['users' => $users->findBy([], ['id' => 'DESC'])]);
+        return $this->render('admin/users.html.twig', ['users' => $users->findBy([], ['id' => 'ASC'])]);
     }
 
     #[Route('/users/new', name: 'admin_user_new', methods: ['GET', 'POST'])]
@@ -321,8 +352,25 @@ class AdminController extends AbstractController
     public function userEdit(int $id, Request $request, UserRepository $users, EntityManagerInterface $entityManager, UserPasswordHasherInterface $hasher): Response
     {
         $user = $users->find($id) ?? throw $this->createNotFoundException('User not found.');
+        $originalRole = $user->getRole();
         $form = $this->createForm(AdminUserType::class, $user)->handleRequest($request);
         if ($form->isSubmitted() && $form->isValid()) {
+            if ($user === $this->getUser() && $user->getRole() !== 'admin') {
+                $user->setRole($originalRole);
+                $this->addFlash('error', 'You cannot remove your own administrator role.');
+
+                return $this->redirectToRoute('admin_users');
+            }
+            $usernameOwner = $users->findOneBy(['username' => $user->getUsername()]);
+            $emailOwner = $users->findOneBy(['email' => $user->getEmail()]);
+            if (
+                ($usernameOwner !== null && $usernameOwner->getId() !== $user->getId())
+                || ($emailOwner !== null && $emailOwner->getId() !== $user->getId())
+            ) {
+                $this->addFlash('error', 'Username or email is already in use.');
+
+                return $this->render('admin/form.html.twig', ['title' => 'Edit user', 'form' => $form]);
+            }
             if ($form->get('plainPassword')->getData()) {
                 $user->setPassword($hasher->hashPassword($user, (string) $form->get('plainPassword')->getData()));
             }
@@ -336,14 +384,23 @@ class AdminController extends AbstractController
     }
 
     #[Route('/users/{id}/delete', name: 'admin_user_delete', requirements: ['id' => '\d+'], methods: ['POST'])]
-    public function userDelete(int $id, Request $request, UserRepository $users, OrderItemRepository $orders, ServiceBookingRepository $bookings, PromoClaimRepository $claims, EntityManagerInterface $entityManager): Response
+    public function userDelete(int $id, Request $request, UserRepository $users, OrderItemRepository $orders, CustomerOrderRepository $customerOrders, ServiceBookingRepository $bookings, PromoClaimRepository $claims, MotorcycleRepository $motorcycles, ServiceRecordRepository $serviceRecords, EntityManagerInterface $entityManager): Response
     {
         $user = $users->find($id) ?? throw $this->createNotFoundException('User not found.');
         $this->assertCsrf($request, 'admin_user_delete_'.$id);
         if ($user === $this->getUser()) {
             $this->addFlash('error', 'You cannot delete your own account.');
-        } elseif ($orders->count(['user' => $user]) || $bookings->count(['user' => $user]) || $claims->count(['user' => $user])) {
-            $this->addFlash('error', 'This user has history and cannot be deleted.');
+        } elseif (
+            $orders->count(['user' => $user])
+            || $customerOrders->count(['user' => $user])
+            || $bookings->count(['user' => $user])
+            || $bookings->count(['createdByStaff' => $user])
+            || $claims->count(['user' => $user])
+            || $motorcycles->count(['user' => $user])
+            || $serviceRecords->count(['customer' => $user])
+            || $serviceRecords->count(['createdByStaff' => $user])
+        ) {
+            $this->addFlash('error', 'This user has linked business history and cannot be deleted.');
         } else {
             $entityManager->remove($user);
             $this->addFlash('success', 'User deleted.');
@@ -354,13 +411,44 @@ class AdminController extends AbstractController
     }
 
     #[Route('/orders', name: 'admin_orders', methods: ['GET'])]
-    public function orders(OrderItemRepository $orders): Response
+    public function orders(Request $request, CustomerOrderRepository $orders): Response
     {
-        return $this->render('admin/orders.html.twig', ['orders' => $orders->findBy([], ['id' => 'DESC'])]);
+        $search = $request->query->get('search');
+        $search = is_string($search) ? trim($search) : '';
+        $status = $request->query->get('status');
+        $status = is_string($status) && in_array($status, ['Pending', 'Cancelled', 'Completed'], true) ? $status : '';
+        $paymentStatus = $request->query->get('payment_status');
+        $paymentStatus = is_string($paymentStatus) && in_array($paymentStatus, ['Due on delivery', 'Unverified'], true) ? $paymentStatus : '';
+        $dateFrom = $this->parseDateFilter($request->query->get('date_from'));
+        $dateTo = $this->parseDateFilter($request->query->get('date_to'));
+        $page = filter_var($request->query->get('page', 1), FILTER_VALIDATE_INT);
+        $page = $page !== false && $page > 0 ? $page : 1;
+        $perPage = 50;
+        $totalOrders = $orders->countForStaff($search, $status, $paymentStatus, $dateFrom, $dateTo?->modify('+1 day'));
+        $totalPages = max(1, (int) ceil($totalOrders / $perPage));
+        $page = min($page, $totalPages);
+        $groups = $orders->findForStaff($search, $status, $paymentStatus, $dateFrom, $dateTo?->modify('+1 day'), $perPage, ($page - 1) * $perPage);
+        $groupIds = array_map(static fn (array $order): int => (int) $order['orderGroupId'], $groups);
+
+        return $this->render('admin/orders.html.twig', [
+            'orders' => $groups,
+            'itemsByOrder' => $orders->findItemsForGroups($groupIds),
+            'counts' => $orders->getStatusCounts(),
+            'filters' => [
+                'search' => $search,
+                'status' => $status,
+                'paymentStatus' => $paymentStatus,
+                'dateFrom' => $dateFrom?->format('Y-m-d') ?? '',
+                'dateTo' => $dateTo?->format('Y-m-d') ?? '',
+            ],
+            'page' => $page,
+            'totalPages' => $totalPages,
+            'totalOrders' => $totalOrders,
+        ]);
     }
 
     #[Route('/orders/{id}/status', name: 'admin_order_status', requirements: ['id' => '\d+'], methods: ['POST'])]
-    public function orderStatus(int $id, Request $request, OrderItemRepository $orders, OrderStatusManager $orderStatusManager): Response
+    public function orderStatus(int $id, Request $request, CustomerOrderRepository $orders, OrderStatusManager $orderStatusManager): Response
     {
         $order = $orders->find($id) ?? throw $this->createNotFoundException('Order not found.');
         $this->assertCsrf($request, 'admin_order_status_'.$id);
@@ -379,7 +467,7 @@ class AdminController extends AbstractController
     }
 
     #[Route('/orders/{id}/delete', name: 'admin_order_delete', requirements: ['id' => '\d+'], methods: ['POST'])]
-    public function orderDelete(int $id, Request $request, OrderItemRepository $orders, OrderStatusManager $orderStatusManager): Response
+    public function orderDelete(int $id, Request $request, CustomerOrderRepository $orders, OrderStatusManager $orderStatusManager): Response
     {
         $order = $orders->find($id) ?? throw $this->createNotFoundException('Order not found.');
         $this->assertCsrf($request, 'admin_order_delete_'.$id);
@@ -394,9 +482,19 @@ class AdminController extends AbstractController
     }
 
     #[Route('/appointments', name: 'admin_appointments', methods: ['GET'])]
-    public function appointments(ServiceBookingRepository $bookings): Response
+    public function appointments(Request $request, ServiceBookingRepository $bookings): Response
     {
-        return $this->render('admin/appointments.html.twig', ['bookings' => $bookings->findBy([], ['id' => 'DESC'])]);
+        $search = $request->query->get('search');
+        $search = is_string($search) ? trim($search) : '';
+        $status = $request->query->get('status');
+        $status = is_string($status) && in_array($status, ['Pending', 'Cancelled', 'Completed'], true) ? $status : '';
+
+        return $this->render('admin/appointments.html.twig', [
+            'bookings' => $bookings->findForAdmin($search, $status),
+            'counts' => $bookings->getAdminStatusCounts(),
+            'search' => $search,
+            'status' => $status,
+        ]);
     }
 
     #[Route('/appointments/new', name: 'admin_appointment_new', methods: ['GET', 'POST'])]
@@ -420,6 +518,7 @@ class AdminController extends AbstractController
             ->add('vehicleModel', TextType::class, ['label' => 'Motorcycle model'])
             ->add('bookingDate', DateType::class, ['widget' => 'single_text', 'input' => 'datetime_immutable'])
             ->add('bookingTime', TimeType::class, ['widget' => 'single_text', 'input' => 'datetime_immutable'])
+            ->add('status', ChoiceType::class, ['choices' => ['Pending' => 'Pending', 'Cancelled' => 'Cancelled', 'Completed' => 'Completed']])
             ->add('notes', TextareaType::class, ['required' => false])
             ->getForm()
             ->handleRequest($request);
@@ -440,7 +539,8 @@ class AdminController extends AbstractController
                     null,
                     trim((string) ($data['notes'] ?? '')) ?: null,
                 );
-                $booking->setSource('staff');
+                $booking->setStatus((string) $data['status']);
+                $booking->setSource('admin');
                 $booking->setCreatedByStaff($admin);
                 $entityManager->persist($booking);
                 $entityManager->flush();
@@ -589,5 +689,23 @@ class AdminController extends AbstractController
         if (!$this->isCsrfTokenValid($tokenId, (string) $request->request->get('_token'))) {
             throw $this->createAccessDeniedException('Invalid security token.');
         }
+    }
+
+    private function applyPromoFormData(FormInterface $form, Promo $promo): void
+    {
+        $promo->setItemOptions(trim((string) $form->get('itemOptions')->getData()));
+        $promo->setProductIcon(trim((string) $form->get('productIcon')->getData()) ?: null);
+        $promo->setServiceIcon(trim((string) $form->get('serviceIcon')->getData()) ?: null);
+    }
+
+    private function parseDateFilter(mixed $value): ?\DateTimeImmutable
+    {
+        if (!is_string($value) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $value)) {
+            return null;
+        }
+
+        $date = \DateTimeImmutable::createFromFormat('!Y-m-d', $value);
+
+        return $date !== false && $date->format('Y-m-d') === $value ? $date : null;
     }
 }

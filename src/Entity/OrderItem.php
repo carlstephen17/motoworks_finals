@@ -102,14 +102,29 @@ class OrderItem
         return $this->quantity;
     }
 
+    public function setQuantity(int $quantity): void
+    {
+        $this->quantity = $quantity;
+    }
+
     public function getTotalAmount(): string
     {
         return $this->totalAmount;
     }
 
+    public function setTotalAmount(string $totalAmount): void
+    {
+        $this->totalAmount = $totalAmount;
+    }
+
     public function getUnitPrice(): ?string
     {
         return $this->unitPrice;
+    }
+
+    public function setUnitPrice(?string $unitPrice): void
+    {
+        $this->unitPrice = $unitPrice;
     }
 
     public function getCreatedAt(): ?\DateTimeImmutable

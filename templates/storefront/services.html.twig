@@ -73,18 +73,19 @@
     </main>
 
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
+        (function() {
             const searchInput = document.getElementById('product-search-input');
-            if (searchInput) {
-                searchInput.addEventListener('input', function(e) {
-                    const query = e.target.value.toLowerCase().trim();
-                    const cards = document.querySelectorAll('#product-grid-container .product-card');
-                    cards.forEach(card => {
-                        const name = card.getAttribute('data-name') || '';
-                        card.style.display = name.includes(query) ? '' : 'none';
-                    });
+            if (!searchInput || searchInput.dataset.searchInitialized) return;
+
+            searchInput.dataset.searchInitialized = 'true';
+            searchInput.addEventListener('input', function(e) {
+                const query = e.target.value.toLowerCase().trim();
+                const cards = document.querySelectorAll('#product-grid-container .product-card');
+                cards.forEach(card => {
+                    const name = card.getAttribute('data-name') || '';
+                    card.style.display = name.includes(query) ? '' : 'none';
                 });
-            }
-        });
+            });
+        })();
     </script>
 {% endblock %}

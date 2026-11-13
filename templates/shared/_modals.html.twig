@@ -6,6 +6,7 @@
             <div id="login-modal-alert" class="modal-alert"></div>
             <form id="ajax-login-form" class="auth-form" action="{{ path('app_login') }}" method="post">
                 <input type="hidden" name="_csrf_token" value="{{ csrf_token('authenticate') }}">
+                <input type="hidden" name="_target_path" id="login-target-path" value="">
                 <input type="text" name="username" placeholder="Username or Email" required autocomplete="username" class="auth-input auth-input-padded">
                 <div class="password-container mb-sm">
                     <input type="password" id="login-password" name="password" placeholder="Password" required autocomplete="current-password" class="auth-input auth-input-padded-r">
@@ -256,6 +257,7 @@
                     <div><span>Phone</span><strong id="order-confirmation-phone"></strong></div>
                     <div><span>Address</span><strong id="order-confirmation-address"></strong></div>
                     <div><span>Payment method</span><strong id="order-confirmation-payment"></strong></div>
+                    <div><span>Payment status</span><strong id="order-confirmation-payment-status"></strong></div>
                 </div>
                 <div style="padding: 14px; border: 1px dashed #2ed573; border-radius: 6px; background: rgba(46, 213, 115, 0.08);">
                     <span style="display: block; color: #9ae6b4; font-size: 12px; text-transform: uppercase;">Order Reference</span>

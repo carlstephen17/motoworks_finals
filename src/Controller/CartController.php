@@ -187,77 +187,72 @@ class CartController extends AbstractController
             return $this->redirectToRoute('product_show', ['id' => $id]);
         }
 
-        if ($isAjax) {
-            $fullName = trim($user->getFirstName().' '.$user->getLastName());
-            $phone = trim((string) $user->getPhone());
-            $address = trim((string) $request->request->get('address', ''));
-            $paymentMethod = trim((string) $request->request->get('payment_method', 'Cash on Delivery'));
-            if ($fullName === '' || !preg_match('/^09[0-9]{9}$/', $phone)) {
-                return $this->json(['success' => false, 'message' => 'Your account must have a valid name and phone number before checkout.'], Response::HTTP_UNPROCESSABLE_ENTITY);
-            }
-            if ($address === '') {
-                return $this->json(['success' => false, 'message' => 'Please enter your delivery address.'], Response::HTTP_UNPROCESSABLE_ENTITY);
-            }
-            if (!in_array($paymentMethod, ['Cash on Delivery', 'GCash', 'Card'], true)) {
-                return $this->json(['success' => false, 'message' => 'Invalid payment method.'], Response::HTTP_UNPROCESSABLE_ENTITY);
-            }
-
-            $paymentReference = ($paymentMethod === 'Cash on Delivery' ? 'MWO-' : 'MWP-')
-                .(new \DateTimeImmutable())->format('Ymd').'-'.strtoupper(bin2hex(random_bytes(4)));
-            $connection = $entityManager->getConnection();
-            $connection->beginTransaction();
-
-            try {
-                $order = new CustomerOrder($user, $address, $paymentMethod, $paymentReference);
-                $entityManager->persist($order);
-                $entityManager->flush();
-
-                $lockedProduct = $entityManager->find(Product::class, $id, LockMode::PESSIMISTIC_WRITE);
-                if (!$lockedProduct || !$lockedProduct->isActive() || $quantity > $lockedProduct->getStock()) {
-                    throw new \DomainException('The selected product is no longer available in the requested quantity.');
-                }
-
-                $unitPrice = $lockedProduct->getPrice();
-                $lineTotal = number_format((float) $unitPrice * $quantity, 2, '.', '');
-                $lockedProduct->setStock($lockedProduct->getStock() - $quantity);
-                $entityManager->persist(new OrderItem(
-                    $user,
-                    $lockedProduct,
-                    $quantity,
-                    $lineTotal,
-                    $paymentMethod,
-                    $paymentReference,
-                    $order,
-                    $unitPrice,
-                ));
-                $user->setAddress($address);
-                $entityManager->flush();
-                $connection->commit();
-            } catch (\DomainException $exception) {
-                $connection->rollBack();
-                $entityManager->clear();
-
-                return $this->json(['success' => false, 'message' => $exception->getMessage()], Response::HTTP_UNPROCESSABLE_ENTITY);
-            } catch (\Throwable $exception) {
-                $connection->rollBack();
-                throw $exception;
-            }
-
-            return $this->json([
-                'success' => true,
-                'message' => 'Order placed successfully!',
-                'payment_method' => $paymentMethod,
-                'payment_reference' => $paymentReference,
-                'customer_name' => $fullName,
-                'phone' => $phone,
-                'address' => $address,
-                'items' => [['name' => $product->getName(), 'quantity' => $quantity]],
-            ]);
+        $fullName = trim($user->getFirstName().' '.$user->getLastName());
+        $phone = trim((string) $user->getPhone());
+        $address = trim((string) $request->request->get('address', ''));
+        $paymentMethod = trim((string) $request->request->get('payment_method', 'Cash on Delivery'));
+        if ($fullName === '' || !preg_match('/^09[0-9]{9}$/', $phone)) {
+            return $this->json(['success' => false, 'message' => 'Your account must have a valid name and phone number before checkout.'], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+        if ($address === '') {
+            return $this->json(['success' => false, 'message' => 'Please enter your delivery address.'], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+        if (!in_array($paymentMethod, ['Cash on Delivery', 'GCash', 'Card'], true)) {
+            return $this->json(['success' => false, 'message' => 'Invalid payment method.'], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
-        $request->getSession()->set('buy_now_cart', [$id => $quantity]);
+        $paymentReference = ($paymentMethod === 'Cash on Delivery' ? 'MWO-' : 'MWP-')
+            .(new \DateTimeImmutable())->format('Ymd').'-'.strtoupper(bin2hex(random_bytes(4)));
+        $connection = $entityManager->getConnection();
+        $connection->beginTransaction();
 
-        return $this->redirectToRoute('checkout', ['buy_now' => 1]);
+        try {
+            $order = new CustomerOrder($user, $address, $paymentMethod, $paymentReference);
+            $entityManager->persist($order);
+            $entityManager->flush();
+
+            $lockedProduct = $entityManager->find(Product::class, $id, LockMode::PESSIMISTIC_WRITE);
+            if (!$lockedProduct || !$lockedProduct->isActive() || $quantity > $lockedProduct->getStock()) {
+                throw new \DomainException('The selected product is no longer available in the requested quantity.');
+            }
+
+            $unitPrice = $lockedProduct->getPrice();
+            $lineTotal = number_format((float) $unitPrice * $quantity, 2, '.', '');
+            $lockedProduct->setStock($lockedProduct->getStock() - $quantity);
+            $entityManager->persist(new OrderItem(
+                $user,
+                $lockedProduct,
+                $quantity,
+                $lineTotal,
+                $paymentMethod,
+                $paymentReference,
+                $order,
+                $unitPrice,
+            ));
+            $user->setAddress($address);
+            $entityManager->flush();
+            $connection->commit();
+        } catch (\DomainException $exception) {
+            $connection->rollBack();
+            $entityManager->clear();
+
+            return $this->json(['success' => false, 'message' => $exception->getMessage()], Response::HTTP_UNPROCESSABLE_ENTITY);
+        } catch (\Throwable $exception) {
+            $connection->rollBack();
+            throw $exception;
+        }
+
+        return $this->json([
+            'success' => true,
+            'message' => 'Order placed successfully!',
+            'payment_method' => $paymentMethod,
+            'payment_status' => $order->getPaymentStatus(),
+            'payment_reference' => $paymentReference,
+            'customer_name' => $fullName,
+            'phone' => $phone,
+            'address' => $address,
+            'items' => [['name' => $product->getName(), 'quantity' => $quantity]],
+        ]);
     }
 
     #[Route('/checkout', name: 'checkout', methods: ['GET', 'POST'])]
@@ -443,6 +438,9 @@ class CartController extends AbstractController
         $validCart = [];
         foreach ($cart as $id => $quantity) {
             $validId = filter_var($id, FILTER_VALIDATE_INT);
+            if (is_array($quantity)) {
+                $quantity = $quantity['quantity'] ?? null;
+            }
             $validQuantity = filter_var($quantity, FILTER_VALIDATE_INT);
             if ($validId && $validQuantity && $validQuantity > 0) {
                 $validCart[$validId] = $validQuantity;

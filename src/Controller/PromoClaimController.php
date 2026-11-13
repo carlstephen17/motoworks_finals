@@ -5,6 +5,7 @@ namespace App\Controller;
 use App\Entity\PromoClaim;
 use App\Entity\ServiceBooking;
 use App\Entity\User;
+use App\Repository\PromoClaimRepository;
 use App\Repository\PromoRepository;
 use App\Repository\ServiceBookingRepository;
 use Doctrine\ORM\EntityManagerInterface;
@@ -62,7 +63,11 @@ class PromoClaimController extends AbstractController
     }
 
     #[Route('/get-claim', name: 'get_claim', methods: ['GET'])]
-    public function show(Request $request, ServiceBookingRepository $bookings): Response
+    public function show(
+        Request $request,
+        ServiceBookingRepository $bookings,
+        PromoClaimRepository $promoClaims,
+    ): Response
     {
         $user = $this->getUser();
         if (!$user instanceof User) {
@@ -70,18 +75,96 @@ class PromoClaimController extends AbstractController
         }
 
         $id = filter_var($request->query->get('id'), FILTER_VALIDATE_INT);
-        $booking = $id ? $bookings->find($id) : null;
-        if (!$booking instanceof ServiceBooking || $booking->getBundleSlug() === null || ($booking->getUser() !== $user && !$this->isGranted('ROLE_ADMIN'))) {
+        $type = (string) $request->query->get('record_type', 'service_booking');
+        $isAdmin = $user->getRole() === 'admin';
+        if ($type === 'service_booking') {
+            $booking = $id ? $bookings->find($id) : null;
+            if (!$booking instanceof ServiceBooking || $booking->getBundleSlug() === null || ($booking->getUser() !== $user && !$isAdmin)) {
+                throw $this->createNotFoundException('Promotion claim not found.');
+            }
+
+            $record = [
+                'id' => $booking->getId(),
+                'type' => $type,
+                'bundleSlug' => $booking->getBundleSlug(),
+                'selectedOption' => $booking->getBundleOption(),
+                'appointmentDate' => $booking->getBookingDate(),
+                'appointmentTime' => $booking->getBookingTime(),
+                'fullName' => trim($booking->getUser()->getFirstName().' '.$booking->getUser()->getLastName()),
+                'phone' => $booking->getUser()->getPhone(),
+                'vehicleModel' => $booking->getVehicleModel(),
+                'status' => $booking->getStatus() ?? 'Pending',
+            ];
+        } elseif ($type === 'promo_claim') {
+            $claim = $id ? $promoClaims->find($id) : null;
+            if (!$claim instanceof PromoClaim || ($claim->getUser() !== $user && !$isAdmin)) {
+                throw $this->createNotFoundException('Promotion claim not found.');
+            }
+
+            $record = [
+                'id' => $claim->getId(),
+                'type' => $type,
+                'bundleSlug' => $claim->getBundleSlug(),
+                'selectedOption' => $claim->getSelectedOption(),
+                'appointmentDate' => $claim->getAppointmentDate(),
+                'appointmentTime' => $claim->getAppointmentTime(),
+                'fullName' => $claim->getFullName(),
+                'phone' => $claim->getPhone(),
+                'vehicleModel' => null,
+                'status' => $claim->getStatus() ?? 'Pending',
+            ];
+        } else {
             throw $this->createNotFoundException('Promotion claim not found.');
         }
 
-        return $this->render('booking/claim_detail.html.twig', ['booking' => $booking]);
+        return $this->render('booking/claim_detail.html.twig', [
+            'record' => $record,
+            'canEdit' => $user->getRole() === 'customer' && strtolower(trim($record['status'])) !== 'completed',
+        ]);
+    }
+
+    #[Route('/promo-history/{type}/{id}/delete', name: 'promo_claim_delete', requirements: ['type' => 'service_booking|promo_claim', 'id' => '\d+'], methods: ['POST'])]
+    public function delete(
+        string $type,
+        int $id,
+        Request $request,
+        ServiceBookingRepository $bookings,
+        PromoClaimRepository $promoClaims,
+        EntityManagerInterface $entityManager,
+    ): Response {
+        $user = $this->getUser();
+        if (!$user instanceof User || $user->getRole() !== 'customer') {
+            throw $this->createAccessDeniedException();
+        }
+        if (!$this->isCsrfTokenValid('promo_history_delete_'.$type.'_'.$id, (string) $request->request->get('_token'))) {
+            throw $this->createAccessDeniedException('Invalid security token.');
+        }
+
+        $record = match ($type) {
+            'service_booking' => $bookings->find($id),
+            'promo_claim' => $promoClaims->find($id),
+            default => null,
+        };
+        if (
+            (!$record instanceof ServiceBooking && !$record instanceof PromoClaim)
+            || $record->getUser() !== $user
+            || ($record instanceof ServiceBooking && $record->getBundleSlug() === null)
+        ) {
+            throw $this->createNotFoundException('Promotion claim not found.');
+        }
+
+        $entityManager->remove($record);
+        $entityManager->flush();
+        $this->addFlash('success', 'Promotion claim cancelled.');
+
+        return $this->redirectToRoute('promo_history');
     }
 
     #[Route('/update-claim', name: 'update_claim', methods: ['POST'])]
     public function update(
         Request $request,
         ServiceBookingRepository $bookings,
+        PromoClaimRepository $promoClaims,
         PromoRepository $promos,
         EntityManagerInterface $entityManager,
     ): Response {
@@ -94,15 +177,24 @@ class PromoClaimController extends AbstractController
         }
 
         $id = filter_var($request->request->get('claim_id'), FILTER_VALIDATE_INT);
-        $booking = $id ? $bookings->find($id) : null;
-        if (!$booking instanceof ServiceBooking || $booking->getBundleSlug() === null || $booking->getUser() !== $user) {
+        $type = (string) $request->request->get('record_type', 'service_booking');
+        $record = match ($type) {
+            'service_booking' => $id ? $bookings->find($id) : null,
+            'promo_claim' => $id ? $promoClaims->find($id) : null,
+            default => null,
+        };
+        if (
+            (!$record instanceof ServiceBooking && !$record instanceof PromoClaim)
+            || $record->getUser() !== $user
+            || ($record instanceof ServiceBooking && $record->getBundleSlug() === null)
+        ) {
             return $this->respond($request, ['success' => false, 'message' => 'Claim not found or you do not have permission to edit it.'], 404);
         }
-        if (strtolower((string) $booking->getStatus()) === 'completed') {
+        if (strtolower(trim((string) $record->getStatus())) === 'completed') {
             return $this->respond($request, ['success' => false, 'message' => 'Completed promotion claims cannot be edited.'], 422);
         }
 
-        $promo = $promos->findOneBy(['slug' => $booking->getBundleSlug(), 'active' => true]);
+        $promo = $promos->findOneBy(['slug' => $record->getBundleSlug(), 'active' => true]);
         $option = trim((string) $request->request->get('selected_option', ''));
         $dateInput = (string) $request->request->get('appointment_date', '');
         $timeInput = (string) $request->request->get('appointment_time', '');
@@ -121,9 +213,15 @@ class PromoClaimController extends AbstractController
             return $this->respond($request, ['success' => false, 'message' => 'Enter valid appointment details and a current promotion option.'], 422);
         }
 
-        $booking->setBundleOption($option);
-        $booking->setBookingDate($date);
-        $booking->setBookingTime($time);
+        if ($record instanceof ServiceBooking) {
+            $record->setBundleOption($option);
+            $record->setBookingDate($date);
+            $record->setBookingTime($time);
+        } else {
+            $record->setSelectedOption($option);
+            $record->setAppointmentDate($date);
+            $record->setAppointmentTime($time);
+        }
         $entityManager->flush();
 
         return $this->respond($request, ['success' => true, 'message' => 'Promotion appointment updated.']);

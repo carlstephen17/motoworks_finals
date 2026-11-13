@@ -2,9 +2,10 @@
 
 namespace App\Entity;
 
+use App\Repository\CustomerOrderRepository;
 use Doctrine\ORM\Mapping as ORM;
 
-#[ORM\Entity]
+#[ORM\Entity(repositoryClass: CustomerOrderRepository::class)]
 #[ORM\Table(name: 'customer_order')]
 class CustomerOrder
 {
@@ -65,6 +66,26 @@ class CustomerOrder
     public function getUser(): User
     {
         return $this->user;
+    }
+
+    public function getDeliveryAddress(): ?string
+    {
+        return $this->deliveryAddress;
+    }
+
+    public function setDeliveryAddress(?string $deliveryAddress): void
+    {
+        $this->deliveryAddress = $deliveryAddress;
+    }
+
+    public function getPaymentMethod(): ?string
+    {
+        return $this->paymentMethod;
+    }
+
+    public function getPaymentStatus(): string
+    {
+        return $this->paymentStatus;
     }
 
     public function getStatus(): string

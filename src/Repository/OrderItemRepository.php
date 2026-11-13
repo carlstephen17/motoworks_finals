@@ -3,6 +3,7 @@
 namespace App\Repository;
 
 use App\Entity\OrderItem;
+use App\Entity\CustomerOrder;
 use App\Entity\User;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
@@ -21,26 +22,29 @@ class OrderItemRepository extends ServiceEntityRepository
     public function findForUser(User $user): array
     {
         return $this->createQueryBuilder('item')
-            ->leftJoin('item.customerOrder', 'customerOrder')
+            ->innerJoin('item.customerOrder', 'customerOrder')
             ->addSelect('customerOrder')
+            ->innerJoin('item.product', 'product')
+            ->addSelect('product')
             ->andWhere('item.user = :user')
             ->setParameter('user', $user)
-            ->orderBy('customerOrder.createdAt', 'DESC')
-            ->addOrderBy('item.id', 'DESC')
+            ->orderBy('customerOrder.id', 'ASC')
+            ->addOrderBy('item.id', 'ASC')
             ->getQuery()
             ->getResult();
     }
 
     /** @return list<OrderItem> */
-    public function findItemsInGroup(OrderItem $order): array
+    public function findItemsInGroup(OrderItem|CustomerOrder $order): array
     {
-        if (!$order->getCustomerOrder()) {
+        $group = $order instanceof CustomerOrder ? $order : $order->getCustomerOrder();
+        if (!$group instanceof CustomerOrder) {
             return [$order];
         }
 
         return $this->createQueryBuilder('item')
             ->andWhere('item.customerOrder = :group')
-            ->setParameter('group', $order->getCustomerOrder())
+            ->setParameter('group', $group)
             ->getQuery()
             ->getResult();
     }

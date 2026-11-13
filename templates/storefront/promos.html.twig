@@ -144,7 +144,8 @@
 
     <script>
         function openClaimModal(slug, title, itemLabel, options) {
-            if (!isLoggedIn) {
+            if (!window.isLoggedIn) {
+                rememberCustomerAction({type: 'promo_booking', slug, title, itemLabel, options});
                 openModal('login-modal');
                 showModalAlert('login-modal', 'Please log in to claim a promotion bundle.', 'error');
                 return;
@@ -178,7 +179,7 @@
             toast.textContent = message;
             toast.className = 'alert-toast ' + (type === 'success' ? 'alert-success' : 'alert-error');
             toast.style.display = 'block';
-            setTimeout(() => { toast.style.display = 'none'; }, 4000);
+            setTimeout(() => { toast.style.display = 'none'; }, 3000);
         }
 
         function submitClaim(event) {
@@ -203,7 +204,7 @@
                 if (data.success) {
                     showAlert(data.message || 'Promotion successfully claimed.', 'success');
                     closeClaimModal();
-                    setTimeout(() => { window.location.href = '{{ path('promo_history') }}'; }, 1500);
+                    setTimeout(() => { window.location.href = '{{ path('promo_history') }}'; }, 3000);
                 } else {
                     showAlert(data.message || 'Unable to claim promotion.', 'error');
                 }

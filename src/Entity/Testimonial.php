@@ -80,4 +80,11 @@ class Testimonial
     {
         return $this->status;
     }
+
+    public function setStatus(?string $status): static
+    {
+        $this->status = $status;
+
+        return $this;
+    }
 }

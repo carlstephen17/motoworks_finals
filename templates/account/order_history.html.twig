@@ -1,30 +1,251 @@
 {% extends 'base.html.twig' %}
 
-{% block title %}Order history | Bencalo MotoWorks{% endblock %}
+{% block title %}My Order History - Bencalo MotoWorks{% endblock %}
+
+{% block stylesheets %}
+    {{ parent() }}
+    <link rel="stylesheet" href="{{ asset('styles/order_history.css') }}">
+{% endblock %}
 
 {% block body %}
-    <main>
-        <p><a href="{{ path('customer_profile') }}">My account</a></p>
-        <h1>Order history</h1>
-        {% for message in app.flashes('success') %}<p role="status">{{ message }}</p>{% endfor %}
-        {% for message in app.flashes('error') %}<p role="alert">{{ message }}</p>{% endfor %}
-        {% for order in orders %}
-            <article>
-                <h2>{{ order.product.name }}</h2>
-                <p>{{ order.quantity }} × ₱{{ order.unitPrice|default(order.product.price)|number_format(2) }}</p>
-                <p>Total: ₱{{ order.totalAmount|number_format(2) }}</p>
-                <p>Order #{{ order.id }} — {{ order.createdAt ? order.createdAt|date('M j, Y') : '' }}</p>
-                <p>Status: {{ order.customerOrder ? order.customerOrder.status : order.status }}</p>
-                {% if (order.customerOrder ? order.customerOrder.status : order.status) in ['Pending', 'Processing'] %}
-                    <form method="post" action="{{ path('order_cancel', {id: order.id}) }}">
-                        <input type="hidden" name="_token" value="{{ csrf_token('order_cancel_' ~ order.id) }}">
-                        <label>Cancellation reason <input name="reason" required maxlength="1000"></label>
-                        <button type="submit">Cancel checkout order</button>
-                    </form>
-                {% endif %}
-            </article>
-        {% else %}
-            <p>You have no orders yet.</p>
-        {% endfor %}
-    </main>
+    <div class="history-wrapper">
+        <main class="history-container">
+            <h2>My Order History</h2>
+
+            {% for message in app.flashes('success') %}
+                <div class="history-alert history-alert-success" role="status">{{ message }}</div>
+            {% endfor %}
+            {% for message in app.flashes('error') %}
+                <div class="history-alert history-alert-error" role="alert">{{ message }}</div>
+            {% endfor %}
+
+            {% if orders is empty %}
+                <p style="color: #9ca3af;">You haven't placed any orders yet.</p>
+                <a href="{{ path('shop_index') }}" class="btn-row-action btn-edit" style="margin-top: 15px;">Browse Shop</a>
+            {% else %}
+                <div class="order-table-wrapper">
+                    <table class="styled-table">
+                        <thead>
+                            <tr>
+                                <th>Order ID</th>
+                                <th>Product</th>
+                                <th>Quantity</th>
+                                <th>Price</th>
+                                <th>Total Amount</th>
+                                <th>Payment</th>
+                                <th>Reference</th>
+                                <th>Status</th>
+                                <th>Date Placed</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for order in orders %}
+                                {% set status = order.customerOrder.status %}
+                                {% set statusClass = status == 'Pending' ? 'badge-pending' : (status == 'Cancelled' ? 'badge-cancelled' : 'badge-completed') %}
+                                {% set unitPrice = order.unitPrice ?? order.product.price %}
+                                <tr>
+                                    <td>#{{ order.customerOrder.id }}</td>
+                                    <td>
+                                        <div style="display: flex; align-items: center; gap: 10px;">
+                                            {% if order.product.image %}
+                                                <img src="{{ asset(order.product.image) }}" alt="" style="width: 40px; height: 40px; object-fit: cover; border-radius: 6px; border: 1px solid #374151;">
+                                            {% endif %}
+                                            <span>{{ order.product.name }}</span>
+                                        </div>
+                                    </td>
+                                    <td>{{ order.quantity }}</td>
+                                    <td>₱{{ unitPrice|number_format(2) }}</td>
+                                    <td>₱{{ order.totalAmount|number_format(2) }}</td>
+                                    <td>{{ order.customerOrder.paymentMethod ?? 'N/A' }}</td>
+                                    <td>{{ order.customerOrder.paymentReference ?? 'N/A' }}</td>
+                                    <td><span class="badge {{ statusClass }}">{{ status }}</span></td>
+                                    <td>{{ order.customerOrder.createdAt|date('M j, Y') }}</td>
+                                    <td>
+                                        <div class="table-actions">
+                                            <button
+                                                type="button"
+                                                class="btn-row-action btn-view js-view-order"
+                                                data-order-id="{{ order.customerOrder.id }}"
+                                                data-product="{{ order.product.name }}"
+                                                data-quantity="{{ order.quantity }}"
+                                                data-unit-price="{{ unitPrice }}"
+                                                data-total="{{ order.totalAmount }}"
+                                                data-status="{{ status }}"
+                                                data-created-at="{{ order.customerOrder.createdAt|date('Y-m-d H:i:s') }}"
+                                                data-full-name="{{ order.user.firstName }} {{ order.user.lastName }}"
+                                                data-phone="{{ order.user.phone ?? '' }}"
+                                                data-address="{{ order.customerOrder.deliveryAddress ?? '' }}"
+                                                data-payment-method="{{ order.customerOrder.paymentMethod ?? '' }}"
+                                                data-payment-reference="{{ order.customerOrder.paymentReference ?? '' }}"
+                                            >
+                                                <i class="fa-solid fa-eye"></i> View
+                                            </button>
+                                            {% if status == 'Pending' %}
+                                                <button
+                                                    type="button"
+                                                    class="btn-row-action btn-edit js-edit-order"
+                                                    data-edit-url="{{ path('order_edit', {id: order.id}) }}"
+                                                    data-order-id="{{ order.customerOrder.id }}"
+                                                    data-full-name="{{ order.user.firstName }} {{ order.user.lastName }}"
+                                                    data-phone="{{ order.user.phone ?? '' }}"
+                                                    data-address="{{ order.customerOrder.deliveryAddress ?? '' }}"
+                                                    data-quantity="{{ order.quantity }}"
+                                                    data-unit-price="{{ unitPrice }}"
+                                                >
+                                                    <i class="fa-solid fa-pen-to-square"></i> Edit
+                                                </button>
+                                                <form method="post" action="{{ path('order_cancel', {id: order.id}) }}" onsubmit="return confirm('Cancel this complete order? Its stock will be restored and the order record retained.');">
+                                                    <input type="hidden" name="_token" value="{{ csrf_token('order_cancel_' ~ order.id) }}">
+                                                    <button type="submit" class="btn-row-action btn-cancel">
+                                                        <i class="fa-solid fa-trash"></i> Cancel
+                                                    </button>
+                                                </form>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% endif %}
+
+            <a href="{{ path('shop_index') }}" class="back-link">
+                <i class="fa-solid fa-arrow-left"></i> Back to Shop
+            </a>
+        </main>
+    </div>
+
+    <div class="modal-overlay" id="view-order-modal" aria-hidden="true">
+        <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="view-order-title">
+            <header class="modal-header">
+                <h3 id="view-order-title">Order Details <span id="view-order-id"></span></h3>
+                <button type="button" class="modal-close js-close-view-order" aria-label="Close">&times;</button>
+            </header>
+            <div style="display: flex; flex-direction: column; gap: 12px; font-size: 0.95rem; color: #f0f6fc;">
+                <div><strong>Product:</strong> <span id="view-order-product"></span></div>
+                <div><strong>Quantity:</strong> <span id="view-order-quantity"></span></div>
+                <div><strong>Price (Unit):</strong> <span id="view-order-unit-price"></span></div>
+                <div><strong>Total Amount:</strong> <span id="view-order-total"></span></div>
+                <div><strong>Status:</strong> <span id="view-order-status"></span></div>
+                <div><strong>Date Placed:</strong> <span id="view-order-date"></span></div>
+                <div><strong>Full Name:</strong> <span id="view-order-name"></span></div>
+                <div><strong>Phone Number:</strong> <span id="view-order-phone"></span></div>
+                <div><strong>Delivery Address:</strong> <span id="view-order-address"></span></div>
+                <div><strong>Payment Method:</strong> <span id="view-order-payment"></span></div>
+                <div><strong>Payment Reference:</strong> <span id="view-order-reference"></span></div>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn-modal-secondary js-close-view-order">Close</button>
+            </div>
+        </section>
+    </div>
+
+    <div class="modal-overlay" id="edit-order-modal" aria-hidden="true">
+        <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="edit-order-title">
+            <header class="modal-header">
+                <h3 id="edit-order-title">Edit Order <span id="edit-order-id"></span></h3>
+                <button type="button" class="modal-close js-close-edit-order" aria-label="Close">&times;</button>
+            </header>
+            {{ form_start(editForm, {attr: {id: 'edit-order-form'}}) }}
+                {{ form_errors(editForm) }}
+                <div class="modal-form-group">
+                    <label for="edit-order-name">Full Name</label>
+                    <input type="text" id="edit-order-name" class="modal-form-control" readonly>
+                </div>
+                <div class="modal-form-group">
+                    <label for="edit-order-phone">Phone Number</label>
+                    <input type="text" id="edit-order-phone" class="modal-form-control" readonly>
+                </div>
+                <div class="modal-form-group">
+                    {{ form_label(editForm.quantity, 'Quantity') }}
+                    {{ form_widget(editForm.quantity, {attr: {class: 'modal-form-control', id: 'edit-order-quantity', oninput: 'calculateEditTotal()'}}) }}
+                    {{ form_errors(editForm.quantity) }}
+                </div>
+                <div class="modal-form-group">
+                    <label>Updated Total Price</label>
+                    <div id="edit-order-total" style="font-size: 1.1rem; font-weight: bold; color: #10b981;">₱0.00</div>
+                </div>
+                <div class="modal-form-group">
+                    {{ form_label(editForm.address, 'Delivery Address') }}
+                    {{ form_widget(editForm.address, {attr: {class: 'modal-form-control', rows: 3, id: 'edit-order-address'}}) }}
+                    {{ form_errors(editForm.address) }}
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn-modal-secondary js-close-edit-order">Cancel</button>
+                    <button type="submit" class="btn-modal-primary">Save Changes</button>
+                </div>
+            {{ form_end(editForm) }}
+        </section>
+    </div>
+
+    <script>
+        const viewOrderModal = document.getElementById('view-order-modal');
+        const editOrderModal = document.getElementById('edit-order-modal');
+        const editOrderForm = document.getElementById('edit-order-form');
+        let currentUnitPrice = 0;
+
+        function setOrderModalOpen(modal, isOpen) {
+            modal.classList.toggle('active', isOpen);
+            modal.setAttribute('aria-hidden', String(!isOpen));
+        }
+
+        function calculateEditTotal() {
+            const quantity = Number.parseInt(editOrderForm.elements['order_edit[quantity]'].value, 10) || 0;
+            const total = quantity * currentUnitPrice;
+            document.getElementById('edit-order-total').textContent = '₱' + total.toLocaleString('en-PH', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            });
+        }
+
+        document.querySelectorAll('.js-view-order').forEach((button) => {
+            button.addEventListener('click', () => {
+                const values = button.dataset;
+                document.getElementById('view-order-id').textContent = '#' + values.orderId;
+                document.getElementById('view-order-product').textContent = values.product;
+                document.getElementById('view-order-quantity').textContent = values.quantity;
+                document.getElementById('view-order-unit-price').textContent = '₱' + Number(values.unitPrice).toFixed(2);
+                document.getElementById('view-order-total').textContent = '₱' + Number(values.total).toFixed(2);
+                document.getElementById('view-order-status').textContent = values.status;
+                document.getElementById('view-order-date').textContent = values.createdAt;
+                document.getElementById('view-order-name').textContent = values.fullName;
+                document.getElementById('view-order-phone').textContent = values.phone;
+                document.getElementById('view-order-address').textContent = values.address;
+                document.getElementById('view-order-payment').textContent = values.paymentMethod || 'Cash on Delivery';
+                document.getElementById('view-order-reference').textContent = values.paymentReference || 'N/A';
+                setOrderModalOpen(viewOrderModal, true);
+            });
+        });
+
+        document.querySelectorAll('.js-edit-order').forEach((button) => {
+            button.addEventListener('click', () => {
+                const values = button.dataset;
+                editOrderForm.action = values.editUrl;
+                document.getElementById('edit-order-id').textContent = '#' + values.orderId;
+                document.getElementById('edit-order-name').value = values.fullName;
+                document.getElementById('edit-order-phone').value = values.phone;
+                document.getElementById('edit-order-address').value = values.address;
+                editOrderForm.elements['order_edit[quantity]'].value = values.quantity;
+                currentUnitPrice = Number(values.unitPrice) || 0;
+                calculateEditTotal();
+                setOrderModalOpen(editOrderModal, true);
+            });
+        });
+
+        document.querySelectorAll('.js-close-view-order').forEach((button) => {
+            button.addEventListener('click', () => setOrderModalOpen(viewOrderModal, false));
+        });
+        document.querySelectorAll('.js-close-edit-order').forEach((button) => {
+            button.addEventListener('click', () => setOrderModalOpen(editOrderModal, false));
+        });
+        [viewOrderModal, editOrderModal].forEach((modal) => {
+            modal.addEventListener('click', (event) => {
+                if (event.target === modal) {
+                    setOrderModalOpen(modal, false);
+                }
+            });
+        });
+    </script>
 {% endblock %}

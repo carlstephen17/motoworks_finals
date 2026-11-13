@@ -13,13 +13,13 @@
             <h2 style="text-align: center; margin-bottom: 24px; color: #fff;">Sign In to Your Account</h2>
 
             {% for message in app.flashes('error') %}
-                <div class="alert alert-error" style="background: rgba(220, 53, 69, 0.2); color: #ea868f; padding: 12px; border-radius: 6px; margin-bottom: 16px; font-size: 0.9rem;">
+                <div class="alert alert-error" role="alert" style="background: rgba(220, 53, 69, 0.2); color: #ea868f; padding: 12px; border-radius: 6px; margin-bottom: 16px; font-size: 0.9rem;">
                     {{ message }}
                 </div>
             {% endfor %}
 
             {% if error %}
-                <div class="alert alert-error" style="background: rgba(220, 53, 69, 0.2); color: #ea868f; padding: 12px; border-radius: 6px; margin-bottom: 16px; font-size: 0.9rem;">
+                <div class="alert alert-error" role="alert" style="background: rgba(220, 53, 69, 0.2); color: #ea868f; padding: 12px; border-radius: 6px; margin-bottom: 16px; font-size: 0.9rem;">
                     {{ error.messageKey|trans(error.messageData, 'security') }}
                 </div>
             {% endif %}
@@ -38,6 +38,10 @@
                 </div>
 
                 <div class="auth-options" style="display: flex; justify-content: space-between; align-items: center; margin: 8px 0;">
+                    <label class="checkbox-label">
+                        <input type="checkbox" name="_remember_me">
+                        Remember Me
+                    </label>
                     <a href="{{ path('password_forgot') }}" style="color: var(--color-primary, #00bcd4); font-size: 0.85rem; text-decoration: none;">Forgot password?</a>
                 </div>
 

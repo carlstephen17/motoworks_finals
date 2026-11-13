@@ -7,18 +7,55 @@
     {% for message in app.flashes('success') %}<p role="status">{{ message }}</p>{% endfor %}
     {% for message in app.flashes('error') %}<p role="alert">{{ message }}</p>{% endfor %}
     <p><a href="{{ path('admin_appointment_new') }}">Create appointment</a></p>
+    <section aria-label="Appointment totals">
+        <p>Total: {{ counts.total }}</p>
+        <p>Pending: {{ counts.pending }}</p>
+        <p>Cancelled: {{ counts.cancelled }}</p>
+        <p>Completed: {{ counts.completed }}</p>
+    </section>
+    <form method="get" action="{{ path('admin_appointments') }}">
+        <label for="appointmentSearch">Search by customer, vehicle, service, or appointment ID</label>
+        <input id="appointmentSearch" name="search" value="{{ search }}" autocomplete="off">
+        <label for="appointmentStatus">Status</label>
+        <select id="appointmentStatus" name="status">
+            <option value="">All statuses</option>
+            {% for option in ['Pending', 'Cancelled', 'Completed'] %}
+                <option value="{{ option }}" {{ status == option ? 'selected' : '' }}>{{ option }}</option>
+            {% endfor %}
+        </select>
+        <button type="submit">Search</button>
+        <a href="{{ path('admin_appointments') }}">Clear</a>
+    </form>
+    <table>
+        <thead><tr><th>ID</th><th>Customer</th><th>Service</th><th>Vehicle</th><th>Date and time</th><th>Bundle</th><th>Status</th><th>Notes</th><th>Actions</th></tr></thead>
+        <tbody>
     {% for booking in bookings %}
-        <article>
-            <h2>{{ booking.service.name }} — {{ booking.bookingDate|date('M j, Y') }} {{ booking.bookingTime|date('g:i A') }}</h2>
-            <p>{{ booking.user.firstName }} {{ booking.user.lastName }} · {{ booking.vehicleModel }} · {{ booking.status }}</p>
-            <a href="{{ path('admin_appointment_edit', {id: booking.id}) }}">Edit appointment details</a>
+        <tr>
+            <td>{{ booking.id }}</td>
+            <td>{{ booking.user.firstName }} {{ booking.user.lastName }}<br>{{ booking.user.email }}<br>{{ booking.user.phone }}</td>
+            <td>{{ booking.service.name }}</td>
+            <td>{{ booking.vehicleModel }}{% if booking.motorcycle and booking.motorcycle.plateNumber %}<br>{{ booking.motorcycle.plateNumber }}{% endif %}</td>
+            <td>{{ booking.bookingDate|date('M j, Y') }}<br>{{ booking.bookingTime|date('g:i A') }}</td>
+            <td>{{ booking.bundleSlug }}{% if booking.bundleOption %}<br>{{ booking.bundleOption }}{% endif %}</td>
+            <td>{{ booking.status }}{% if booking.rejectionReason %}<br>{{ booking.rejectionReason }}{% endif %}</td>
+            <td>{{ booking.notes }}</td>
+            <td>
+            <a href="{{ path('admin_appointment_edit', {id: booking.id}) }}">Edit</a>
             <form method="post" action="{{ path('admin_appointment_status', {id: booking.id}) }}">
                 <input type="hidden" name="_token" value="{{ csrf_token('admin_appointment_status_' ~ booking.id) }}">
                 <select name="status">{% for status in ['Pending','Confirmed','Completed','Cancelled','Rejected'] %}<option {{ booking.status == status ? 'selected' : '' }}>{{ status }}</option>{% endfor %}</select>
                 <button type="submit">Update status</button>
             </form>
-            <form method="post" action="{{ path('admin_appointment_delete', {id: booking.id}) }}"><input type="hidden" name="_token" value="{{ csrf_token('admin_appointment_delete_' ~ booking.id) }}"><button>Delete</button></form>
-        </article>
-    {% else %}<p>No appointments.</p>{% endfor %}
+            <form method="post" action="{{ path('admin_appointment_delete', {id: booking.id}) }}" onsubmit="return confirm('Delete this appointment?')">
+                <input type="hidden" name="_token" value="{{ csrf_token('admin_appointment_delete_' ~ booking.id) }}">
+                <button type="submit">Delete</button>
+            </form>
+            </td>
+        </tr>
+    {% else %}
+        <tr><td colspan="9">No appointments match your filters.</td></tr>
+    {% endfor %}
+        </tbody>
+    </table>
 </main>
 {% endblock %}

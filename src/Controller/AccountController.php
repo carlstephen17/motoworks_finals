@@ -4,11 +4,13 @@ namespace App\Controller;
 
 use App\Entity\User;
 use App\Entity\OrderItem;
+use App\Form\OrderEditType;
 use App\Form\ProfileType;
 use App\Repository\OrderItemRepository;
 use App\Repository\ServiceBookingRepository;
 use App\Repository\UserRepository;
 use App\Service\ImageUploader;
+use App\Service\OrderEditManager;
 use App\Service\OrderStatusManager;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -29,7 +31,7 @@ class AccountController extends AbstractController
         }
         $form = $this->createForm(ProfileType::class, $user)->handleRequest($request);
         if ($form->isSubmitted() && $form->isValid()) {
-            $existingEmail = $users->findOneBy(['email' => $user->getEmail()]);
+            $existingEmail = $users->findByEmailInsensitive($user->getEmail());
             if ($existingEmail && $existingEmail->getId() !== $user->getId()) {
                 $this->addFlash('error', 'That email address is already in use.');
             } else {
@@ -57,12 +59,13 @@ class AccountController extends AbstractController
     {
         $this->denyAccessUnlessGranted('ROLE_USER');
         $user = $this->getUser();
-        if (!$user instanceof User) {
+        if (!$user instanceof User || $user->getRole() !== 'customer') {
             throw $this->createAccessDeniedException();
         }
 
         return $this->render('account/order_history.html.twig', [
             'orders' => $orders->findForUser($user),
+            'editForm' => $this->createForm(OrderEditType::class)->createView(),
         ]);
     }
 
@@ -70,7 +73,7 @@ class AccountController extends AbstractController
     public function cancelOrder(int $id, Request $request, OrderItemRepository $orders, OrderStatusManager $orderStatusManager): Response
     {
         $user = $this->getUser();
-        if (!$user instanceof User) {
+        if (!$user instanceof User || $user->getRole() !== 'customer') {
             throw $this->createAccessDeniedException();
         }
         if (!$this->isCsrfTokenValid('order_cancel_'.$id, (string) $request->request->get('_token'))) {
@@ -81,16 +84,60 @@ class AccountController extends AbstractController
             throw $this->createNotFoundException('Order not found.');
         }
 
-        $reason = trim((string) $request->request->get('reason', ''));
-        if ($reason === '' || mb_strlen($reason) > 500) {
-            $this->addFlash('error', 'Provide a cancellation reason of no more than 500 characters.');
+        if ($order->getCustomerOrder()?->getStatus() !== 'Pending') {
+            $this->addFlash('error', 'Only pending orders can be cancelled.');
 
             return $this->redirectToRoute('order_history');
         }
 
         try {
-            $orderStatusManager->updateStatus($order, 'Cancelled', $reason);
+            $orderStatusManager->updateStatus($order, 'Cancelled', 'Cancelled by customer');
             $this->addFlash('success', 'Order cancelled and stock restored.');
+        } catch (\DomainException $exception) {
+            $this->addFlash('error', $exception->getMessage());
+        }
+
+        return $this->redirectToRoute('order_history');
+    }
+
+    #[Route('/order-history/{id}/edit', name: 'order_edit', requirements: ['id' => '\d+'], methods: ['POST'])]
+    public function editOrder(
+        int $id,
+        Request $request,
+        OrderItemRepository $orders,
+        OrderEditManager $orderEditManager,
+    ): Response {
+        $user = $this->getUser();
+        if (!$user instanceof User || $user->getRole() !== 'customer') {
+            throw $this->createAccessDeniedException();
+        }
+
+        $order = $orders->find($id);
+        if (!$order instanceof OrderItem || $order->getUser() !== $user) {
+            throw $this->createNotFoundException('Order not found.');
+        }
+
+        $form = $this->createForm(OrderEditType::class)->handleRequest($request);
+        if (!$form->isSubmitted() || !$form->isValid()) {
+            $errors = [];
+            foreach ($form->getErrors(true) as $error) {
+                $errors[] = $error->getMessage();
+            }
+            $this->addFlash('error', $errors[0] ?? 'Enter a valid quantity and delivery address.');
+
+            return $this->redirectToRoute('order_history');
+        }
+
+        try {
+            $orderEditManager->updatePendingOrder(
+                $order,
+                (int) $form->get('quantity')->getData(),
+                (string) $form->get('address')->getData(),
+            );
+            $this->addFlash('success', sprintf(
+                'Order #%d updated successfully.',
+                $order->getCustomerOrder()?->getId(),
+            ));
         } catch (\DomainException $exception) {
             $this->addFlash('error', $exception->getMessage());
         }

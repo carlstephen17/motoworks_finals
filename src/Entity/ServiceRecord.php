@@ -101,6 +101,16 @@ class ServiceRecord
         return $this->service;
     }
 
+    public function setMotorcycle(?Motorcycle $motorcycle): void
+    {
+        $this->motorcycle = $motorcycle;
+        if ($motorcycle !== null) {
+            $this->motorcycleModel = $motorcycle->getModel();
+            $this->plateNumber = $motorcycle->getPlateNumber();
+        }
+        $this->touch();
+    }
+
     public function setService(Service $service): void
     {
         $this->service = $service;
@@ -115,6 +125,11 @@ class ServiceRecord
     public function getMotorcycleModel(): string
     {
         return $this->motorcycleModel;
+    }
+
+    public function getPlateNumber(): ?string
+    {
+        return $this->plateNumber;
     }
 
     public function getServiceDate(): \DateTimeImmutable

@@ -129,17 +129,17 @@ class StorefrontController extends AbstractController
     #[Route('/services', name: 'service_index', methods: ['GET'])]
     public function services(ServiceRepository $services): Response
     {
-        return $this->render('storefront/services.html.twig', [
+        return $this->render('storefront/services.html.twig', array_merge([
             'services' => $services->findActiveServices(),
-        ]);
+        ], $this->authModalFormViews()));
     }
 
     #[Route('/promos', name: 'promo_index', methods: ['GET'])]
     public function promos(PromoRepository $promos, ServiceRepository $services): Response
     {
-        return $this->render('storefront/promos.html.twig', [
+        return $this->render('storefront/promos.html.twig', array_merge([
             'promos' => $promos->findActivePromos(),
             'bookingServices' => $services->findActiveServices(),
-        ]);
+        ], $this->authModalFormViews()));
     }
 }

@@ -3,6 +3,7 @@
 namespace App\Controller;
 
 use App\Entity\CustomerOrder;
+use App\Entity\Motorcycle;
 use App\Entity\OrderItem;
 use App\Entity\Promo;
 use App\Entity\PromoClaim;
@@ -12,9 +13,11 @@ use App\Entity\ServiceBooking;
 use App\Entity\ServiceRecord;
 use App\Entity\User;
 use App\Form\PromoClaimUpdateType;
+use App\Form\StaffOrderItemType;
 use App\Form\ServiceBookingType;
 use App\Form\ServiceRecordUpdateType;
-use App\Repository\OrderItemRepository;
+use App\Repository\CustomerOrderRepository;
+use App\Repository\MotorcycleRepository;
 use App\Repository\PromoClaimRepository;
 use App\Repository\PromoRepository;
 use App\Repository\ProductRepository;
@@ -27,14 +30,19 @@ use Doctrine\DBAL\LockMode;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\Form\Extension\Core\Type\ChoiceType;
+use Symfony\Component\Form\Extension\Core\Type\CollectionType;
 use Symfony\Component\Form\Extension\Core\Type\DateType;
-use Symfony\Component\Form\Extension\Core\Type\IntegerType;
 use Symfony\Component\Form\Extension\Core\Type\TextareaType;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
 use Symfony\Component\Form\Extension\Core\Type\TimeType;
+use Symfony\Component\Form\FormBuilderInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Validator\Constraints\Length;
+use Symfony\Component\Validator\Constraints\Count;
+use Symfony\Component\Validator\Constraints\NotBlank;
+use Symfony\Component\Validator\Constraints\Regex;
 
 #[Route('/staff')]
 class StaffController extends AbstractController
@@ -42,7 +50,7 @@ class StaffController extends AbstractController
     #[Route('', name: 'staff_dashboard', methods: ['GET'])]
     public function dashboard(
         ServiceBookingRepository $bookings,
-        OrderItemRepository $orders,
+        CustomerOrderRepository $orders,
         PromoClaimRepository $claims,
         ServiceRecordRepository $records,
     ): Response {
@@ -57,10 +65,25 @@ class StaffController extends AbstractController
     }
 
     #[Route('/appointments', name: 'staff_appointments', methods: ['GET'])]
-    public function appointments(ServiceBookingRepository $bookings): Response
+    public function appointments(Request $request, ServiceBookingRepository $bookings): Response
     {
+        $search = $request->query->get('search');
+        $search = is_string($search) ? trim($search) : '';
+        $status = $request->query->get('status');
+        $status = is_string($status) && in_array($status, ['Pending', 'Cancelled', 'Completed'], true) ? $status : '';
+        $date = $this->parseDateFilter($request->query->get('date'));
+        $source = $request->query->get('source');
+        $source = is_string($source) && in_array($source, ['online', 'staff', 'admin'], true) ? $source : '';
+
         return $this->render('staff/appointments.html.twig', [
-            'bookings' => $bookings->findBy([], ['id' => 'DESC']),
+            'bookings' => $bookings->findForStaff($search, $status, $date, $source),
+            'counts' => $bookings->getAdminStatusCounts(),
+            'filters' => [
+                'search' => $search,
+                'status' => $status,
+                'date' => $date?->format('Y-m-d') ?? '',
+                'source' => $source,
+            ],
         ]);
     }
 
@@ -68,13 +91,14 @@ class StaffController extends AbstractController
     public function appointmentNew(
         Request $request,
         UserRepository $users,
+        MotorcycleRepository $motorcycles,
         ServiceRepository $services,
         EntityManagerInterface $entityManager,
     ): Response {
         $staff = $this->requireStaff();
         $customers = $users->findBy(['role' => 'customer'], ['firstName' => 'ASC']);
         $serviceList = $services->findActiveServices();
-        $form = $this->bookingForm($customers, $serviceList);
+        $form = $this->bookingForm($customers, $serviceList, $motorcycles->findBy([], ['model' => 'ASC']));
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
@@ -83,19 +107,41 @@ class StaffController extends AbstractController
             $service = $services->find((int) $data['serviceId']);
             $date = $data['bookingDate'];
             $time = $data['bookingTime'];
-            $vehicle = trim((string) $data['vehicleModel']);
-            if (!$customer || !$service || !$service->isActive() || !$date instanceof \DateTimeImmutable || !$time instanceof \DateTimeImmutable || $vehicle === '') {
+            if (!$customer || !$service || !$service->isActive() || !$date instanceof \DateTimeImmutable || !$time instanceof \DateTimeImmutable) {
                 $this->addFlash('error', 'Choose a customer, service, motorcycle, and valid appointment time.');
             } else {
-                $booking = new ServiceBooking($customer, $service, $vehicle, $date, $time, null, null, trim((string) ($data['notes'] ?? '')) ?: null);
-                $booking->setSource('staff');
-                $booking->setCreatedByStaff($staff);
-                $booking->setStatus('Pending');
-                $entityManager->persist($booking);
-                $entityManager->flush();
-                $this->addFlash('success', 'Appointment created.');
+                try {
+                    $motorcycle = $this->resolveCustomerMotorcycle(
+                        $customer,
+                        (string) $data['motorcycleMode'],
+                        (int) ($data['motorcycleId'] ?? 0),
+                        (string) ($data['motorcycleModel'] ?? ''),
+                        (string) ($data['plateNumber'] ?? ''),
+                        $motorcycles,
+                        $entityManager,
+                    );
+                    $booking = new ServiceBooking(
+                        $customer,
+                        $service,
+                        $motorcycle->getModel(),
+                        $date,
+                        $time,
+                        null,
+                        null,
+                        trim((string) ($data['notes'] ?? '')) ?: null,
+                    );
+                    $booking->setMotorcycle($motorcycle);
+                    $booking->setSource('staff');
+                    $booking->setCreatedByStaff($staff);
+                    $booking->setStatus('Pending');
+                    $entityManager->persist($booking);
+                    $entityManager->flush();
+                    $this->addFlash('success', 'Appointment created.');
 
-                return $this->redirectToRoute('staff_appointments');
+                    return $this->redirectToRoute('staff_appointments');
+                } catch (\InvalidArgumentException $exception) {
+                    $this->addFlash('error', $exception->getMessage());
+                }
             }
         }
 
@@ -117,7 +163,14 @@ class StaffController extends AbstractController
         if (!in_array($status, ['Pending', 'Confirmed', 'Completed', 'Cancelled', 'Rejected'], true)) {
             throw $this->createNotFoundException('Invalid appointment status.');
         }
+        $rejectionReason = trim((string) $request->request->get('rejectionReason', ''));
+        if (mb_strlen($rejectionReason) > 1000) {
+            $this->addFlash('error', 'Cancellation reason must be no more than 1000 characters.');
+
+            return $this->redirectToRoute('staff_appointments');
+        }
         $booking->setStatus($status);
+        $booking->setRejectionReason(in_array($status, ['Cancelled', 'Rejected'], true) ? ($rejectionReason ?: null) : null);
         $entityManager->flush();
         $this->addFlash('success', 'Appointment updated.');
 
@@ -167,9 +220,40 @@ class StaffController extends AbstractController
     }
 
     #[Route('/orders', name: 'staff_orders', methods: ['GET'])]
-    public function orders(OrderItemRepository $orders): Response
+    public function orders(Request $request, CustomerOrderRepository $orders): Response
     {
-        return $this->render('staff/orders.html.twig', ['orders' => $orders->findBy([], ['id' => 'DESC'])]);
+        $search = $request->query->get('search');
+        $search = is_string($search) ? trim($search) : '';
+        $status = $request->query->get('status');
+        $status = is_string($status) && in_array($status, ['Pending', 'Cancelled', 'Completed'], true) ? $status : '';
+        $paymentStatus = $request->query->get('payment_status');
+        $paymentStatus = is_string($paymentStatus) && in_array($paymentStatus, ['Due on delivery', 'Unverified'], true) ? $paymentStatus : '';
+        $dateFrom = $this->parseDateFilter($request->query->get('date_from'));
+        $dateTo = $this->parseDateFilter($request->query->get('date_to'));
+        $page = filter_var($request->query->get('page', 1), FILTER_VALIDATE_INT);
+        $page = $page !== false && $page > 0 ? $page : 1;
+        $perPage = 50;
+        $totalOrders = $orders->countForStaff($search, $status, $paymentStatus, $dateFrom, $dateTo?->modify('+1 day'));
+        $totalPages = max(1, (int) ceil($totalOrders / $perPage));
+        $page = min($page, $totalPages);
+        $groups = $orders->findForStaff($search, $status, $paymentStatus, $dateFrom, $dateTo?->modify('+1 day'), $perPage, ($page - 1) * $perPage);
+        $groupIds = array_map(static fn (array $order): int => (int) $order['orderGroupId'], $groups);
+
+        return $this->render('staff/orders.html.twig', [
+            'orders' => $groups,
+            'itemsByOrder' => $orders->findItemsForGroups($groupIds),
+            'counts' => $orders->getStatusCounts(),
+            'filters' => [
+                'search' => $search,
+                'status' => $status,
+                'paymentStatus' => $paymentStatus,
+                'dateFrom' => $dateFrom?->format('Y-m-d') ?? '',
+                'dateTo' => $dateTo?->format('Y-m-d') ?? '',
+            ],
+            'page' => $page,
+            'totalPages' => $totalPages,
+            'totalOrders' => $totalOrders,
+        ]);
     }
 
     #[Route('/orders/new', name: 'staff_order_new', methods: ['GET', 'POST'])]
@@ -188,37 +272,59 @@ class StaffController extends AbstractController
         if ($form->isSubmitted() && $form->isValid()) {
             $data = $form->getData();
             $customer = $users->find((int) $data['customerId']);
-            $productId = (int) $data['productId'];
-            $quantity = (int) $data['quantity'];
-            $product = $entityManager->find(Product::class, $productId);
-            if (!$customer || !$product || !$product->isActive() || $quantity < 1) {
-                $this->addFlash('error', 'Choose a valid customer, product, and quantity.');
+            $deliveryAddress = trim((string) $data['deliveryAddress']);
+            $requestedItems = [];
+            foreach ($data['items'] as $item) {
+                $productId = (int) $item['productId'];
+                $requestedItems[$productId] = ($requestedItems[$productId] ?? 0) + (int) $item['quantity'];
+            }
+            if (
+                !$customer
+                || $customer->getRole() !== 'customer'
+                || $deliveryAddress === ''
+                || mb_strlen($deliveryAddress) > 2000
+                || count($data['items']) < 1
+                || count($data['items']) > 20
+                || array_filter($requestedItems, static fn (int $quantity): bool => $quantity < 1 || $quantity > 999)
+            ) {
+                $this->addFlash('error', 'Choose a customer, delivery address, and between 1 and 20 valid order items.');
             } else {
                 $connection = $entityManager->getConnection();
                 $connection->beginTransaction();
                 try {
-                    $product = $entityManager->find(Product::class, $productId, LockMode::PESSIMISTIC_WRITE);
-                    if (!$product || $quantity > $product->getStock()) {
-                        throw new \DomainException('The requested quantity is not available.');
+                    ksort($requestedItems, SORT_NUMERIC);
+                    $lockedProducts = [];
+                    foreach ($requestedItems as $productId => $quantity) {
+                        $product = $entityManager->find(Product::class, $productId, LockMode::PESSIMISTIC_WRITE);
+                        if (!$product instanceof Product || !$product->isActive()) {
+                            throw new \DomainException('One or more selected products are unavailable.');
+                        }
+                        if ($quantity > $product->getStock()) {
+                            throw new \DomainException($product->getName().' has only '.$product->getStock().' in stock.');
+                        }
+                        $lockedProducts[$productId] = $product;
                     }
-                    $paymentMethod = (string) $data['paymentMethod'];
                     $reference = 'MWO-'.(new \DateTimeImmutable())->format('Ymd').'-'.strtoupper(bin2hex(random_bytes(4)));
-                    $orderGroup = new CustomerOrder($customer, $customer->getAddress() ?? '', $paymentMethod, $reference);
+                    $paymentMethod = 'Cash on Delivery';
+                    $orderGroup = new CustomerOrder($customer, $deliveryAddress, $paymentMethod, $reference);
                     $orderGroup->setCreatedByStaff($this->requireStaff());
                     $entityManager->persist($orderGroup);
                     $entityManager->flush();
-                    $unitPrice = $product->getPrice();
-                    $product->setStock($product->getStock() - $quantity);
-                    $entityManager->persist(new OrderItem(
-                        $customer,
-                        $product,
-                        $quantity,
-                        number_format((float) $unitPrice * $quantity, 2, '.', ''),
-                        $paymentMethod,
-                        $reference,
-                        $orderGroup,
-                        $unitPrice,
-                    ));
+                    foreach ($requestedItems as $productId => $quantity) {
+                        $product = $lockedProducts[$productId];
+                        $unitPrice = $product->getPrice();
+                        $product->setStock($product->getStock() - $quantity);
+                        $entityManager->persist(new OrderItem(
+                            $customer,
+                            $product,
+                            $quantity,
+                            number_format((float) $unitPrice * $quantity, 2, '.', ''),
+                            $paymentMethod,
+                            $reference,
+                            $orderGroup,
+                            $unitPrice,
+                        ));
+                    }
                     $entityManager->flush();
                     $connection->commit();
                     $this->addFlash('success', 'Order created.');
@@ -239,7 +345,7 @@ class StaffController extends AbstractController
     }
 
     #[Route('/orders/{id}/status', name: 'staff_order_status_update', requirements: ['id' => '\d+'], methods: ['POST'])]
-    public function orderStatus(int $id, Request $request, OrderItemRepository $orders, OrderStatusManager $orderStatusManager): Response
+    public function orderStatus(int $id, Request $request, CustomerOrderRepository $orders, OrderStatusManager $orderStatusManager): Response
     {
         $this->requireStaff();
         $order = $orders->find($id) ?? throw $this->createNotFoundException('Order not found.');
@@ -259,7 +365,7 @@ class StaffController extends AbstractController
     }
 
     #[Route('/orders/{id}/delete', name: 'staff_order_delete', requirements: ['id' => '\d+'], methods: ['POST'])]
-    public function orderDelete(int $id, Request $request, OrderItemRepository $orders, OrderStatusManager $orderStatusManager): Response
+    public function orderDelete(int $id, Request $request, CustomerOrderRepository $orders, OrderStatusManager $orderStatusManager): Response
     {
         $this->requireStaff();
         $order = $orders->find($id) ?? throw $this->createNotFoundException('Order not found.');
@@ -275,9 +381,19 @@ class StaffController extends AbstractController
     }
 
     #[Route('/promo-history', name: 'staff_promo_history', methods: ['GET'])]
-    public function promoHistory(PromoClaimRepository $claims): Response
+    public function promoHistory(Request $request, PromoClaimRepository $claims): Response
     {
-        return $this->render('staff/promo_history.html.twig', ['claims' => $claims->findBy([], ['id' => 'DESC'])]);
+        $search = $request->query->get('search');
+        $search = is_string($search) ? trim($search) : '';
+        $status = $request->query->get('status');
+        $status = is_string($status) && in_array($status, ['Pending', 'Confirmed', 'Completed', 'Cancelled'], true) ? $status : '';
+
+        return $this->render('staff/promo_history.html.twig', [
+            'claims' => $claims->findForStaff($search, $status),
+            'counts' => $claims->getStaffStatusCounts(),
+            'search' => $search,
+            'status' => $status,
+        ]);
     }
 
     #[Route('/promo-claims/new', name: 'staff_promo_claim_new', methods: ['GET', 'POST'])]
@@ -437,40 +553,62 @@ class StaffController extends AbstractController
     }
 
     #[Route('/service-records/new', name: 'staff_service_record_new', methods: ['GET', 'POST'])]
-    public function serviceRecordNew(Request $request, UserRepository $users, ServiceRepository $services, EntityManagerInterface $entityManager): Response
+    public function serviceRecordNew(Request $request, UserRepository $users, MotorcycleRepository $motorcycles, ServiceRepository $services, EntityManagerInterface $entityManager): Response
     {
         $staff = $this->requireStaff();
         $customers = $users->findBy(['role' => 'customer'], ['firstName' => 'ASC']);
         $serviceList = $services->findActiveServices();
-        $form = $this->serviceRecordForm($customers, $serviceList);
+        $form = $this->serviceRecordForm($customers, $serviceList, $motorcycles->findBy([], ['model' => 'ASC']));
         $form->handleRequest($request);
         if ($form->isSubmitted() && $form->isValid()) {
             $data = $form->getData();
             $customer = $users->find((int) $data['customerId']);
             $service = $services->find((int) $data['serviceId']);
             $date = $data['serviceDate'];
-            $model = trim((string) $data['motorcycleModel']);
             $description = trim((string) $data['workDescription']);
-            if (!$customer || !$service || !$date instanceof \DateTimeImmutable || $model === '' || $description === '') {
+            $cost = trim((string) ($data['cost'] ?? ''));
+            if ($cost !== '' && preg_match('/^\d{1,8}(?:\.\d{1,2})?$/', $cost) !== 1) {
+                $this->addFlash('error', 'Enter a service cost with up to 8 whole-number digits and 2 decimal places.');
+            } elseif (
+                !$customer
+                || !$service
+                || !$service->isActive()
+                || !$date instanceof \DateTimeImmutable
+                || $description === ''
+            ) {
                 $this->addFlash('error', 'Complete the customer, service, motorcycle, and work description.');
             } else {
-                $record = new ServiceRecord(
-                    $customer,
-                    $service,
-                    $staff,
-                    $model,
-                    $date,
-                    $description,
-                    trim((string) ($data['plateNumber'] ?? '')) ?: null,
-                    trim((string) ($data['partsUsed'] ?? '')) ?: null,
-                    trim((string) ($data['cost'] ?? '')) ?: null,
-                    trim((string) ($data['notes'] ?? '')) ?: null,
-                );
-                $entityManager->persist($record);
-                $entityManager->flush();
-                $this->addFlash('success', 'Service record created.');
+                try {
+                    $motorcycle = $this->resolveCustomerMotorcycle(
+                        $customer,
+                        (string) $data['motorcycleMode'],
+                        (int) ($data['motorcycleId'] ?? 0),
+                        (string) ($data['motorcycleModel'] ?? ''),
+                        (string) ($data['plateNumber'] ?? ''),
+                        $motorcycles,
+                        $entityManager,
+                    );
+                    $record = new ServiceRecord(
+                        $customer,
+                        $service,
+                        $staff,
+                        $motorcycle->getModel(),
+                        $date,
+                        $description,
+                        $motorcycle->getPlateNumber(),
+                        trim((string) ($data['partsUsed'] ?? '')) ?: null,
+                        $cost !== '' ? $cost : null,
+                        trim((string) ($data['notes'] ?? '')) ?: null,
+                    );
+                    $record->setMotorcycle($motorcycle);
+                    $entityManager->persist($record);
+                    $entityManager->flush();
+                    $this->addFlash('success', 'Service record created.');
 
-                return $this->redirectToRoute('staff_service_records');
+                    return $this->redirectToRoute('staff_service_records');
+                } catch (\InvalidArgumentException $exception) {
+                    $this->addFlash('error', $exception->getMessage());
+                }
             }
         }
 
@@ -505,7 +643,7 @@ class StaffController extends AbstractController
         }
     }
 
-    private function bookingForm(array $customers, array $services): \Symfony\Component\Form\FormInterface
+    private function bookingForm(array $customers, array $services, array $motorcycles): \Symfony\Component\Form\FormInterface
     {
         $customerChoices = [];
         foreach ($customers as $customer) {
@@ -516,13 +654,15 @@ class StaffController extends AbstractController
             $serviceChoices[$service->getName()] = $service->getId();
         }
 
-        return $this->createFormBuilder()
+        $form = $this->createFormBuilder()
             ->add('customerId', ChoiceType::class, ['choices' => $customerChoices, 'placeholder' => 'Choose customer'])
-            ->add('serviceId', ChoiceType::class, ['choices' => $serviceChoices, 'placeholder' => 'Choose service'])
-            ->add('vehicleModel', TextType::class, ['label' => 'Motorcycle model'])
+            ->add('serviceId', ChoiceType::class, ['choices' => $serviceChoices, 'placeholder' => 'Choose service']);
+        $this->addMotorcycleFields($form, $motorcycles);
+
+        return $form
             ->add('bookingDate', DateType::class, ['widget' => 'single_text', 'input' => 'datetime_immutable'])
             ->add('bookingTime', TimeType::class, ['widget' => 'single_text', 'input' => 'datetime_immutable'])
-            ->add('notes', TextareaType::class, ['required' => false])
+            ->add('notes', TextareaType::class, ['required' => false, 'constraints' => [new Length(max: 2000)]])
             ->getForm();
     }
 
@@ -532,17 +672,33 @@ class StaffController extends AbstractController
         foreach ($customers as $customer) {
             $customerChoices[$customer->getFirstName().' '.$customer->getLastName()] = $customer->getId();
         }
-        $productChoices = [];
-        foreach ($products as $product) {
-            $productChoices[$product->getName().' — ₱'.$product->getPrice()] = $product->getId();
-        }
 
         return $this->createFormBuilder()
             ->add('customerId', ChoiceType::class, ['choices' => $customerChoices, 'placeholder' => 'Choose customer'])
-            ->add('productId', ChoiceType::class, ['choices' => $productChoices, 'placeholder' => 'Choose product'])
-            ->add('quantity', IntegerType::class, ['data' => 1, 'attr' => ['min' => 1]])
-            ->add('paymentMethod', ChoiceType::class, ['choices' => ['Cash on Delivery' => 'Cash on Delivery', 'GCash' => 'GCash', 'Card' => 'Card']])
+            ->add('deliveryAddress', TextareaType::class, [
+                'constraints' => [new NotBlank(), new Length(max: 2000)],
+            ])
+            ->add('items', CollectionType::class, [
+                'entry_type' => StaffOrderItemType::class,
+                'entry_options' => ['products' => $products],
+                'allow_add' => true,
+                'allow_delete' => true,
+                'prototype' => true,
+                'data' => [['quantity' => 1]],
+                'constraints' => [new Count(min: 1, max: 20)],
+            ])
             ->getForm();
+    }
+
+    private function parseDateFilter(mixed $value): ?\DateTimeImmutable
+    {
+        if (!is_string($value) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $value)) {
+            return null;
+        }
+
+        $date = \DateTimeImmutable::createFromFormat('!Y-m-d', $value);
+
+        return $date !== false && $date->format('Y-m-d') === $value ? $date : null;
     }
 
     private function promoClaimForm(array $customers, array $promos): \Symfony\Component\Form\FormInterface
@@ -565,7 +721,7 @@ class StaffController extends AbstractController
             ->getForm();
     }
 
-    private function serviceRecordForm(array $customers, array $services): \Symfony\Component\Form\FormInterface
+    private function serviceRecordForm(array $customers, array $services, array $motorcycles): \Symfony\Component\Form\FormInterface
     {
         $customerChoices = [];
         foreach ($customers as $customer) {
@@ -576,16 +732,121 @@ class StaffController extends AbstractController
             $serviceChoices[$service->getName()] = $service->getId();
         }
 
-        return $this->createFormBuilder()
+        $form = $this->createFormBuilder()
             ->add('customerId', ChoiceType::class, ['choices' => $customerChoices, 'placeholder' => 'Choose customer'])
-            ->add('serviceId', ChoiceType::class, ['choices' => $serviceChoices, 'placeholder' => 'Choose service'])
-            ->add('motorcycleModel', TextType::class)
-            ->add('plateNumber', TextType::class, ['required' => false])
+            ->add('serviceId', ChoiceType::class, ['choices' => $serviceChoices, 'placeholder' => 'Choose service']);
+        $this->addMotorcycleFields($form, $motorcycles);
+
+        return $form
             ->add('serviceDate', DateType::class, ['widget' => 'single_text', 'input' => 'datetime_immutable'])
-            ->add('workDescription', TextareaType::class)
-            ->add('partsUsed', TextareaType::class, ['required' => false])
-            ->add('cost', TextType::class, ['required' => false])
-            ->add('notes', TextareaType::class, ['required' => false])
+            ->add('workDescription', TextareaType::class, ['constraints' => [new NotBlank(), new Length(max: 5000)]])
+            ->add('partsUsed', TextareaType::class, ['required' => false, 'constraints' => [new Length(max: 5000)]])
+            ->add('cost', TextType::class, [
+                'required' => false,
+                'empty_data' => null,
+                'attr' => ['maxlength' => 11, 'inputmode' => 'decimal'],
+                'constraints' => [new Regex('/^\d{1,8}(?:\.\d{1,2})?$/')],
+            ])
+            ->add('notes', TextareaType::class, ['required' => false, 'constraints' => [new Length(max: 2000)]])
             ->getForm();
+    }
+
+    private function addMotorcycleFields(FormBuilderInterface $form, array $motorcycles): void
+    {
+        $motorcycleChoices = [];
+        $motorcycleCustomerIds = [];
+        foreach ($motorcycles as $motorcycle) {
+            if (!$motorcycle instanceof Motorcycle || $motorcycle->getId() === null) {
+                continue;
+            }
+            $label = $motorcycle->getModel();
+            if ($motorcycle->getPlateNumber()) {
+                $label .= ' — '.$motorcycle->getPlateNumber();
+            }
+            $motorcycleChoices['#'.$motorcycle->getId().' '.$label] = $motorcycle->getId();
+            $motorcycleCustomerIds[$motorcycle->getId()] = $motorcycle->getUser()->getId();
+        }
+
+        $form
+            ->add('motorcycleMode', ChoiceType::class, [
+                'label' => 'Motorcycle',
+                'choices' => [
+                    'Choose registered motorcycle' => 'existing',
+                    'Register motorcycle for this customer' => 'new',
+                ],
+                'data' => 'existing',
+            ])
+            ->add('motorcycleId', ChoiceType::class, [
+                'label' => 'Registered motorcycle',
+                'choices' => $motorcycleChoices,
+                'placeholder' => 'Select motorcycle',
+                'required' => false,
+                'choice_attr' => static fn (mixed $choice, string $key, mixed $value): array => [
+                    'data-customer' => (string) ($motorcycleCustomerIds[(int) $value] ?? ''),
+                ],
+            ])
+            ->add('motorcycleModel', TextType::class, [
+                'label' => 'Motorcycle model',
+                'required' => false,
+                'attr' => ['maxlength' => 255],
+                'constraints' => [new Length(max: 255)],
+            ])
+            ->add('plateNumber', TextType::class, [
+                'label' => 'Plate number',
+                'required' => false,
+                'attr' => ['maxlength' => 32],
+                'constraints' => [new Length(max: 32)],
+            ]);
+    }
+
+    private function resolveCustomerMotorcycle(
+        User $customer,
+        string $mode,
+        int $motorcycleId,
+        string $model,
+        string $plate,
+        MotorcycleRepository $motorcycles,
+        EntityManagerInterface $entityManager,
+    ): Motorcycle {
+        if ($mode === 'existing') {
+            $motorcycle = $motorcycleId > 0 ? $motorcycles->find($motorcycleId) : null;
+            if (!$motorcycle instanceof Motorcycle || $motorcycle->getUser() !== $customer) {
+                throw new \InvalidArgumentException('Choose a motorcycle that belongs to the selected customer.');
+            }
+
+            return $motorcycle;
+        }
+        if ($mode !== 'new') {
+            throw new \InvalidArgumentException('Choose a valid motorcycle option.');
+        }
+
+        $model = trim($model);
+        $plate = strtoupper(trim($plate));
+        if ($model === '' || mb_strlen($model) > 255 || mb_strlen($plate) > 32) {
+            throw new \InvalidArgumentException('Enter a valid motorcycle model and plate number.');
+        }
+
+        if ($plate !== '') {
+            $existingPlate = $motorcycles->findByPlateNumber($plate);
+            if ($existingPlate instanceof Motorcycle) {
+                if (
+                    $existingPlate->getUser() === $customer
+                    && strtolower(trim($existingPlate->getModel())) === strtolower($model)
+                ) {
+                    return $existingPlate;
+                }
+                throw new \InvalidArgumentException('This plate number is already registered.');
+            }
+        }
+
+        $motorcycle = $motorcycles->findDuplicate($customer, $model, $plate !== '' ? $plate : null);
+        if ($motorcycle instanceof Motorcycle) {
+            return $motorcycle;
+        }
+
+        $motorcycle = new Motorcycle($customer, $model, $plate !== '' ? $plate : null);
+        $entityManager->persist($motorcycle);
+
+        return $motorcycle;
     }
 }

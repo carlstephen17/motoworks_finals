@@ -39,7 +39,16 @@
         {% block site_footer %}{% include 'shared/_footer.html.twig' %}{% endblock %}
         {% block modals %}{% include 'shared/_modals.html.twig' %}{% endblock %}
         <script>
-            let isLoggedIn = {{ app.user ? 'true' : 'false' }};
+            window.isLoggedIn = {{ app.user ? 'true' : 'false' }};
+
+            const pendingCustomerActionKey = 'motoworks.pendingCustomerAction';
+
+            function rememberCustomerAction(action) {
+                const returnPath = window.location.pathname + window.location.search;
+                sessionStorage.setItem(pendingCustomerActionKey, JSON.stringify({...action, returnPath}));
+                const loginTarget = document.getElementById('login-target-path');
+                if (loginTarget) loginTarget.value = returnPath;
+            }
 
             function openModal(modalId) {
                 const modal = document.getElementById(modalId);
@@ -72,6 +81,38 @@
                 alertBox.className = 'modal-alert ' + type;
             }
 
+            function getPendingCustomerAction() {
+                const savedAction = sessionStorage.getItem(pendingCustomerActionKey);
+                if (!savedAction) return null;
+
+                try {
+                    return JSON.parse(savedAction);
+                } catch (error) {
+                    sessionStorage.removeItem(pendingCustomerActionKey);
+                    console.error('Unable to restore the pending customer action.', error);
+                    showModalAlert('login-modal', 'Unable to resume the requested action. Please try again.', 'error');
+                    return null;
+                }
+            }
+
+            function getAuthenticatedRedirect(responseUrl) {
+                const returnPath = getPendingCustomerAction()?.returnPath;
+                return typeof returnPath === 'string' && returnPath.startsWith('/') && !returnPath.startsWith('//')
+                    ? returnPath
+                    : responseUrl;
+            }
+
+            function showTimedModalAlert(modalId, message, type = 'success') {
+                const alertBox = document.getElementById(modalId + '-alert');
+                if (!alertBox) return;
+                if (alertBox.hideTimeout) window.clearTimeout(alertBox.hideTimeout);
+                showModalAlert(modalId, message, type);
+                alertBox.hideTimeout = window.setTimeout(() => {
+                    alertBox.className = 'modal-alert';
+                    alertBox.textContent = '';
+                }, 3000);
+            }
+
             function togglePasswordVisibility(fieldId, button) {
                 const field = document.getElementById(fieldId);
                 const icon = button.querySelector('i');
@@ -87,7 +128,8 @@
             }
 
             function openServiceBookingModal(serviceId, serviceName) {
-                if (!isLoggedIn) {
+                if (!window.isLoggedIn) {
+                    rememberCustomerAction({type: 'service_booking', serviceId, serviceName});
                     openModal('login-modal');
                     showModalAlert('login-modal', 'Please log in to book a service appointment.', 'error');
                     return;
@@ -98,6 +140,12 @@
                 form.reset();
                 form.dataset.submitting = 'false';
                 form.style.display = '';
+                const bookingAlert = document.getElementById('service-booking-modal-alert');
+                if (bookingAlert && bookingAlert.hideTimeout) window.clearTimeout(bookingAlert.hideTimeout);
+                if (bookingAlert) {
+                    bookingAlert.className = 'modal-alert';
+                    bookingAlert.textContent = '';
+                }
                 document.getElementById('booking-confirmation-panel').style.display = 'none';
                 document.getElementById('booking-service-id').value = serviceId;
                 document.getElementById('booking-service-name').textContent = serviceName || 'Selected service';
@@ -105,7 +153,7 @@
             }
 
             function openCartModal(productId, productName, productPrice, stockLimit, csrfToken) {
-                if (!isLoggedIn) {
+                if (!window.isLoggedIn) {
                     openModal('login-modal');
                     showModalAlert('login-modal', 'Please log in to add items to your cart.', 'error');
                     return;
@@ -131,7 +179,8 @@
             }
 
             function openBuyModal(productId, productName, productPrice, stockLimit, csrfToken) {
-                if (!isLoggedIn) {
+                if (!window.isLoggedIn) {
+                    rememberCustomerAction({type: 'buy_now', productId, productName, productPrice, stockLimit, csrfToken});
                     openModal('login-modal');
                     showModalAlert('login-modal', 'Please log in to make a purchase.', 'error');
                     return;
@@ -146,6 +195,12 @@
                 document.getElementById('buy-csrf-token').value = csrfToken;
                 document.getElementById('buy-product-name').textContent = productName;
                 document.getElementById('buy-product-price').textContent = '₱' + (parseFloat(productPrice) || 0).toFixed(2);
+                const buyAlert = document.getElementById('buy-modal-alert');
+                if (buyAlert && buyAlert.hideTimeout) window.clearTimeout(buyAlert.hideTimeout);
+                if (buyAlert) {
+                    buyAlert.className = 'modal-alert';
+                    buyAlert.textContent = '';
+                }
                 const quantity = document.getElementById('buy-quantity');
                 quantity.value = '1';
                 quantity.min = '1';
@@ -180,12 +235,12 @@
                     });
                     const data = await response.json();
                     if (!response.ok || !data.success) {
-                        showModalAlert(modalId, data.message || 'The request could not be completed.', 'error');
+                        showTimedModalAlert(modalId, data.message || 'The request could not be completed.', 'error');
                         return;
                     }
                     onSuccess(data);
                 } catch (error) {
-                    showModalAlert(modalId, 'Unable to contact the server. Please try again.', 'error');
+                    showTimedModalAlert(modalId, 'Unable to contact the server. Please try again.', 'error');
                 } finally {
                     form.dataset.submitting = 'false';
                     if (submitButton) {
@@ -216,6 +271,7 @@
                     const resultPage = new DOMParser().parseFromString(html, 'text/html');
                     const finalPath = new URL(response.url).pathname;
                     const alertText = resultPage.querySelector('[role="alert"]')?.textContent.trim();
+                    const statusText = resultPage.querySelector('[role="status"]')?.textContent.trim();
                     const validationMessages = Array.from(resultPage.querySelectorAll('form ul li, form .form-error-message'))
                         .map((message) => message.textContent.trim())
                         .filter(Boolean);
@@ -225,21 +281,21 @@
                         if (!response.ok || finalPath === new URL(form.action).pathname) {
                             showModalAlert(modalId, errorMessage || 'Invalid username or password.', 'error');
                         } else {
-                            window.location.assign(response.url);
+                            window.location.assign(getAuthenticatedRedirect(response.url));
                             return;
                         }
                     } else if (modalId === 'register-modal') {
                         if (!response.ok || finalPath === new URL(form.action).pathname) {
                             showModalAlert(modalId, errorMessage || 'Check the registration details and try again.', 'error');
                         } else {
-                            window.location.assign(response.url);
+                            window.location.assign(getAuthenticatedRedirect(response.url));
                             return;
                         }
                     } else if (modalId === 'forgot-modal') {
-                        if (!response.ok) {
-                            showModalAlert(modalId, alertText || 'Unable to request a password reset.', 'error');
+                        if (!response.ok || errorMessage) {
+                            showModalAlert(modalId, errorMessage || 'Unable to request a password reset.', 'error');
                         } else {
-                            showModalAlert(modalId, alertText || 'If that email exists, reset instructions have been sent.', 'success');
+                            showModalAlert(modalId, statusText || alertText || 'If that email exists, reset instructions have been sent.', 'success');
                         }
                     }
                 } catch (error) {
@@ -336,6 +392,7 @@
                         document.getElementById('booking-confirmation-phone').textContent = data.phone || '';
                         document.getElementById('booking-confirmation-notes').textContent = data.notes || 'None';
                         document.getElementById('booking-confirmation-reference').textContent = data.booking_reference || data.booking_id || 'Pending';
+                        showTimedModalAlert('service-booking-modal', 'Service booking recorded. Reference: ' + (data.booking_reference || data.booking_id || 'Pending'), 'success');
                         bookingForm.style.display = 'none';
                         document.getElementById('booking-confirmation-panel').style.display = 'block';
                     }));
@@ -355,17 +412,48 @@
                 if (buyForm) {
                     buyForm.addEventListener('submit', (event) => submitModalForm(event, buyForm, 'buy-modal', (data) => {
                         const items = (data.items || []).map((item) => item.name + ' (x' + item.quantity + ')').join(', ');
+                        const paymentStatus = data.payment_status || 'Unverified';
+                        const paymentStatusLabel = paymentStatus === 'Unverified' ? 'Pending verification (Unverified)' : paymentStatus;
                         document.getElementById('order-confirmation-customer').textContent = data.customer_name || '';
                         document.getElementById('order-confirmation-item').textContent = items;
                         document.getElementById('order-confirmation-phone').textContent = data.phone || '';
                         document.getElementById('order-confirmation-address').textContent = data.address || '';
                         document.getElementById('order-confirmation-payment').textContent = data.payment_method || '';
+                        document.getElementById('order-confirmation-payment-status').textContent = paymentStatusLabel;
                         document.getElementById('order-confirmation-reference').textContent = data.payment_reference || '';
-                        document.getElementById('buy-modal-alert').style.display = 'none';
+                        const paymentNotice = paymentStatus === 'Unverified'
+                            ? 'Order recorded. Online payment is pending verification.'
+                            : 'Order recorded. Payment is due on delivery.';
+                        showTimedModalAlert('buy-modal', paymentNotice, 'success');
                         buyForm.style.display = 'none';
                         document.getElementById('order-confirmation-panel').style.display = 'block';
                     }));
                     document.getElementById('buy-quantity').addEventListener('input', () => validateStockLimit('buy-quantity', 'buy-stock-warning', 'ajax-buy-form'));
+                }
+
+                if (window.isLoggedIn) {
+                    const pendingAction = getPendingCustomerAction();
+                    if (pendingAction) {
+                        sessionStorage.removeItem(pendingCustomerActionKey);
+                        if (pendingAction.type === 'buy_now') {
+                            openBuyModal(
+                                pendingAction.productId,
+                                pendingAction.productName,
+                                pendingAction.productPrice,
+                                pendingAction.stockLimit,
+                                pendingAction.csrfToken,
+                            );
+                        } else if (pendingAction.type === 'service_booking') {
+                            openServiceBookingModal(pendingAction.serviceId, pendingAction.serviceName);
+                        } else if (pendingAction.type === 'promo_booking' && typeof openClaimModal === 'function') {
+                            openClaimModal(
+                                pendingAction.slug,
+                                pendingAction.title,
+                                pendingAction.itemLabel,
+                                pendingAction.options,
+                            );
+                        }
+                    }
                 }
             });
         </script>

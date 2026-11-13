@@ -45,10 +45,17 @@ function motoworks_env(string $key, ?string $default = null): ?string
 
 define('APP_ENV', motoworks_env('APP_ENV', 'production'));
 define('APP_DEBUG', filter_var(motoworks_env('APP_DEBUG', 'false'), FILTER_VALIDATE_BOOLEAN));
-define('DB_HOST', motoworks_env('DB_HOST', 'localhost'));
-define('DB_USER', motoworks_env('DB_USER', ''));
-define('DB_PASS', motoworks_env('DB_PASS', ''));
-define('DB_NAME', motoworks_env('DB_NAME', ''));
+$dbHost = motoworks_env('DB_HOST');
+$dbPort = motoworks_env('DB_PORT');
+$dbUser = motoworks_env('DB_USER');
+$dbPass = motoworks_env('DB_PASS');
+$dbName = motoworks_env('DB_NAME');
+
+define('DB_HOST', $dbHost ?: '127.0.0.1');
+define('DB_PORT', $dbPort ?: motoworks_env('MYSQL_PORT', '3306'));
+define('DB_USER', $dbUser ?: motoworks_env('MYSQL_USER', 'root'));
+define('DB_PASS', $dbPass !== null ? $dbPass : motoworks_env('MYSQL_PASSWORD', motoworks_env('MYSQL_ROOT_PASSWORD', '')));
+define('DB_NAME', $dbName ?: motoworks_env('MYSQL_DATABASE', ''));
 
 define('DEFAULT_ADMIN_USERNAME', motoworks_env('DEFAULT_ADMIN_USERNAME', 'admin'));
 define('DEFAULT_ADMIN_FIRSTNAME', motoworks_env('DEFAULT_ADMIN_FIRSTNAME', 'System'));
@@ -63,11 +70,15 @@ if (!preg_match('/^[A-Za-z0-9_]+$/', DB_NAME)) {
     throw new RuntimeException('DB_NAME must contain only letters, numbers, and underscores.');
 }
 
+if (!ctype_digit(DB_PORT) || (int) DB_PORT < 1 || (int) DB_PORT > 65535) {
+    throw new RuntimeException('DB_PORT must be a valid TCP port.');
+}
+
 ini_set('display_errors', APP_DEBUG ? '1' : '0');
 error_reporting(APP_DEBUG ? E_ALL : 0);
 
 try {
-    $dsn = 'mysql:host=' . DB_HOST . ';charset=utf8mb4';
+    $dsn = 'mysql:host=' . DB_HOST . ';port=' . DB_PORT . ';charset=utf8mb4';
     if (!defined('MOTOWORKS_SETUP')) {
         $dsn .= ';dbname=' . DB_NAME;
     }

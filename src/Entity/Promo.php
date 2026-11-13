@@ -139,6 +139,11 @@ class Promo
         return $this;
     }
 
+    public function getItemOptionsText(): string
+    {
+        return $this->itemOptions;
+    }
+
     public function getPerks(): ?string
     {
         return $this->perks;
@@ -180,6 +185,11 @@ class Promo
         return $this->productIcon ?: 'fa-solid fa-circle-dot';
     }
 
+    public function getStoredProductIcon(): ?string
+    {
+        return $this->productIcon;
+    }
+
     public function setProductIcon(?string $productIcon): static
     {
         $this->productIcon = $productIcon;
@@ -190,6 +200,11 @@ class Promo
     public function getServiceIcon(): ?string
     {
         return $this->serviceIcon ?: 'fa-solid fa-screwdriver-wrench';
+    }
+
+    public function getStoredServiceIcon(): ?string
+    {
+        return $this->serviceIcon;
     }
 
     public function setServiceIcon(?string $serviceIcon): static

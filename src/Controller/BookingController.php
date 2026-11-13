@@ -6,6 +6,7 @@ use App\Entity\Service;
 use App\Entity\ServiceBooking;
 use App\Entity\User;
 use App\Form\CustomerAppointmentUpdateType;
+use App\Repository\PromoClaimRepository;
 use App\Repository\PromoRepository;
 use App\Repository\ServiceBookingRepository;
 use App\Repository\ServiceRepository;
@@ -16,6 +17,7 @@ use Symfony\Component\Form\Extension\Core\Type\DateType;
 use Symfony\Component\Form\Extension\Core\Type\TextareaType;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
 use Symfony\Component\Form\Extension\Core\Type\TimeType;
+use Symfony\Component\Form\FormFactoryInterface;
 use Symfony\Component\Form\FormInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -24,6 +26,10 @@ use Symfony\Component\Validator\Constraints\Length;
 
 class BookingController extends AbstractController
 {
+    public function __construct(private readonly FormFactoryInterface $formFactory)
+    {
+    }
+
     #[Route('/book-service', name: 'booking_new', methods: ['GET', 'POST'])]
     public function new(
         Request $request,
@@ -60,31 +66,40 @@ class BookingController extends AbstractController
                 'label' => 'Service',
                 'choices' => $serviceChoices,
                 'placeholder' => 'Choose a service',
+                'attr' => ['class' => 'form-control'],
             ])
-            ->add('vehicleModel', TextType::class, ['label' => 'Motorcycle model'])
+            ->add('vehicleModel', TextType::class, [
+                'label' => 'Motorcycle model',
+                'attr' => ['class' => 'form-control', 'maxlength' => 255],
+            ])
             ->add('bookingDate', DateType::class, [
                 'label' => 'Date',
                 'widget' => 'single_text',
                 'input' => 'datetime_immutable',
+                'attr' => ['class' => 'form-control', 'min' => (new \DateTimeImmutable('today'))->format('Y-m-d')],
             ])
             ->add('bookingTime', TimeType::class, [
                 'label' => 'Time',
                 'widget' => 'single_text',
                 'input' => 'datetime_immutable',
+                'attr' => ['class' => 'form-control'],
             ])
             ->add('promoSlug', ChoiceType::class, [
                 'label' => 'Promotion (optional)',
                 'choices' => $promoChoices,
                 'required' => false,
+                'attr' => ['class' => 'form-control'],
             ])
             ->add('promoOption', TextType::class, [
                 'label' => 'Promotion option (optional)',
                 'required' => false,
+                'attr' => ['class' => 'form-control', 'maxlength' => 255],
             ])
             ->add('notes', TextareaType::class, [
                 'label' => 'Notes',
                 'required' => false,
                 'constraints' => [new Length(max: 2000)],
+                'attr' => ['class' => 'form-control', 'rows' => 3],
             ])
             ->getForm();
         $form->handleRequest($request);
@@ -186,7 +201,7 @@ class BookingController extends AbstractController
             throw $this->createNotFoundException('Appointment not found.');
         }
 
-        if ($booking->getStatus() !== 'Pending') {
+        if (strtolower(trim((string) $booking->getStatus())) !== 'pending') {
             $this->addFlash('error', 'Only pending appointments can be edited.');
 
             return $this->redirectToRoute('appointment_history');
@@ -196,14 +211,29 @@ class BookingController extends AbstractController
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
-            if ($booking->getBookingDate()->setTime(0, 0) < new \DateTimeImmutable('today')) {
+            $service = $form->get('service')->getData();
+            $vehicleModel = trim((string) $form->get('vehicleModel')->getData());
+            $bookingDate = $form->get('bookingDate')->getData();
+            $bookingTime = $form->get('bookingTime')->getData();
+            $notes = trim((string) $form->get('notes')->getData());
+
+            if (!$service instanceof Service || !$bookingDate instanceof \DateTimeImmutable || !$bookingTime instanceof \DateTimeImmutable) {
+                $this->addFlash('error', 'Choose a service, date, and time for the appointment.');
+
+                return $this->renderAppointmentHistory($user, $bookings, $services, $form, $id);
+            }
+
+            if ($bookingDate->setTime(0, 0) < new \DateTimeImmutable('today')) {
                 $this->addFlash('error', 'Choose a booking date that is today or later.');
 
                 return $this->renderAppointmentHistory($user, $bookings, $services, $form, $id);
             }
 
-            $booking->setVehicleModel(trim((string) $booking->getVehicleModel()));
-            $booking->setNotes(trim((string) $booking->getNotes()) ?: null);
+            $booking->setService($service);
+            $booking->setVehicleModel($vehicleModel);
+            $booking->setBookingDate($bookingDate);
+            $booking->setBookingTime($bookingTime);
+            $booking->setNotes($notes ?: null);
             $entityManager->flush();
             $this->addFlash('success', 'Appointment updated successfully.');
 
@@ -214,16 +244,62 @@ class BookingController extends AbstractController
     }
 
     #[Route('/promo-history', name: 'promo_history', methods: ['GET'])]
-    public function promoHistory(ServiceBookingRepository $bookings): Response
+    public function promoHistory(ServiceBookingRepository $bookings, PromoClaimRepository $promoClaims): Response
     {
         $this->denyAccessUnlessGranted('ROLE_USER');
         $user = $this->getUser();
         if (!$user instanceof User) {
             throw $this->createAccessDeniedException();
         }
+        if ($user->getRole() === 'admin') {
+            return $this->redirectToRoute('admin_promo_history');
+        }
+        if ($user->getRole() === 'staff') {
+            return $this->redirectToRoute('staff_promo_history');
+        }
+        if ($user->getRole() !== 'customer') {
+            throw $this->createAccessDeniedException();
+        }
+
+        $history = [];
+        foreach ($bookings->findForUser($user, true) as $booking) {
+            $history[] = [
+                'type' => 'service_booking',
+                'id' => $booking->getId(),
+                'bundleSlug' => $booking->getBundleSlug(),
+                'selectedOption' => $booking->getBundleOption(),
+                'appointmentDate' => $booking->getBookingDate(),
+                'appointmentTime' => $booking->getBookingTime(),
+                'fullName' => trim($user->getFirstName().' '.$user->getLastName()),
+                'phone' => $user->getPhone(),
+                'vehicleModel' => $booking->getVehicleModel(),
+                'status' => $booking->getStatus() ?? 'Pending',
+            ];
+        }
+        foreach ($promoClaims->findForUser($user) as $claim) {
+            $history[] = [
+                'type' => 'promo_claim',
+                'id' => $claim->getId(),
+                'bundleSlug' => $claim->getBundleSlug(),
+                'selectedOption' => $claim->getSelectedOption(),
+                'appointmentDate' => $claim->getAppointmentDate(),
+                'appointmentTime' => $claim->getAppointmentTime(),
+                'fullName' => $claim->getFullName(),
+                'phone' => $claim->getPhone(),
+                'vehicleModel' => null,
+                'status' => $claim->getStatus() ?? 'Pending',
+            ];
+        }
+        usort($history, static function (array $first, array $second): int {
+            $dateComparison = $first['appointmentDate']->format('Y-m-d') <=> $second['appointmentDate']->format('Y-m-d');
+
+            return $dateComparison !== 0
+                ? $dateComparison
+                : $first['appointmentTime']->format('H:i:s') <=> $second['appointmentTime']->format('H:i:s');
+        });
 
         return $this->render('booking/promo_history.html.twig', [
-            'bookings' => $bookings->findForUser($user, true),
+            'claims' => $history,
         ]);
     }
 
@@ -240,7 +316,7 @@ class BookingController extends AbstractController
 
         foreach ($appointments as $appointment) {
             $id = $appointment->getId();
-            if ($id === null || $appointment->getStatus() !== 'Pending') {
+            if ($id === null || strtolower(trim((string) $appointment->getStatus())) !== 'pending') {
                 continue;
             }
 
@@ -262,7 +338,7 @@ class BookingController extends AbstractController
         ServiceRepository $services,
         ?array $activeServices = null,
     ): FormInterface {
-        return $this->createForm(CustomerAppointmentUpdateType::class, $booking, [
+        return $this->formFactory->createNamed('appointment_'.$booking->getId(), CustomerAppointmentUpdateType::class, $booking, [
             'services' => $activeServices ?? $services->findActiveServices(),
             'action' => $this->generateUrl('appointment_edit', ['id' => $booking->getId()]),
         ]);

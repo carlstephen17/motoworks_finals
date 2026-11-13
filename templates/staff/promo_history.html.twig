@@ -7,12 +7,58 @@
     {% for message in app.flashes('success') %}<p role="status">{{ message }}</p>{% endfor %}
     {% for message in app.flashes('error') %}<p role="alert">{{ message }}</p>{% endfor %}
     <p><a href="{{ path('staff_promo_claim_new') }}">Create claim</a></p>
-    {% for claim in claims %}
-        <article><h2>{{ claim.bundleSlug }} — {{ claim.selectedOption }}</h2><p>{{ claim.fullName }} · {{ claim.phone }} · {{ claim.appointmentDate|date('M j, Y') }} · {{ claim.status }}</p>
-            <a href="{{ path('staff_promo_claim_edit', {id: claim.id}) }}">Edit claim details</a>
-            <form method="post" action="{{ path('staff_promo_claim_update', {id: claim.id}) }}"><input type="hidden" name="_token" value="{{ csrf_token('staff_promo_claim_' ~ claim.id) }}"><select name="status">{% for status in ['Pending','Confirmed','Used','Completed','Cancelled'] %}<option {{ claim.status == status ? 'selected' : '' }}>{{ status }}</option>{% endfor %}</select><button>Update</button></form>
-            <form method="post" action="{{ path('staff_promo_claim_delete', {id: claim.id}) }}"><input type="hidden" name="_token" value="{{ csrf_token('staff_promo_claim_' ~ claim.id) }}"><button>Delete</button></form>
-        </article>
-    {% else %}<p>No promotion claims.</p>{% endfor %}
+    <section aria-label="Promotion claim totals">
+        <p>All claims: {{ counts.total }}</p>
+        <p>Pending: {{ counts.pending }}</p>
+        <p>Confirmed: {{ counts.confirmed }}</p>
+        <p>Completed: {{ counts.completed }}</p>
+        <p>Cancelled: {{ counts.cancelled }}</p>
+    </section>
+    <form method="get" action="{{ path('staff_promo_history') }}">
+        <label for="claimSearch">Search customer, phone, promotion, option, or username</label>
+        <input id="claimSearch" type="search" name="search" value="{{ search }}">
+        <label for="claimStatus">Status</label>
+        <select id="claimStatus" name="status">
+            <option value="">All statuses</option>
+            {% for option in ['Pending', 'Confirmed', 'Completed', 'Cancelled'] %}
+                <option value="{{ option }}" {{ status == option ? 'selected' : '' }}>{{ option }}</option>
+            {% endfor %}
+        </select>
+        <button type="submit">Filter</button>
+        <a href="{{ path('staff_promo_history') }}">Clear</a>
+    </form>
+
+    <table>
+        <thead><tr><th>Claim</th><th>Customer</th><th>Promotion</th><th>Appointment</th><th>Status</th><th>Actions</th></tr></thead>
+        <tbody>
+        {% for claim in claims %}
+            <tr>
+                <td>#{{ claim.id }}<br>{{ claim.user ? claim.user.username : 'Guest claim' }}</td>
+                <td>{{ claim.fullName }}<br>{{ claim.phone }}</td>
+                <td>{{ claim.bundleSlug }}<br>{{ claim.selectedOption }}</td>
+                <td>{{ claim.appointmentDate|date('M j, Y') }} {{ claim.appointmentTime|date('g:i A') }}</td>
+                <td>{{ claim.status|default('Pending') }}</td>
+                <td>
+                    <a href="{{ path('staff_promo_claim_edit', {id: claim.id}) }}">Edit details</a>
+                    <form method="post" action="{{ path('staff_promo_claim_update', {id: claim.id}) }}">
+                        <input type="hidden" name="_token" value="{{ csrf_token('staff_promo_claim_' ~ claim.id) }}">
+                        <select name="status">
+                            {% for option in ['Pending', 'Confirmed', 'Used', 'Completed', 'Cancelled'] %}
+                                <option value="{{ option }}" {{ (claim.status|default('Pending')) == option ? 'selected' : '' }}>{{ option }}</option>
+                            {% endfor %}
+                        </select>
+                        <button type="submit">Update status</button>
+                    </form>
+                    <form method="post" action="{{ path('staff_promo_claim_delete', {id: claim.id}) }}" onsubmit="return confirm('Delete this promotion claim?')">
+                        <input type="hidden" name="_token" value="{{ csrf_token('staff_promo_claim_' ~ claim.id) }}">
+                        <button type="submit">Delete</button>
+                    </form>
+                </td>
+            </tr>
+        {% else %}
+            <tr><td colspan="6">No promo claims match these filters.</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
 </main>
 {% endblock %}

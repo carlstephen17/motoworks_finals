@@ -6,12 +6,126 @@
     <h1>Services</h1>
     {% for message in app.flashes('success') %}<p role="status">{{ message }}</p>{% endfor %}
     {% for message in app.flashes('error') %}<p role="alert">{{ message }}</p>{% endfor %}
-    <p><a href="{{ path('admin_service_new') }}">Create service</a></p>
-    {% for service in services %}
-        <article><h2>{{ service.name }}</h2><p>{{ service.description }}</p><p>₱{{ service.price }} · {{ service.active ? 'Active' : 'Inactive' }}</p>
-            <a href="{{ path('admin_service_edit', {id: service.id}) }}">Edit</a>
-            <form method="post" action="{{ path('admin_service_delete', {id: service.id}) }}"><input type="hidden" name="_token" value="{{ csrf_token('admin_service_delete_' ~ service.id) }}"><button type="submit">Delete / deactivate</button></form>
-        </article>
-    {% else %}<p>No services.</p>{% endfor %}
+    <p><a href="{{ path('admin_service_new') }}" id="serviceCreate" data-create-url="{{ path('admin_service_new') }}">Create service</a></p>
+    <div class="table-filters">
+        <label for="serviceSearch">Search services</label>
+        <input id="serviceSearch" type="search" placeholder="Search by ID, name, or description..." autocomplete="off">
+        <label for="serviceStatus">Status</label>
+        <select id="serviceStatus">
+            <option value="">All statuses</option>
+            <option value="1">Active</option>
+            <option value="0">Inactive</option>
+        </select>
+    </div>
+    <table class="admin-table" id="serviceTable">
+        <thead><tr><th>ID</th><th>Image</th><th>Service name</th><th>Description</th><th>Price</th><th>Status</th><th>Actions</th></tr></thead>
+        <tbody>
+        {% for service in services %}
+            <tr data-search="{{ (service.id ~ ' ' ~ service.name ~ ' ' ~ service.description)|lower }}" data-status="{{ service.active ? '1' : '0' }}">
+                <td>{{ service.id }}</td>
+                <td>
+                    {% if service.image %}
+                        <img src="{{ asset(service.image) }}" alt="{{ service.name }}" width="40" height="40" style="object-fit: cover; border-radius: 4px;">
+                    {% else %}
+                        <span>No image</span>
+                    {% endif %}
+                </td>
+                <td>{{ service.name }}</td>
+                <td>{{ service.description }}</td>
+                <td>₱{{ service.price|number_format(2) }}</td>
+                <td>{{ service.active ? 'Active' : 'Inactive' }}</td>
+                <td>
+                    <button type="button" class="service-view" data-id="{{ service.id }}" data-name="{{ service.name }}" data-description="{{ service.description }}" data-price="{{ service.price }}" data-status="{{ service.active ? 'Active' : 'Inactive' }}" data-image="{{ service.image ? asset(service.image) : '' }}">View</button>
+                    <a href="{{ path('admin_service_edit', {id: service.id}) }}" class="service-edit" data-action="{{ path('admin_service_edit', {id: service.id}) }}" data-name="{{ service.name }}" data-description="{{ service.description }}" data-price="{{ service.price }}" data-active="{{ service.active ? '1' : '0' }}" data-featured="{{ service.featured ? '1' : '0' }}">Edit</a>
+                    <form method="post" action="{{ path('admin_service_delete', {id: service.id}) }}">
+                        <input type="hidden" name="_token" value="{{ csrf_token('admin_service_delete_' ~ service.id) }}">
+                        <button type="submit">Delete / deactivate</button>
+                    </form>
+                </td>
+            </tr>
+        {% else %}
+            <tr><td colspan="7">No services found.</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    <dialog id="serviceDetails" aria-labelledby="serviceDetailsTitle">
+        <h2 id="serviceDetailsTitle">Service details</h2>
+        <img data-service-image alt="" width="140" height="140" style="object-fit: contain;">
+        <p><strong>ID:</strong> <span data-service-id></span></p>
+        <p><strong>Name:</strong> <span data-service-name></span></p>
+        <p><strong>Description:</strong> <span data-service-description></span></p>
+        <p><strong>Price:</strong> <span data-service-price></span></p>
+        <p><strong>Status:</strong> <span data-service-status></span></p>
+        <button type="button" data-close-service-details>Close</button>
+    </dialog>
+    <dialog id="serviceFormDialog" aria-labelledby="serviceFormTitle">
+        <h2 id="serviceFormTitle">Create service</h2>
+        <p>When editing, leave the image empty to keep the current image.</p>
+        {{ form_start(serviceForm, {action: path('admin_service_new'), attr: {id: 'serviceAdminForm'}}) }}
+            {{ form_widget(serviceForm) }}
+            <button type="submit">Save service</button>
+            <button type="button" data-close-service-form>Cancel</button>
+        {{ form_end(serviceForm) }}
+    </dialog>
 </main>
+<script>
+(() => {
+    const table = document.getElementById('serviceTable');
+    const search = document.getElementById('serviceSearch');
+    const status = document.getElementById('serviceStatus');
+    const dialog = document.getElementById('serviceDetails');
+    const formDialog = document.getElementById('serviceFormDialog');
+    const form = document.getElementById('serviceAdminForm');
+    const createLink = document.getElementById('serviceCreate');
+    if (!table || !search || !status || !dialog || !formDialog || !form || !createLink || table.dataset.bound) return;
+    table.dataset.bound = 'true';
+    const rows = [...table.querySelectorAll('tbody tr[data-search]')];
+    const filterRows = () => {
+        const term = search.value.trim().toLowerCase();
+        rows.forEach(row => {
+            row.hidden = !row.dataset.search.includes(term) || (status.value !== '' && row.dataset.status !== status.value);
+        });
+    };
+    search.addEventListener('input', filterRows);
+    status.addEventListener('change', filterRows);
+    table.addEventListener('click', event => {
+        const button = event.target.closest('.service-view');
+        if (!button) return;
+        dialog.querySelector('[data-service-id]').textContent = button.dataset.id;
+        dialog.querySelector('[data-service-name]').textContent = button.dataset.name;
+        dialog.querySelector('[data-service-description]').textContent = button.dataset.description;
+        dialog.querySelector('[data-service-price]').textContent = `₱${Number(button.dataset.price).toFixed(2)}`;
+        dialog.querySelector('[data-service-status]').textContent = button.dataset.status;
+        const image = dialog.querySelector('[data-service-image]');
+        image.hidden = !button.dataset.image;
+        if (button.dataset.image) image.src = button.dataset.image;
+        else image.removeAttribute('src');
+        dialog.showModal();
+    });
+    dialog.querySelector('[data-close-service-details]').addEventListener('click', () => dialog.close());
+    const title = document.getElementById('serviceFormTitle');
+    createLink.addEventListener('click', event => {
+        event.preventDefault();
+        form.reset();
+        form.action = createLink.dataset.createUrl;
+        title.textContent = 'Create service';
+        formDialog.showModal();
+    });
+    table.addEventListener('click', event => {
+        const link = event.target.closest('.service-edit');
+        if (!link) return;
+        event.preventDefault();
+        form.reset();
+        form.action = link.dataset.action;
+        form.elements.namedItem('service[name]').value = link.dataset.name;
+        form.elements.namedItem('service[price]').value = link.dataset.price;
+        form.elements.namedItem('service[description]').value = link.dataset.description;
+        form.elements.namedItem('service[active]').value = link.dataset.active;
+        form.elements.namedItem('service[featured]').checked = link.dataset.featured === '1';
+        title.textContent = 'Edit service';
+        formDialog.showModal();
+    });
+    formDialog.querySelector('[data-close-service-form]').addEventListener('click', () => formDialog.close());
+})();
+</script>
 {% endblock %}

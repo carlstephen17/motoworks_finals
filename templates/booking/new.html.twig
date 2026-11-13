@@ -1,20 +1,42 @@
 {% extends 'base.html.twig' %}
 
-{% block title %}Book a service | Bencalo MotoWorks{% endblock %}
+{% block title %}Book a Service - Bencalo MotoWorks{% endblock %}
+
+{% block stylesheets %}
+    {{ parent() }}
+    <link rel="stylesheet" href="{{ asset('styles/appointment_history.css') }}">
+{% endblock %}
 
 {% block body %}
-    <main>
-        <h1>Book a service</h1>
-        {% for message in app.flashes('error') %}<p role="alert">{{ message }}</p>{% endfor %}
-        {{ form_start(form) }}
-            {{ form_row(form.serviceId) }}
-            {{ form_row(form.vehicleModel) }}
-            {{ form_row(form.bookingDate) }}
-            {{ form_row(form.bookingTime) }}
-            {{ form_row(form.promoSlug) }}
-            {{ form_row(form.promoOption) }}
-            {{ form_row(form.notes) }}
-            <button type="submit">Submit booking</button>
-        {{ form_end(form) }}
+    <main class="container" style="max-width: 760px; margin: 40px auto; padding: 0 20px;">
+        <div class="crud-modal-content" style="max-width: none;">
+            <div class="crud-modal-header">
+                <h3>Book Service Appointment</h3>
+                <a href="{{ path('service_index') }}" class="close-modal-btn" aria-label="Back to services">
+                    <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
+                </a>
+            </div>
+
+            {% for message in app.flashes('success') %}
+                <div class="alert-toast" role="status">{{ message }}</div>
+            {% endfor %}
+            {% for message in app.flashes('error') %}
+                <div class="alert-toast alert-toast-error" role="alert">{{ message }}</div>
+            {% endfor %}
+
+            {{ form_start(form) }}
+                {{ form_row(form.serviceId) }}
+                {{ form_row(form.vehicleModel) }}
+                {{ form_row(form.bookingDate) }}
+                {{ form_row(form.bookingTime) }}
+                {{ form_row(form.promoSlug) }}
+                {{ form_row(form.promoOption) }}
+                {{ form_row(form.notes) }}
+                <button type="submit" class="btn-create-booking">
+                    <i class="fa-solid fa-calendar-check" aria-hidden="true"></i>
+                    Confirm Service Appointment
+                </button>
+            {{ form_end(form) }}
+        </div>
     </main>
 {% endblock %}

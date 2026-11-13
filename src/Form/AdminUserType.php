@@ -25,7 +25,16 @@ class AdminUserType extends AbstractType
             ->add('lastName', TextType::class, ['label' => 'Last name', 'constraints' => [new NotBlank(), new Length(max: 50)]])
             ->add('username', TextType::class, ['constraints' => [new NotBlank(), new Regex('/^[A-Za-z0-9._-]{3,50}$/')]])
             ->add('email', EmailType::class, ['constraints' => [new NotBlank(), new Email(), new Length(max: 100)]])
-            ->add('phone', TelType::class, ['required' => false, 'constraints' => [new Length(max: 20)]])
+            ->add('phone', TelType::class, [
+                'attr' => [
+                    'inputmode' => 'numeric',
+                    'pattern' => '09[0-9]{9}',
+                    'minlength' => 11,
+                    'maxlength' => 11,
+                    'title' => 'Enter an 11-digit Philippine mobile number starting with 09',
+                ],
+                'constraints' => [new NotBlank(), new Regex('/^09[0-9]{9}$/')],
+            ])
             ->add('role', ChoiceType::class, [
                 'choices' => ['Customer' => 'customer', 'Staff' => 'staff', 'Administrator' => 'admin'],
             ])

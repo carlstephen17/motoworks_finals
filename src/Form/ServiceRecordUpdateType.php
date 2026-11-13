@@ -34,6 +34,7 @@ class ServiceRecordUpdateType extends AbstractType
             ->add('partsUsed', TextareaType::class, ['required' => false, 'constraints' => [new Length(max: 5000)]])
             ->add('cost', TextType::class, [
                 'required' => false,
+                'empty_data' => null,
                 'attr' => ['inputmode' => 'decimal'],
                 'constraints' => [new Regex('/^\d{1,8}(?:\.\d{1,2})?$/')],
             ])

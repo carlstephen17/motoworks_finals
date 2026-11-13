@@ -10,7 +10,6 @@ use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\Form\Extension\Core\Type\EmailType;
 use Symfony\Component\Form\Extension\Core\Type\FileType;
-use Symfony\Component\Form\Extension\Core\Type\SubmitType;
 use Symfony\Component\Form\Extension\Core\Type\TextareaType;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
@@ -90,7 +89,7 @@ class InformationController extends AbstractController
         $form = $this->createFormBuilder()
             ->add('name', TextType::class, ['label' => 'Full name'])
             ->add('email', EmailType::class, ['label' => 'Email address'])
-            ->add('subject', TextType::class)
+            ->add('subject', TextType::class, ['required' => false])
             ->add('message', TextareaType::class, ['label' => 'Message'])
             ->add('imageFile', FileType::class, [
                 'label' => 'Photo (optional)',
@@ -98,7 +97,6 @@ class InformationController extends AbstractController
                 'required' => false,
                 'constraints' => [new File(maxSize: '5M'), new ImageFile()],
             ])
-            ->add('submit', SubmitType::class, ['label' => 'Send message'])
             ->getForm();
         $form->handleRequest($request);
 
@@ -112,14 +110,15 @@ class InformationController extends AbstractController
             if ($name === '' || mb_strlen($name) > 255 || mb_strlen($email) > 100 || mb_strlen($subject) > 255 || $message === '' || mb_strlen($message) > 10000) {
                 $this->addFlash('error', 'Please check the name, email, subject, and message lengths.');
             } else {
-                $testimonial = new Testimonial($name, $email, $subject, $message);
+                $testimonial = (new Testimonial($name, $email, $subject, $message))
+                    ->setStatus('approved');
                 $image = $form->get('imageFile')->getData();
                 if ($image instanceof UploadedFile) {
                     $testimonial->setImage($imageUploader->upload($image, 'images/testimonials'));
                 }
                 $entityManager->persist($testimonial);
                 $entityManager->flush();
-                $this->addFlash('success', 'Thank you. Your message has been submitted for review.');
+                $this->addFlash('success', 'Thank you! Your message and review have been submitted successfully.');
 
                 return $this->redirectToRoute('page_contact');
             }

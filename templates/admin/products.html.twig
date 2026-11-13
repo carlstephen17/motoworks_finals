@@ -6,21 +6,130 @@
     <h1>Products</h1>
     {% for message in app.flashes('success') %}<p role="status">{{ message }}</p>{% endfor %}
     {% for message in app.flashes('error') %}<p role="alert">{{ message }}</p>{% endfor %}
-    <p><a href="{{ path('admin_product_new') }}">Create product</a></p>
-    <table><thead><tr><th>Name</th><th>Price</th><th>Stock</th><th>Active</th><th>Actions</th></tr></thead><tbody>
-    {% for product in products %}
-        <tr><td>{{ product.name }}</td><td>₱{{ product.price }}</td><td>{{ product.stock }}</td><td>{{ product.active ? 'Yes' : 'No' }}</td><td>
-            <a href="{{ path('admin_product_edit', {id: product.id}) }}">Edit</a>
-            <form method="post" action="{{ path('admin_stock_update', {id: product.id}) }}">
-                <input type="hidden" name="_token" value="{{ csrf_token('admin_stock_update_' ~ product.id) }}">
-                <label>Stock <input name="stock" type="number" min="0" value="{{ product.stock }}" required></label>
-                <button type="submit">Update stock</button>
-            </form>
-            <form method="post" action="{{ path('admin_product_delete', {id: product.id}) }}">
-                <input type="hidden" name="_token" value="{{ csrf_token('admin_product_delete_' ~ product.id) }}"><button type="submit">Delete / deactivate</button>
-            </form>
-        </td></tr>
-    {% else %}<tr><td colspan="5">No products.</td></tr>{% endfor %}
-    </tbody></table>
+    <p><a href="{{ path('admin_product_new') }}" id="productCreate" data-create-url="{{ path('admin_product_new') }}">Create product</a></p>
+    <div class="table-filters">
+        <label for="productSearch">Search products</label>
+        <input id="productSearch" type="search" placeholder="Search products by name..." autocomplete="off">
+        <label for="productStatus">Status</label>
+        <select id="productStatus">
+            <option value="">All statuses</option>
+            <option value="1">Active</option>
+            <option value="0">Inactive</option>
+        </select>
+    </div>
+    <table class="admin-table" id="productTable">
+        <thead><tr><th>ID</th><th>Image</th><th>Product name</th><th>Price</th><th>Status</th><th>Stock</th><th>Actions</th></tr></thead>
+        <tbody>
+        {% for product in products %}
+            <tr data-name="{{ product.name|lower }}" data-status="{{ product.active ? '1' : '0' }}">
+                <td>{{ product.id }}</td>
+                <td>
+                    {% if product.image %}
+                        <img src="{{ asset(product.image) }}" alt="{{ product.name }}" width="40" height="40" style="object-fit: cover; border-radius: 4px;">
+                    {% else %}
+                        <span>No image</span>
+                    {% endif %}
+                </td>
+                <td>{{ product.name }}</td>
+                <td>₱{{ product.price|number_format(2) }}</td>
+                <td>{{ product.active ? 'Active' : 'Inactive' }}</td>
+                <td>{{ product.stock }}</td>
+                <td>
+                    <button type="button" class="product-view" data-id="{{ product.id }}" data-name="{{ product.name }}" data-price="{{ product.price }}" data-stock="{{ product.stock }}" data-status="{{ product.active ? 'Active' : 'Inactive' }}" data-image="{{ product.image ? asset(product.image) : '' }}">View</button>
+                    <a href="{{ path('admin_product_edit', {id: product.id}) }}" class="product-edit" data-action="{{ path('admin_product_edit', {id: product.id}) }}" data-id="{{ product.id }}" data-name="{{ product.name }}" data-price="{{ product.price }}" data-stock="{{ product.stock }}" data-active="{{ product.active ? '1' : '0' }}">Edit</a>
+                    <form method="post" action="{{ path('admin_stock_update', {id: product.id}) }}">
+                        <input type="hidden" name="_token" value="{{ csrf_token('admin_stock_update_' ~ product.id) }}">
+                        <label>Stock <input name="stock" type="number" min="0" value="{{ product.stock }}" required></label>
+                        <button type="submit">Update stock</button>
+                    </form>
+                    <form method="post" action="{{ path('admin_product_delete', {id: product.id}) }}">
+                        <input type="hidden" name="_token" value="{{ csrf_token('admin_product_delete_' ~ product.id) }}">
+                        <button type="submit">Delete / deactivate</button>
+                    </form>
+                </td>
+            </tr>
+        {% else %}
+            <tr><td colspan="7">No products found.</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    <dialog id="productDetails" aria-labelledby="productDetailsTitle">
+        <h2 id="productDetailsTitle">Product details</h2>
+        <img data-product-image alt="" width="100" height="100" style="object-fit: cover;">
+        <p><strong>ID:</strong> <span data-product-id></span></p>
+        <p><strong>Name:</strong> <span data-product-name></span></p>
+        <p><strong>Price:</strong> <span data-product-price></span></p>
+        <p><strong>Status:</strong> <span data-product-status></span></p>
+        <p><strong>Stock:</strong> <span data-product-stock></span></p>
+        <button type="button" data-close-product-details>Close</button>
+    </dialog>
+    <dialog id="productFormDialog" aria-labelledby="productFormTitle">
+        <h2 id="productFormTitle">Create product</h2>
+        <p>When editing, leave the image empty to keep the current image.</p>
+        {{ form_start(productForm, {action: path('admin_product_new'), attr: {id: 'productAdminForm'}}) }}
+            {{ form_widget(productForm) }}
+            <button type="submit">Save product</button>
+            <button type="button" data-close-product-form>Cancel</button>
+        {{ form_end(productForm) }}
+    </dialog>
 </main>
+<script>
+(() => {
+    const table = document.getElementById('productTable');
+    const search = document.getElementById('productSearch');
+    const status = document.getElementById('productStatus');
+    const dialog = document.getElementById('productDetails');
+    const formDialog = document.getElementById('productFormDialog');
+    const form = document.getElementById('productAdminForm');
+    const createLink = document.getElementById('productCreate');
+    if (!table || !search || !status || !dialog || !formDialog || !form || !createLink || table.dataset.bound) return;
+    table.dataset.bound = 'true';
+    const rows = [...table.querySelectorAll('tbody tr[data-name]')];
+    const filterRows = () => {
+        const term = search.value.trim().toLowerCase();
+        rows.forEach(row => {
+            row.hidden = !row.dataset.name.includes(term) || (status.value !== '' && row.dataset.status !== status.value);
+        });
+    };
+    search.addEventListener('input', filterRows);
+    status.addEventListener('change', filterRows);
+    table.addEventListener('click', event => {
+        const button = event.target.closest('.product-view');
+        if (!button) return;
+        dialog.querySelector('[data-product-id]').textContent = button.dataset.id;
+        dialog.querySelector('[data-product-name]').textContent = button.dataset.name;
+        dialog.querySelector('[data-product-price]').textContent = `₱${Number(button.dataset.price).toFixed(2)}`;
+        dialog.querySelector('[data-product-status]').textContent = button.dataset.status;
+        dialog.querySelector('[data-product-stock]').textContent = button.dataset.stock;
+        const image = dialog.querySelector('[data-product-image]');
+        image.hidden = !button.dataset.image;
+        if (button.dataset.image) image.src = button.dataset.image;
+        else image.removeAttribute('src');
+        dialog.showModal();
+    });
+    dialog.querySelector('[data-close-product-details]').addEventListener('click', () => dialog.close());
+    const title = document.getElementById('productFormTitle');
+    createLink.addEventListener('click', event => {
+        event.preventDefault();
+        form.reset();
+        form.action = createLink.dataset.createUrl;
+        title.textContent = 'Create product';
+        formDialog.showModal();
+    });
+    table.addEventListener('click', event => {
+        const link = event.target.closest('.product-edit');
+        if (!link) return;
+        event.preventDefault();
+        form.reset();
+        form.action = link.dataset.action;
+        form.elements.namedItem('product[name]').value = link.dataset.name;
+        form.elements.namedItem('product[price]').value = link.dataset.price;
+        form.elements.namedItem('product[stock]').value = link.dataset.stock;
+        form.elements.namedItem('product[active]').checked = link.dataset.active === '1';
+        title.textContent = 'Edit product';
+        formDialog.showModal();
+    });
+    formDialog.querySelector('[data-close-product-form]').addEventListener('click', () => formDialog.close());
+})();
+</script>
 {% endblock %}

@@ -5,6 +5,115 @@
 <main>
     <h1>{{ title }}</h1>
     {% for message in app.flashes('error') %}<p role="alert">{{ message }}</p>{% endfor %}
-    {{ form_start(form) }}{{ form_widget(form) }}<button type="submit">Save</button>{{ form_end(form) }}
+    {{ form_start(form) }}
+        {{ form_errors(form) }}
+        {% if form.motorcycleMode is defined %}
+            {{ form_row(form.customerId) }}
+            {{ form_row(form.serviceId) }}
+            {{ form_row(form.motorcycleMode) }}
+            <div data-existing-motorcycle>
+                {{ form_row(form.motorcycleId) }}
+            </div>
+            <div data-new-motorcycle hidden>
+                {{ form_row(form.motorcycleModel) }}
+                {{ form_row(form.plateNumber) }}
+            </div>
+            {% for field in form %}
+                {% if field.vars.name not in ['_token', 'customerId', 'serviceId', 'motorcycleMode', 'motorcycleId', 'motorcycleModel', 'plateNumber'] %}
+                    {{ form_row(field) }}
+                {% endif %}
+            {% endfor %}
+            {{ form_rest(form) }}
+        {% elseif form.items is defined %}
+            {{ form_row(form.customerId) }}
+            {{ form_row(form.deliveryAddress) }}
+            {{ form_errors(form.items) }}
+            <div id="order-items" data-prototype="{{ form_widget(form.items.vars.prototype)|e('html_attr') }}">
+                {% for item in form.items %}
+                    <div class="order-item-entry">
+                        {{ form_row(item.productId) }}
+                        {{ form_row(item.quantity) }}
+                        <button type="button" class="remove-order-item">Remove item</button>
+                    </div>
+                {% endfor %}
+            </div>
+            {% do form.items.setRendered %}
+            <button type="button" id="add-order-item">Add another item</button>
+            {{ form_rest(form) }}
+        {% else %}
+            {{ form_widget(form) }}
+        {% endif %}
+        <button type="submit">Save</button>
+    {{ form_end(form) }}
 </main>
+{% if form.motorcycleMode is defined %}
+    <script>
+        const customerSelect = document.getElementById('{{ form.customerId.vars.id }}');
+        const motorcycleMode = document.getElementById('{{ form.motorcycleMode.vars.id }}');
+        const motorcycleSelect = document.getElementById('{{ form.motorcycleId.vars.id }}');
+        const motorcycleModel = document.getElementById('{{ form.motorcycleModel.vars.id }}');
+        const existingMotorcycle = document.querySelector('[data-existing-motorcycle]');
+        const newMotorcycleFields = document.querySelector('[data-new-motorcycle]');
+
+        function updateMotorcycleFields() {
+            const customerId = customerSelect.value;
+            let hasCustomerMotorcycle = false;
+            Array.from(motorcycleSelect.options).forEach((option) => {
+                if (!option.value) {
+                    option.hidden = false;
+                    option.disabled = false;
+                    return;
+                }
+                const matchesCustomer = Boolean(customerId) && option.dataset.customer === customerId;
+                option.hidden = !matchesCustomer;
+                option.disabled = !matchesCustomer;
+                hasCustomerMotorcycle = hasCustomerMotorcycle || matchesCustomer;
+                if (!matchesCustomer && option.selected) {
+                    motorcycleSelect.value = '';
+                }
+            });
+
+            if (customerId && motorcycleMode.value === 'existing' && !hasCustomerMotorcycle) {
+                motorcycleMode.value = 'new';
+            }
+            const isNew = motorcycleMode.value === 'new';
+            existingMotorcycle.hidden = isNew;
+            newMotorcycleFields.hidden = !isNew;
+            motorcycleSelect.required = !isNew;
+            motorcycleModel.required = isNew;
+        }
+
+        customerSelect.addEventListener('change', updateMotorcycleFields);
+        motorcycleMode.addEventListener('change', updateMotorcycleFields);
+        updateMotorcycleFields();
+    </script>
+{% endif %}
+{% if form.items is defined %}
+    <script>
+        const orderItems = document.getElementById('order-items');
+        let nextOrderItemIndex = orderItems.children.length;
+
+        document.getElementById('add-order-item').addEventListener('click', () => {
+            if (orderItems.children.length >= 20) {
+                return;
+            }
+
+            const entry = document.createElement('div');
+            entry.className = 'order-item-entry';
+            entry.innerHTML = orderItems.dataset.prototype.replaceAll('__name__', String(nextOrderItemIndex++));
+            const removeButton = document.createElement('button');
+            removeButton.type = 'button';
+            removeButton.className = 'remove-order-item';
+            removeButton.textContent = 'Remove item';
+            entry.append(removeButton);
+            orderItems.append(entry);
+        });
+
+        orderItems.addEventListener('click', (event) => {
+            if (event.target instanceof Element && event.target.classList.contains('remove-order-item')) {
+                event.target.closest('.order-item-entry').remove();
+            }
+        });
+    </script>
+{% endif %}
 {% endblock %}

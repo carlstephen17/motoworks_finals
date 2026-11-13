@@ -416,6 +416,44 @@ VALUES
 'staff', NULL, NULL, NULL, NULL, '2026-11-11 15:17:31');
 
 
+
+
+-- =====================================================
+-- 8. ORDER
+-- =====================================================
+
+INSERT INTO `order`
+(
+    `orderId`,
+    `userId`,
+    `productId`,
+    `orderQuantity`,
+    `orderTotalAmount`,
+    `orderPaymentMethod`,
+    `orderPaymentReference`,
+    `orderStatus`,
+    `orderCreatedAt`,
+    `orderGroupId`,
+    `orderUnitPrice`
+)
+VALUES
+-- ORDER GROUP 1
+(1, 2, 1, 1, 1500.00, 'Cash on Delivery', 'MWO-20261101-72F5F414', 'Pending', '2026-11-02 00:45:45', 1, 1500.00),
+
+-- ORDER GROUP 2
+(2, 2, 2, 2, 700.00, 'Cash on Delivery', 'MWO-20261101-569C6825', 'Pending', '2026-11-02 00:51:18', 2, 350.00),
+
+-- ORDER GROUP 3
+(3, 3, 3, 1, 350.00, 'Cash on Delivery', 'MWO-20261107-59483D02', 'Pending', '2026-11-07 13:02:24', 3, 350.00),
+
+-- ORDER GROUP 4
+(4, 3, 4, 1, 1200.00, 'Cash on Delivery', 'MWO-20261107-313CC8E5', 'Pending', '2026-11-07 13:02:43', 4, 1200.00),
+
+-- ORDER GROUP 5
+(5, 3, 5, 1, 450.00, 'Cash on Delivery', 'MWO-20261107-8DDE030A', 'Completed', '2026-11-07 13:03:07', 5, 450.00);
+
+
+
 -- =====================================================
 -- END OF SUPPLIED RECORDS
 -- =====================================================
