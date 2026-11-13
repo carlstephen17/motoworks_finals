@@ -21,7 +21,7 @@
 
             {% if orders is empty %}
                 <p style="color: #9ca3af;">You haven't placed any orders yet.</p>
-                <a href="{{ path('shop_index') }}" class="btn-row-action btn-edit" style="margin-top: 15px;">Browse Shop</a>
+                <a href="{{ path('shop_index') }}" class="btn-row-action btn-view" style="margin-top: 15px;">Browse Shop</a>
             {% else %}
                 <div class="order-table-wrapper">
                     <table class="styled-table">
@@ -42,9 +42,11 @@
                         <tbody>
                             {% for order in orders %}
                                 {% set status = order.customerOrder.status %}
-                                {% set statusClass = status == 'Pending' ? 'badge-pending' : (status == 'Cancelled' ? 'badge-cancelled' : 'badge-completed') %}
+                                {% set statusClass = status == 'Pending' or status == 'Cancellation Pending' ? 'badge-pending' : (status == 'Cancelled' ? 'badge-cancelled' : 'badge-completed') %}
                                 {% set unitPrice = order.unitPrice ?? order.product.price %}
-                                <tr>
+                                {% set recordType = order.customerOrder ? 'customer_order' : 'order_item' %}
+                                {% set recordId = order.customerOrder ? order.customerOrder.id : order.id %}
+                                <tr data-transaction-key="{{ recordType }}:{{ recordId }}">
                                     <td>#{{ order.customerOrder.id }}</td>
                                     <td>
                                         <div style="display: flex; align-items: center; gap: 10px;">
@@ -59,7 +61,7 @@
                                     <td>₱{{ order.totalAmount|number_format(2) }}</td>
                                     <td>{{ order.customerOrder.paymentMethod ?? 'N/A' }}</td>
                                     <td>{{ order.customerOrder.paymentReference ?? 'N/A' }}</td>
-                                    <td><span class="badge {{ statusClass }}">{{ status }}</span></td>
+                                    <td><span class="badge {{ statusClass }}" data-transaction-status>{{ status }}</span></td>
                                     <td>{{ order.customerOrder.createdAt|date('M j, Y') }}</td>
                                     <td>
                                         <div class="table-actions">
@@ -81,21 +83,8 @@
                                             >
                                                 <i class="fa-solid fa-eye"></i> View
                                             </button>
-                                            {% if status == 'Pending' %}
-                                                <button
-                                                    type="button"
-                                                    class="btn-row-action btn-edit js-edit-order"
-                                                    data-edit-url="{{ path('order_edit', {id: order.id}) }}"
-                                                    data-order-id="{{ order.customerOrder.id }}"
-                                                    data-full-name="{{ order.user.firstName }} {{ order.user.lastName }}"
-                                                    data-phone="{{ order.user.phone ?? '' }}"
-                                                    data-address="{{ order.customerOrder.deliveryAddress ?? '' }}"
-                                                    data-quantity="{{ order.quantity }}"
-                                                    data-unit-price="{{ unitPrice }}"
-                                                >
-                                                    <i class="fa-solid fa-pen-to-square"></i> Edit
-                                                </button>
-                                                <form method="post" action="{{ path('order_cancel', {id: order.id}) }}" onsubmit="return confirm('Cancel this complete order? Its stock will be restored and the order record retained.');">
+                                            {% if status in ['Pending', 'Cancellation Pending'] %}
+                                                <form method="post" action="{{ path('order_cancel', {id: order.id}) }}" data-cancel-form data-turbo="false" {% if status == 'Cancellation Pending' %}hidden{% endif %}>
                                                     <input type="hidden" name="_token" value="{{ csrf_token('order_cancel_' ~ order.id) }}">
                                                     <button type="submit" class="btn-row-action btn-cancel">
                                                         <i class="fa-solid fa-trash"></i> Cancel
@@ -142,62 +131,15 @@
         </section>
     </div>
 
-    <div class="modal-overlay" id="edit-order-modal" aria-hidden="true">
-        <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="edit-order-title">
-            <header class="modal-header">
-                <h3 id="edit-order-title">Edit Order <span id="edit-order-id"></span></h3>
-                <button type="button" class="modal-close js-close-edit-order" aria-label="Close">&times;</button>
-            </header>
-            {{ form_start(editForm, {attr: {id: 'edit-order-form'}}) }}
-                {{ form_errors(editForm) }}
-                <div class="modal-form-group">
-                    <label for="edit-order-name">Full Name</label>
-                    <input type="text" id="edit-order-name" class="modal-form-control" readonly>
-                </div>
-                <div class="modal-form-group">
-                    <label for="edit-order-phone">Phone Number</label>
-                    <input type="text" id="edit-order-phone" class="modal-form-control" readonly>
-                </div>
-                <div class="modal-form-group">
-                    {{ form_label(editForm.quantity, 'Quantity') }}
-                    {{ form_widget(editForm.quantity, {attr: {class: 'modal-form-control', id: 'edit-order-quantity', oninput: 'calculateEditTotal()'}}) }}
-                    {{ form_errors(editForm.quantity) }}
-                </div>
-                <div class="modal-form-group">
-                    <label>Updated Total Price</label>
-                    <div id="edit-order-total" style="font-size: 1.1rem; font-weight: bold; color: #10b981;">₱0.00</div>
-                </div>
-                <div class="modal-form-group">
-                    {{ form_label(editForm.address, 'Delivery Address') }}
-                    {{ form_widget(editForm.address, {attr: {class: 'modal-form-control', rows: 3, id: 'edit-order-address'}}) }}
-                    {{ form_errors(editForm.address) }}
-                </div>
-                <div class="modal-actions">
-                    <button type="button" class="btn-modal-secondary js-close-edit-order">Cancel</button>
-                    <button type="submit" class="btn-modal-primary">Save Changes</button>
-                </div>
-            {{ form_end(editForm) }}
-        </section>
-    </div>
+    {% include 'shared/_cancellation_controls.html.twig' %}
 
     <script>
+        (() => {
         const viewOrderModal = document.getElementById('view-order-modal');
-        const editOrderModal = document.getElementById('edit-order-modal');
-        const editOrderForm = document.getElementById('edit-order-form');
-        let currentUnitPrice = 0;
 
         function setOrderModalOpen(modal, isOpen) {
             modal.classList.toggle('active', isOpen);
             modal.setAttribute('aria-hidden', String(!isOpen));
-        }
-
-        function calculateEditTotal() {
-            const quantity = Number.parseInt(editOrderForm.elements['order_edit[quantity]'].value, 10) || 0;
-            const total = quantity * currentUnitPrice;
-            document.getElementById('edit-order-total').textContent = '₱' + total.toLocaleString('en-PH', {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2
-            });
         }
 
         document.querySelectorAll('.js-view-order').forEach((button) => {
@@ -219,33 +161,14 @@
             });
         });
 
-        document.querySelectorAll('.js-edit-order').forEach((button) => {
-            button.addEventListener('click', () => {
-                const values = button.dataset;
-                editOrderForm.action = values.editUrl;
-                document.getElementById('edit-order-id').textContent = '#' + values.orderId;
-                document.getElementById('edit-order-name').value = values.fullName;
-                document.getElementById('edit-order-phone').value = values.phone;
-                document.getElementById('edit-order-address').value = values.address;
-                editOrderForm.elements['order_edit[quantity]'].value = values.quantity;
-                currentUnitPrice = Number(values.unitPrice) || 0;
-                calculateEditTotal();
-                setOrderModalOpen(editOrderModal, true);
-            });
-        });
-
         document.querySelectorAll('.js-close-view-order').forEach((button) => {
             button.addEventListener('click', () => setOrderModalOpen(viewOrderModal, false));
         });
-        document.querySelectorAll('.js-close-edit-order').forEach((button) => {
-            button.addEventListener('click', () => setOrderModalOpen(editOrderModal, false));
+        viewOrderModal.addEventListener('click', (event) => {
+            if (event.target === viewOrderModal) {
+                setOrderModalOpen(viewOrderModal, false);
+            }
         });
-        [viewOrderModal, editOrderModal].forEach((modal) => {
-            modal.addEventListener('click', (event) => {
-                if (event.target === modal) {
-                    setOrderModalOpen(modal, false);
-                }
-            });
-        });
+        })();
     </script>
 {% endblock %}

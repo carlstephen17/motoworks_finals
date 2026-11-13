@@ -14,16 +14,28 @@
             {% if app.request.pathinfo starts with '/admin' %}
                 <link rel="stylesheet" href="{{ asset('admin/css/admin_layout.css') }}">
                 <link rel="stylesheet" href="{{ asset('admin/css/admin_products.css') }}">
+                {% if app.request.pathinfo == '/admin' or app.request.pathinfo == '/admin/' %}
+                    <link rel="stylesheet" href="{{ asset('admin/css/admin_dashboard.css') }}">
+                {% endif %}
             {% elseif app.request.pathinfo starts with '/staff' %}
+                <link rel="stylesheet" href="{{ asset('admin/css/admin_layout.css') }}">
+                <link rel="stylesheet" href="{{ asset('admin/css/admin_products.css') }}">
+                <link rel="stylesheet" href="{{ asset('admin/css/admin_dashboard.css') }}">
                 <link rel="stylesheet" href="{{ asset('staff/css/staff_layout.css') }}">
                 <link rel="stylesheet" href="{{ asset('staff/css/staff_dashboard.css') }}">
                 <link rel="stylesheet" href="{{ asset('staff/css/staff_tables.css') }}">
                 <link rel="stylesheet" href="{{ asset('staff/css/staff_forms.css') }}">
+                <link rel="stylesheet" href="{{ asset('staff/css/staff_appointments.css') }}">
+                <link rel="stylesheet" href="{{ asset('staff/css/staff_orders.css') }}">
+                <link rel="stylesheet" href="{{ asset('staff/css/staff_promo_history.css') }}">
             {% endif %}
         {% endblock %}
 
         {% block javascripts %}
             {% block importmap %}{{ importmap('app') }}{% endblock %}
+            {% if app.request.pathinfo starts with '/staff' %}
+                <script src="{{ asset('staff/js/staff.js') }}" defer></script>
+            {% endif %}
         {% endblock %}
 
         {% set frankenphp_hot_reload = app.request.server.get('FRANKENPHP_HOT_RELOAD') %}
@@ -33,19 +45,42 @@
         <script src="https://cdn.jsdelivr.net/npm/frankenphp-hot-reload/+esm" type="module"></script>
         {% endif %}
     </head>
-    <body>
+    <body class="{{ app.request.pathinfo starts with '/admin' ? 'admin-page' : (app.request.pathinfo starts with '/staff' ? 'staff-page' : '') }}">
         {% block site_header %}{% include 'shared/_header.html.twig' %}{% endblock %}
         {% block body %}{% endblock %}
-        {% block site_footer %}{% include 'shared/_footer.html.twig' %}{% endblock %}
-        {% block modals %}{% include 'shared/_modals.html.twig' %}{% endblock %}
+        {% block site_footer %}
+            {% if not (app.request.pathinfo starts with '/admin' or app.request.pathinfo starts with '/staff') %}
+                {% include 'shared/_footer.html.twig' %}
+            {% endif %}
+        {% endblock %}
+        {% block modals %}
+            {% if registrationForm is defined and forgotPasswordForm is defined %}
+                {% include 'shared/_modals.html.twig' %}
+            {% else %}
+                {% set modalForms = auth_modal_form_views() %}
+                {% include 'shared/_modals.html.twig' with modalForms %}
+            {% endif %}
+            {% if app.request.pathinfo starts with '/admin' or app.request.pathinfo starts with '/staff' %}
+                {% include 'shared/_deferred_action_controls.html.twig' %}
+            {% endif %}
+        {% endblock %}
+        {% set authSuccessMessages = app.flashes('auth_success') %}
+        <div
+            id="auth-success-notification"
+            role="status"
+            aria-live="polite"
+            data-auto-dismiss
+            style="position: fixed; top: 20px; right: 20px; z-index: 3000; padding: 14px 18px; border-radius: 6px; background: #198754; color: #fff; display: {{ authSuccessMessages is empty ? 'none' : 'block' }};"
+        >{{ authSuccessMessages|first|default('') }}</div>
         <script>
             window.isLoggedIn = {{ app.user ? 'true' : 'false' }};
 
-            const pendingCustomerActionKey = 'motoworks.pendingCustomerAction';
+            window.pendingCustomerActionKey = 'motoworks.pendingCustomerAction';
+            window.pendingAuthSuccessKey = 'motoworks.pendingAuthSuccess';
 
             function rememberCustomerAction(action) {
                 const returnPath = window.location.pathname + window.location.search;
-                sessionStorage.setItem(pendingCustomerActionKey, JSON.stringify({...action, returnPath}));
+                sessionStorage.setItem(window.pendingCustomerActionKey, JSON.stringify({...action, returnPath}));
                 const loginTarget = document.getElementById('login-target-path');
                 if (loginTarget) loginTarget.value = returnPath;
             }
@@ -60,10 +95,16 @@
             function closeModal(modalId) {
                 const modal = document.getElementById(modalId);
                 if (!modal) return;
+                if (modal.paymentStatusTimer) {
+                    window.clearInterval(modal.paymentStatusTimer);
+                    modal.paymentStatusTimer = null;
+                }
                 modal.style.display = 'none';
                 modal.classList.remove('active');
                 const alertBox = document.getElementById(modalId + '-alert');
                 if (alertBox) {
+                    if (alertBox.hideTimeout) window.clearTimeout(alertBox.hideTimeout);
+                    alertBox.hideTimeout = null;
                     alertBox.className = 'modal-alert';
                     alertBox.textContent = '';
                 }
@@ -82,13 +123,13 @@
             }
 
             function getPendingCustomerAction() {
-                const savedAction = sessionStorage.getItem(pendingCustomerActionKey);
+                const savedAction = sessionStorage.getItem(window.pendingCustomerActionKey);
                 if (!savedAction) return null;
 
                 try {
                     return JSON.parse(savedAction);
                 } catch (error) {
-                    sessionStorage.removeItem(pendingCustomerActionKey);
+                    sessionStorage.removeItem(window.pendingCustomerActionKey);
                     console.error('Unable to restore the pending customer action.', error);
                     showModalAlert('login-modal', 'Unable to resume the requested action. Please try again.', 'error');
                     return null;
@@ -96,6 +137,8 @@
             }
 
             function getAuthenticatedRedirect(responseUrl) {
+                const responsePath = new URL(responseUrl, window.location.origin).pathname;
+                if (responsePath.startsWith('/admin') || responsePath.startsWith('/staff')) return responseUrl;
                 const returnPath = getPendingCustomerAction()?.returnPath;
                 return typeof returnPath === 'string' && returnPath.startsWith('/') && !returnPath.startsWith('//')
                     ? returnPath
@@ -110,6 +153,7 @@
                 alertBox.hideTimeout = window.setTimeout(() => {
                     alertBox.className = 'modal-alert';
                     alertBox.textContent = '';
+                    alertBox.hideTimeout = null;
                 }, 3000);
             }
 
@@ -121,6 +165,7 @@
                 field.type = visible ? 'text' : 'password';
                 icon.classList.toggle('fa-eye', !visible);
                 icon.classList.toggle('fa-eye-slash', visible);
+                button.setAttribute('aria-pressed', String(visible));
             }
 
             function toggleUserDropdownMenu() {
@@ -193,6 +238,7 @@
                 form.style.display = '';
                 document.getElementById('buy-product-id').value = productId;
                 document.getElementById('buy-csrf-token').value = csrfToken;
+                document.getElementById('buy-submission-key').value = createOrderSubmissionKey();
                 document.getElementById('buy-product-name').textContent = productName;
                 document.getElementById('buy-product-price').textContent = '₱' + (parseFloat(productPrice) || 0).toFixed(2);
                 const buyAlert = document.getElementById('buy-modal-alert');
@@ -214,6 +260,110 @@
                 warning.style.display = 'none';
                 warning.textContent = '';
                 openModal('buy-modal');
+            }
+
+            function createOrderSubmissionKey() {
+                if (window.crypto?.randomUUID) return window.crypto.randomUUID();
+                const bytes = new Uint8Array(16);
+                window.crypto.getRandomValues(bytes);
+                return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+            }
+
+            function updateProductStock(productId, remainingStock) {
+                const stock = Math.max(0, Number.parseInt(remainingStock, 10) || 0);
+                document.querySelectorAll('.product-card[data-product-id], main[data-product-id]').forEach((card) => {
+                    if (String(card.dataset.productId) !== String(productId)) return;
+                    const stockDisplay = card.querySelector('[data-stock-display]');
+                    if (stockDisplay) {
+                        stockDisplay.textContent = stock > 0 ? 'Stock: ' + stock + ' available' : 'Out of Stock';
+                        stockDisplay.style.color = stock > 0 ? '#2e7d32' : '#c62828';
+                    }
+                    card.querySelectorAll('.js-add-to-cart, .js-buy-now').forEach((button) => {
+                        button.dataset.stockLimit = String(stock);
+                        button.disabled = stock === 0;
+                        button.style.opacity = stock > 0 ? '' : '0.5';
+                        button.style.cursor = stock > 0 ? '' : 'not-allowed';
+                        if (button.classList.contains('js-buy-now')) {
+                            button.textContent = stock > 0 ? 'Buy Now' : 'Out of Stock';
+                            button.classList.toggle('btn-primary', stock > 0);
+                            button.classList.toggle('btn-secondary', stock === 0);
+                            button.style.background = stock > 0 ? '' : '#ccc';
+                            button.style.borderColor = stock > 0 ? '' : '#ccc';
+                        }
+                    });
+                    const detailQuantity = card.querySelector('.product-detail-cart-form input[name="quantity"]');
+                    const detailCartButton = card.querySelector('.product-detail-cart-form button[type="submit"]');
+                    if (detailQuantity) detailQuantity.max = String(stock);
+                    if (detailCartButton) detailCartButton.disabled = stock === 0;
+                });
+            }
+
+            function displayOrderDate(value) {
+                const date = new Date(value);
+                return Number.isNaN(date.getTime()) ? 'Not available' : date.toLocaleString();
+            }
+
+            function showPaymentConfirmation(data) {
+                const modal = document.getElementById('payment-confirmation-modal');
+                if (!modal) return;
+                document.getElementById('payment-confirmation-order').textContent = '#' + (data.order_id || '');
+                document.getElementById('payment-confirmation-order-status').textContent = data.order_status || 'Pending';
+                document.getElementById('payment-confirmation-customer').textContent = data.customer_name || '';
+                document.getElementById('payment-confirmation-items').textContent = (data.items || [])
+                    .map((item) => item.name + ' (x' + item.quantity + ')')
+                    .join(', ');
+                document.getElementById('payment-confirmation-amount').textContent = Number(data.total_amount || 0)
+                    .toLocaleString('en-PH', {style: 'currency', currency: 'PHP'});
+                document.getElementById('payment-confirmation-method').textContent = data.payment_method || '';
+                document.getElementById('payment-confirmation-date').textContent = displayOrderDate(data.order_created_at);
+                document.getElementById('payment-confirmation-reference').textContent = data.payment_reference || '';
+                document.getElementById('payment-confirmation-status').textContent = data.payment_status || 'Pending';
+                document.getElementById('payment-confirmation-checked').textContent = 'Not checked';
+                document.getElementById('payment-confirmation-instructions').textContent =
+                    'No payment provider is connected and no card details are collected. Contact staff to complete payment; the status changes only after staff confirms receipt.';
+                modal.dataset.orderId = String(data.order_id || '');
+                modal.dataset.statusUrl = modal.dataset.statusUrlTemplate.replace(
+                    /\/0(?=\/|$)/,
+                    '/' + encodeURIComponent(data.order_id),
+                );
+                showTimedModalAlert('payment-confirmation-modal', data.duplicate ? 'This order was already recorded. No duplicate charge or stock deduction was made.' : 'Order placed successfully. Payment is awaiting staff verification.', 'success');
+                openModal('payment-confirmation-modal');
+                if (modal.paymentStatusTimer) window.clearInterval(modal.paymentStatusTimer);
+                modal.paymentStatusTimer = window.setInterval(() => refreshPaymentStatus(modal), 10000);
+                refreshPaymentStatus(modal);
+            }
+
+            async function refreshPaymentStatus(modal) {
+                if (!modal.dataset.statusUrl) return;
+                try {
+                    const response = await fetch(modal.dataset.statusUrl, {
+                        cache: 'no-store',
+                        headers: {'X-Requested-With': 'XMLHttpRequest'},
+                    });
+                    const data = await response.json();
+                    if (!response.ok) {
+                        throw new Error(data.message || 'Payment status could not be refreshed.');
+                    }
+                    document.getElementById('payment-confirmation-status').textContent = data.payment_status;
+                    document.getElementById('payment-confirmation-order-status').textContent = data.order_status;
+                    document.getElementById('payment-confirmation-checked').textContent = new Date().toLocaleTimeString();
+                    if (data.payment_verified_at) {
+                        document.getElementById('payment-confirmation-instructions').textContent =
+                            'Payment was verified by staff at ' + displayOrderDate(data.payment_verified_at) + '.';
+                    }
+                    if (data.payment_status === 'Paid' && modal.paymentStatusTimer) {
+                        window.clearInterval(modal.paymentStatusTimer);
+                        modal.paymentStatusTimer = null;
+                        showTimedModalAlert('payment-confirmation-modal', 'Payment was verified by staff.', 'success');
+                    }
+                } catch (error) {
+                    console.error('Unable to refresh the order payment status.', error);
+                    showTimedModalAlert('payment-confirmation-modal', error.message || 'Payment status could not be refreshed.', 'error');
+                    if (modal.paymentStatusTimer) {
+                        window.clearInterval(modal.paymentStatusTimer);
+                        modal.paymentStatusTimer = null;
+                    }
+                }
             }
 
             async function submitModalForm(event, form, modalId, onSuccess) {
@@ -281,6 +431,9 @@
                         if (!response.ok || finalPath === new URL(form.action).pathname) {
                             showModalAlert(modalId, errorMessage || 'Invalid username or password.', 'error');
                         } else {
+                            const successMessage = resultPage.getElementById('auth-success-notification')?.textContent.trim()
+                                || 'Login successful! Welcome back.';
+                            sessionStorage.setItem(window.pendingAuthSuccessKey, successMessage);
                             window.location.assign(getAuthenticatedRedirect(response.url));
                             return;
                         }
@@ -326,7 +479,50 @@
                 }
             }
 
-            document.addEventListener('DOMContentLoaded', () => {
+            function initializePage() {
+                if (document.body.dataset.motoworksPageInitialized === 'true') return;
+                document.body.dataset.motoworksPageInitialized = 'true';
+
+                document.querySelectorAll('[data-auto-dismiss]').forEach((notification) => {
+                    window.setTimeout(() => notification.remove(), 3000);
+                });
+
+                if (document.body.classList.contains('admin-page') || document.body.classList.contains('staff-page')) {
+                    document.addEventListener('submit', (event) => {
+                        const form = event.target;
+                        if (!(form instanceof HTMLFormElement) || form.method.toUpperCase() !== 'POST') return;
+                        if (form.matches('form[data-deferred-action]') && form.dataset.deferredSubmit !== 'true') return;
+                        if (form.matches('form[data-deferred-cancel-status]') && form.dataset.deferredSubmit !== 'true') {
+                            const status = form.querySelector('select[name="status"]');
+                            if (status && status.value === form.dataset.deferredCancelStatus && status.value !== status.dataset.initialStatus) return;
+                        }
+                        if (form.dataset.submitting === 'true') {
+                            event.preventDefault();
+                            return;
+                        }
+
+                        form.dataset.submitting = 'true';
+                        form.querySelectorAll('button:not([type]), button[type="submit"], input[type="submit"]').forEach((button) => {
+                            button.disabled = true;
+                        });
+                    });
+                }
+
+                const pendingAuthSuccess = sessionStorage.getItem(window.pendingAuthSuccessKey);
+                if (pendingAuthSuccess) {
+                    sessionStorage.removeItem(window.pendingAuthSuccessKey);
+                    const notification = document.getElementById('auth-success-notification');
+                    if (notification) {
+                        notification.textContent = pendingAuthSuccess;
+                        notification.style.display = 'block';
+                        window.setTimeout(() => notification.remove(), 3000);
+                    }
+                }
+
+                if (window.location.pathname === '/login') openModal('login-modal');
+                const loginError = document.getElementById('login-page-auth-error');
+                if (loginError) showModalAlert('login-modal', loginError.textContent.trim(), 'error');
+
                 const navToggle = document.getElementById('nav-toggle-btn');
                 const mainNav = document.getElementById('main-nav');
                 if (navToggle && mainNav) {
@@ -356,21 +552,58 @@
                     window.history.replaceState({}, document.title, window.location.pathname);
                 }
 
-                document.addEventListener('keydown', (event) => {
-                    if (event.key === 'Escape') {
-                        const activeModal = document.querySelector('.modal-overlay.active, .auth-modal.active');
-                        if (activeModal) closeModal(activeModal.id);
-                    }
-                });
+                if (!window.motoworksGlobalListenersInitialized) {
+                    document.addEventListener('keydown', (event) => {
+                        if (event.key === 'Escape') {
+                            const activeModal = document.querySelector('.modal-overlay.active, .auth-modal.active');
+                            if (activeModal) closeModal(activeModal.id);
+                        }
+                    });
+                    document.addEventListener('click', (event) => {
+                        if (!event.target.closest('#nav-user-dropdown')) {
+                            document.getElementById('userMenuDropdown')?.classList.remove('show');
+                        }
+                        if (!(event.target instanceof Element)) return;
+                        const buyButton = event.target.closest('.js-buy-now');
+                        if (buyButton && !buyButton.disabled) {
+                            openBuyModal(
+                                buyButton.dataset.productId,
+                                buyButton.dataset.productName,
+                                buyButton.dataset.productPrice,
+                                buyButton.dataset.stockLimit,
+                                buyButton.dataset.csrfToken,
+                            );
+                            return;
+                        }
+                        const cartButton = event.target.closest('.js-add-to-cart');
+                        if (cartButton && !cartButton.disabled) {
+                            openCartModal(
+                                cartButton.dataset.productId,
+                                cartButton.dataset.productName,
+                                cartButton.dataset.productPrice,
+                                cartButton.dataset.stockLimit,
+                                cartButton.dataset.csrfToken,
+                            );
+                            return;
+                        }
+                        if (event.target.closest('#copy-payment-reference')) {
+                            const reference = document.getElementById('payment-confirmation-reference').textContent;
+                            if (!reference) return;
+                            navigator.clipboard.writeText(reference).then(
+                                () => showTimedModalAlert('payment-confirmation-modal', 'Reference copied.', 'success'),
+                                (error) => {
+                                    console.error('Unable to copy the payment reference.', error);
+                                    showTimedModalAlert('payment-confirmation-modal', 'Could not copy the reference. Please select and copy it manually.', 'error');
+                                },
+                            );
+                        }
+                    });
+                    window.motoworksGlobalListenersInitialized = true;
+                }
                 document.querySelectorAll('.modal-overlay, .auth-modal').forEach((modal) => {
                     modal.addEventListener('click', (event) => {
                         if (event.target === modal) closeModal(modal.id);
                     });
-                });
-                document.addEventListener('click', (event) => {
-                    if (!event.target.closest('#nav-user-dropdown')) {
-                        document.getElementById('userMenuDropdown')?.classList.remove('show');
-                    }
                 });
 
                 const loginForm = document.getElementById('ajax-login-form');
@@ -411,9 +644,10 @@
                 }
                 if (buyForm) {
                     buyForm.addEventListener('submit', (event) => submitModalForm(event, buyForm, 'buy-modal', (data) => {
+                        updateProductStock(data.product_id, data.remaining_stock);
                         const items = (data.items || []).map((item) => item.name + ' (x' + item.quantity + ')').join(', ');
-                        const paymentStatus = data.payment_status || 'Unverified';
-                        const paymentStatusLabel = paymentStatus === 'Unverified' ? 'Pending verification (Unverified)' : paymentStatus;
+                        const paymentStatus = data.payment_status || 'Pending';
+                        const paymentStatusLabel = paymentStatus === 'Pending' ? 'Pending staff confirmation' : paymentStatus;
                         document.getElementById('order-confirmation-customer').textContent = data.customer_name || '';
                         document.getElementById('order-confirmation-item').textContent = items;
                         document.getElementById('order-confirmation-phone').textContent = data.phone || '';
@@ -421,8 +655,13 @@
                         document.getElementById('order-confirmation-payment').textContent = data.payment_method || '';
                         document.getElementById('order-confirmation-payment-status').textContent = paymentStatusLabel;
                         document.getElementById('order-confirmation-reference').textContent = data.payment_reference || '';
-                        const paymentNotice = paymentStatus === 'Unverified'
-                            ? 'Order recorded. Online payment is pending verification.'
+                        if (paymentStatus === 'Pending') {
+                            closeModal('buy-modal');
+                            showPaymentConfirmation(data);
+                            return;
+                        }
+                        const paymentNotice = data.duplicate
+                            ? 'This order was already recorded.'
                             : 'Order recorded. Payment is due on delivery.';
                         showTimedModalAlert('buy-modal', paymentNotice, 'success');
                         buyForm.style.display = 'none';
@@ -434,7 +673,7 @@
                 if (window.isLoggedIn) {
                     const pendingAction = getPendingCustomerAction();
                     if (pendingAction) {
-                        sessionStorage.removeItem(pendingCustomerActionKey);
+                        sessionStorage.removeItem(window.pendingCustomerActionKey);
                         if (pendingAction.type === 'buy_now') {
                             openBuyModal(
                                 pendingAction.productId,
@@ -447,6 +686,7 @@
                             openServiceBookingModal(pendingAction.serviceId, pendingAction.serviceName);
                         } else if (pendingAction.type === 'promo_booking' && typeof openClaimModal === 'function') {
                             openClaimModal(
+                                pendingAction.promoId,
                                 pendingAction.slug,
                                 pendingAction.title,
                                 pendingAction.itemLabel,
@@ -455,7 +695,11 @@
                         }
                     }
                 }
-            });
+            }
+
+            document.addEventListener('DOMContentLoaded', initializePage);
+            document.addEventListener('turbo:load', initializePage);
         </script>
+        <div id="admin-toast-container" popover="manual" role="region" aria-label="Notifications" aria-live="polite"></div>
     </body>
 </html>

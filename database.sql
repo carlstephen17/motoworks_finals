@@ -35,7 +35,7 @@ CREATE TABLE IF NOT EXISTS `customer_order` (
   `orderDeliveryAddress` TEXT DEFAULT NULL,
   `orderPaymentMethod` VARCHAR(50) DEFAULT NULL,
   `orderPaymentReference` VARCHAR(32) DEFAULT NULL,
-  `orderPaymentStatus` VARCHAR(32) NOT NULL DEFAULT 'Unverified',
+  `orderPaymentStatus` VARCHAR(32) NOT NULL DEFAULT 'Pending',
   `orderStatus` VARCHAR(50) NOT NULL DEFAULT 'Pending',
   `orderCancellationReason` TEXT DEFAULT NULL,
   `orderCreatedByStaffId` INT(11) DEFAULT NULL,

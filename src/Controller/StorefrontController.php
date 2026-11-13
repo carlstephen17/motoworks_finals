@@ -121,9 +121,9 @@ class StorefrontController extends AbstractController
             throw $this->createNotFoundException('Product not found.');
         }
 
-        return $this->render('storefront/product.html.twig', [
+        return $this->render('storefront/product.html.twig', array_merge([
             'product' => $product,
-        ]);
+        ], $this->authModalFormViews()));
     }
 
     #[Route('/services', name: 'service_index', methods: ['GET'])]
@@ -135,11 +135,10 @@ class StorefrontController extends AbstractController
     }
 
     #[Route('/promos', name: 'promo_index', methods: ['GET'])]
-    public function promos(PromoRepository $promos, ServiceRepository $services): Response
+    public function promos(PromoRepository $promos): Response
     {
         return $this->render('storefront/promos.html.twig', array_merge([
             'promos' => $promos->findActivePromos(),
-            'bookingServices' => $services->findActiveServices(),
         ], $this->authModalFormViews()));
     }
 }

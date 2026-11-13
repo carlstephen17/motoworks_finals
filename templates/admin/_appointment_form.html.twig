@@ -1,0 +1,11 @@
+<div class="modal-header">
+    <h3 id="appointmentActionTitle">{{ title }}</h3>
+    <button type="button" class="close-btn" data-close-appointment-form aria-label="Close">×</button>
+</div>
+{{ form_start(form, {action: action, attr: {id: 'appointmentActionForm'}}) }}
+    {{ form_widget(form) }}
+    <div class="modal-footer">
+        <button type="submit" class="btn-primary">Save appointment</button>
+        <button type="button" class="btn-secondary" data-close-appointment-form>Cancel</button>
+    </div>
+{{ form_end(form) }}

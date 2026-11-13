@@ -26,6 +26,41 @@ body {
     min-height: 100vh;
 }
 
+.admin-page,
+.staff-page {
+    min-height: 100vh;
+}
+
+body.admin-page,
+body.staff-page {
+    display: block;
+    padding-top: 0 !important;
+    background-color: var(--light-bg);
+    color: var(--text-main);
+}
+
+.admin-page > main:not(.admin-main),
+.staff-page > main:not(.admin-main) {
+    margin-left: var(--sidebar-width);
+    min-width: 0;
+    padding: 24px 30px;
+}
+
+.admin-page > main:not(.admin-main) > h1 {
+    margin: 0 0 20px;
+    color: #181c32;
+}
+
+.admin-page > main:not(.admin-main) > table,
+.admin-page > main:not(.admin-main) > section,
+.admin-page > main:not(.admin-main) > form {
+    margin-bottom: 20px;
+}
+
+.admin-page .admin-sidebar nav {
+    min-height: 0;
+}
+
 /* Sidebar Styles */
 .admin-sidebar {
     width: var(--sidebar-width);
@@ -107,13 +142,42 @@ body {
     border-top: 1px solid #2b2b40;
 }
 
-.sidebar-logout a {
-    color: #f64e60 !important;
+.sidebar-logout form {
+    margin: 0;
+    width: 100%;
 }
 
-.sidebar-logout a:hover {
+.sidebar-logout a,
+.sidebar-logout button {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    padding: 14px 25px;
+    color: #f64e60 !important;
+    background: transparent;
+    border: none;
+    border-left: 4px solid transparent;
+    text-decoration: none;
+    font-size: 0.95rem;
+    font-weight: 500;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.3s ease;
+}
+
+.sidebar-logout button i,
+.sidebar-logout a i {
+    margin-right: 15px;
+    font-size: 1.1rem;
+    width: 20px;
+    text-align: center;
+}
+
+.sidebar-logout a:hover,
+.sidebar-logout button:hover {
     background-color: rgba(246, 78, 96, 0.1) !important;
     border-left-color: #f64e60 !important;
+    color: #f64e60 !important;
 }
 
 /* Main Content Area */
@@ -123,6 +187,7 @@ body {
     display: flex;
     flex-direction: column;
     min-width: 0;
+    margin-top: 0;
 }
 
 .main-header {

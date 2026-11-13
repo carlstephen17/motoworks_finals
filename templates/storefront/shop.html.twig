@@ -31,7 +31,7 @@
             {% for productEntry in products %}
                 {% set product = productEntry.product %}
                 {% set stockLevel = product.stock %}
-                <div class="product-card" data-name="{{ product.name|lower }}">
+                <div class="product-card" data-name="{{ product.name|lower }}" data-product-id="{{ product.id }}">
                     <!-- IMAGE -->
                     <div class="product-image">
                         {% if productEntry.image %}
@@ -50,6 +50,7 @@
                     <!-- STOCK -->
                     <div
                         class="product-stock"
+                        data-stock-display
                         style="font-size: 0.85rem; margin: 5px 0 10px 0; color: {{ stockLevel > 0 ? '#2e7d32' : '#c62828' }};"
                     >
                         {% if stockLevel > 0 %}
@@ -64,8 +65,12 @@
                         <!-- ADD TO CART -->
                         <button
                             type="button"
-                            onclick='openCartModal({{ product.id }}, {{ product.name|json_encode|e('html_attr') }}, {{ product.price|json_encode|e('html_attr') }}, {{ stockLevel }}, {{ csrf_token('cart_add_' ~ product.id)|json_encode|e('html_attr') }})'
-                            class="btn btn-outline btn-block btn-cart-add"
+                            class="btn btn-outline btn-block btn-cart-add js-add-to-cart"
+                            data-product-id="{{ product.id }}"
+                            data-product-name="{{ product.name|e('html_attr') }}"
+                            data-product-price="{{ product.price }}"
+                            data-stock-limit="{{ stockLevel }}"
+                            data-csrf-token="{{ csrf_token('cart_add_' ~ product.id) }}"
                             aria-label="Add to cart"
                             {{ stockLevel <= 0 ? 'disabled style="opacity: 0.5; cursor: not-allowed;"' : '' }}
                         >
@@ -73,24 +78,16 @@
                         </button>
 
                         <!-- BUY NOW -->
-                        {% if stockLevel > 0 %}
-                            <button
-                                type="button"
-                                onclick='openBuyModal({{ product.id }}, {{ product.name|json_encode|e('html_attr') }}, {{ product.price|json_encode|e('html_attr') }}, {{ stockLevel }}, {{ csrf_token('buy_now_' ~ product.id)|json_encode|e('html_attr') }})'
-                                class="btn btn-primary btn-block"
-                            >
-                                Buy Now
-                            </button>
-                        {% else %}
-                            <button
-                                type="button"
-                                class="btn btn-secondary btn-block"
-                                disabled
-                                style="background: #ccc; cursor: not-allowed; border-color: #ccc;"
-                            >
-                                Out of Stock
-                            </button>
-                        {% endif %}
+                        <button
+                            type="button"
+                            class="btn {{ stockLevel > 0 ? 'btn-primary' : 'btn-secondary' }} btn-block js-buy-now"
+                            data-product-id="{{ product.id }}"
+                            data-product-name="{{ product.name|e('html_attr') }}"
+                            data-product-price="{{ product.price }}"
+                            data-stock-limit="{{ stockLevel }}"
+                            data-csrf-token="{{ csrf_token('buy_now_' ~ product.id) }}"
+                            {{ stockLevel <= 0 ? 'disabled style="background: #ccc; cursor: not-allowed; border-color: #ccc;"' : '' }}
+                        >{{ stockLevel > 0 ? 'Buy Now' : 'Out of Stock' }}</button>
                     </div>
                 </div>
             {% else %}

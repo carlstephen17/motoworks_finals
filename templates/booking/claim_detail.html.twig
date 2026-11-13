@@ -15,20 +15,6 @@
         <p><strong>Appointment:</strong> {{ record.appointmentDate|date('M j, Y') }} at {{ record.appointmentTime|date('g:i A') }}</p>
         <p><strong>Status:</strong> {{ record.status }}</p>
 
-        {% if canEdit %}
-            <form method="post" action="{{ path('update_claim') }}">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token('update_claim') }}">
-                <input type="hidden" name="claim_id" value="{{ record.id }}">
-                <input type="hidden" name="record_type" value="{{ record.type }}">
-                <label for="claim-selected-option">Selected option</label>
-                <input id="claim-selected-option" name="selected_option" value="{{ record.selectedOption }}" maxlength="255" required>
-                <label for="claim-appointment-date">Date</label>
-                <input id="claim-appointment-date" name="appointment_date" type="date" min="{{ 'now'|date('Y-m-d') }}" value="{{ record.appointmentDate|date('Y-m-d') }}" required>
-                <label for="claim-appointment-time">Time</label>
-                <input id="claim-appointment-time" name="appointment_time" type="time" value="{{ record.appointmentTime|date('H:i') }}" required>
-                <button type="submit">Save changes</button>
-            </form>
-        {% endif %}
         <a href="{{ path('promo_history') }}">Back to promotion history</a>
     </main>
 {% endblock %}

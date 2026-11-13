@@ -27,8 +27,18 @@ class CustomerOrder
     #[ORM\Column(name: 'orderPaymentReference', length: 32, nullable: true)]
     private ?string $paymentReference = null;
 
+    #[ORM\Column(name: 'orderSubmissionKey', length: 36, nullable: true, unique: true)]
+    private ?string $submissionKey = null;
+
     #[ORM\Column(name: 'orderPaymentStatus', length: 32)]
-    private string $paymentStatus = 'Unverified';
+    private string $paymentStatus = 'Pending';
+
+    #[ORM\Column(name: 'orderPaymentVerifiedAt', type: 'datetime_immutable', nullable: true)]
+    private ?\DateTimeImmutable $paymentVerifiedAt = null;
+
+    #[ORM\ManyToOne(targetEntity: User::class)]
+    #[ORM\JoinColumn(name: 'orderPaymentVerifiedById', referencedColumnName: 'userId', nullable: true, onDelete: 'SET NULL')]
+    private ?User $paymentVerifiedBy = null;
 
     #[ORM\Column(name: 'orderStatus', length: 50)]
     private string $status = 'Pending';
@@ -43,13 +53,20 @@ class CustomerOrder
     #[ORM\Column(name: 'orderCreatedAt', type: 'datetime_immutable')]
     private \DateTimeImmutable $createdAt;
 
-    public function __construct(User $user, string $address, string $paymentMethod, string $paymentReference)
+    public function __construct(
+        User $user,
+        string $address,
+        string $paymentMethod,
+        string $paymentReference,
+        ?string $submissionKey = null,
+    )
     {
         $this->user = $user;
         $this->deliveryAddress = $address;
         $this->paymentMethod = $paymentMethod;
         $this->paymentReference = $paymentReference;
-        $this->paymentStatus = $paymentMethod === 'Cash on Delivery' ? 'Due on delivery' : 'Unverified';
+        $this->submissionKey = $submissionKey;
+        $this->paymentStatus = $paymentMethod === 'Cash on Delivery' ? 'Due on delivery' : 'Pending';
         $this->createdAt = new \DateTimeImmutable();
     }
 
@@ -61,6 +78,37 @@ class CustomerOrder
     public function getPaymentReference(): ?string
     {
         return $this->paymentReference;
+    }
+
+    public function setPaymentReference(string $paymentReference): void
+    {
+        $this->paymentReference = $paymentReference;
+    }
+
+    public function getSubmissionKey(): ?string
+    {
+        return $this->submissionKey;
+    }
+
+    public function getPaymentVerifiedAt(): ?\DateTimeImmutable
+    {
+        return $this->paymentVerifiedAt;
+    }
+
+    public function getPaymentVerifiedBy(): ?User
+    {
+        return $this->paymentVerifiedBy;
+    }
+
+    public function markPaymentVerified(User $staff): void
+    {
+        if ($this->paymentStatus !== 'Pending') {
+            throw new \DomainException('Only pending payments can be confirmed.');
+        }
+
+        $this->paymentStatus = 'Paid';
+        $this->paymentVerifiedAt = new \DateTimeImmutable();
+        $this->paymentVerifiedBy = $staff;
     }
 
     public function getUser(): User
@@ -101,6 +149,11 @@ class CustomerOrder
     public function setCreatedByStaff(User $staff): void
     {
         $this->createdByStaff = $staff;
+    }
+
+    public function getCreatedByStaff(): ?User
+    {
+        return $this->createdByStaff;
     }
 
     public function setCancellationReason(?string $reason): void

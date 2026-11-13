@@ -1,17 +1,115 @@
 {% extends 'base.html.twig' %}
 
-{% block site_header %}{% endblock %}
+{% block site_header %}{% include 'admin/_sidebar.html.twig' %}{% endblock %}
 {% block site_footer %}{% endblock %}
 {% block title %}Admin dashboard | Bencalo MotoWorks{% endblock %}
 
 {% block body %}
-    <main>
-        <h1>Admin dashboard</h1>
-        {% include 'admin/_sidebar.html.twig' %}
-        <section>
-            {% for label, count in counts %}
-                <article><h2>{{ label|replace({'_': ' '})|title }}</h2><p>{{ count }}</p></article>
-            {% endfor %}
-        </section>
+    <main class="admin-main">
+        <header class="main-header">
+            <h2>Dashboard Overview</h2>
+            <div class="admin-user-info"><span>Welcome back, Admin</span></div>
+        </header>
+        <div class="admin-content-body">
+            <section class="management-overview" aria-label="Business overview">
+                <div class="management-section">
+                    <div class="management-section-heading">
+                        <h3>Business Overview / Users</h3>
+                        <a href="{{ path('admin_users') }}">Manage users</a>
+                    </div>
+                    <div class="management-count-grid management-count-grid-three">
+                        <a class="management-count-card" href="{{ path('admin_users') }}">
+                            <span class="management-count-label">Total Customers</span>
+                            <strong data-dashboard-count="customers">{{ counts.customers }}</strong>
+                        </a>
+                        <a class="management-count-card" href="{{ path('admin_users') }}">
+                            <span class="management-count-label">Total Staff</span>
+                            <strong data-dashboard-count="staff">{{ counts.staff }}</strong>
+                        </a>
+                        <a class="management-count-card" href="{{ path('admin_users') }}">
+                            <span class="management-count-label">Total Users</span>
+                            <strong data-dashboard-count="users">{{ counts.users }}</strong>
+                        </a>
+                    </div>
+                </div>
+
+                <div class="management-section">
+                    <div class="management-section-heading">
+                        <h3>Inventory / Catalog</h3>
+                        <a href="{{ path('admin_products') }}">Manage products</a>
+                    </div>
+                    <div class="management-count-grid management-count-grid-three">
+                        <a class="management-count-card" href="{{ path('admin_products') }}">
+                            <span class="management-count-label">Total Products</span>
+                            <strong data-dashboard-count="products">{{ counts.products }}</strong>
+                        </a>
+                        <a class="management-count-card" href="{{ path('admin_products') }}">
+                            <span class="management-count-label">Active Products</span>
+                            <strong data-dashboard-count="productsActive">{{ counts.productsActive }}</strong>
+                        </a>
+                        <a class="management-count-card" href="{{ path('admin_products') }}">
+                            <span class="management-count-label">Inactive Products</span>
+                            <strong data-dashboard-count="productsInactive">{{ counts.productsInactive }}</strong>
+                        </a>
+                    </div>
+                </div>
+
+                <div class="management-section">
+                    <div class="management-section-heading">
+                        <h3>Operations &amp; Engagement</h3>
+                    </div>
+                    <div class="management-count-grid management-count-grid-three">
+                        <a class="management-count-card" href="{{ path('admin_orders') }}">
+                            <span class="management-count-label">Total Orders</span>
+                            <strong data-dashboard-count="orders">{{ counts.orders }}</strong>
+                        </a>
+                        <a class="management-count-card" href="{{ path('admin_appointments') }}">
+                            <span class="management-count-label">Total Service Appointments</span>
+                            <strong data-dashboard-count="appointments">{{ counts.appointments }}</strong>
+                        </a>
+                        <a class="management-count-card" href="{{ path('admin_promos', {history: 1}) }}">
+                            <span class="management-count-label">Total Promo History</span>
+                            <strong data-dashboard-count="promoClaims">{{ counts.promoClaims }}</strong>
+                        </a>
+                    </div>
+                </div>
+
+            </section>
+            <div id="dashboard-activity">
+                {% include 'admin/_dashboard_activity.html.twig' %}
+            </div>
+        </div>
     </main>
+    <script>
+        (() => {
+            const countElements = document.querySelectorAll('[data-dashboard-count]');
+            const activityContainer = document.getElementById('dashboard-activity');
+            if (!countElements.length || !activityContainer) return;
+
+            const refreshCounts = async () => {
+                try {
+                    const response = await fetch('{{ path('admin_dashboard_stats') }}', {
+                        headers: {'Accept': 'application/json'},
+                        credentials: 'same-origin'
+                    });
+                    if (!response.ok) throw new Error(`Dashboard stats request failed (${response.status}).`);
+                    const result = await response.json();
+                    countElements.forEach((element) => {
+                        const value = result.counts[element.dataset.dashboardCount];
+                        if (Number.isInteger(value)) element.textContent = String(value);
+                    });
+                    if (typeof result.activityHtml === 'string') activityContainer.innerHTML = result.activityHtml;
+                } catch (error) {
+                    console.error('Unable to refresh Admin dashboard statistics.', error);
+                }
+            };
+
+            if (window.adminDashboardPollingInterval) {
+                window.clearInterval(window.adminDashboardPollingInterval);
+            }
+            window.adminDashboardPollingInterval = window.setInterval(() => {
+                if (document.visibilityState === 'visible') refreshCounts();
+            }, 10000);
+        })();
+    </script>
 {% endblock %}

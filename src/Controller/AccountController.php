@@ -4,17 +4,18 @@ namespace App\Controller;
 
 use App\Entity\User;
 use App\Entity\OrderItem;
-use App\Form\OrderEditType;
 use App\Form\ProfileType;
+use App\Repository\CustomerOrderRepository;
 use App\Repository\OrderItemRepository;
 use App\Repository\ServiceBookingRepository;
 use App\Repository\UserRepository;
 use App\Service\ImageUploader;
-use App\Service\OrderEditManager;
-use App\Service\OrderStatusManager;
+use App\Service\CancellationActionPresenter;
+use App\Service\CancellationManager;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
+use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
@@ -55,7 +56,7 @@ class AccountController extends AbstractController
     }
 
     #[Route('/order-history', name: 'order_history', methods: ['GET'])]
-    public function orders(OrderItemRepository $orders): Response
+    public function orders(OrderItemRepository $orders, CancellationManager $cancellations): Response
     {
         $this->denyAccessUnlessGranted('ROLE_USER');
         $user = $this->getUser();
@@ -63,20 +64,51 @@ class AccountController extends AbstractController
             throw $this->createAccessDeniedException();
         }
 
+        $pendingCancellations = $cancellations->findPendingByRecordForUser($user);
+
         return $this->render('account/order_history.html.twig', [
             'orders' => $orders->findForUser($user),
-            'editForm' => $this->createForm(OrderEditType::class)->createView(),
+            'pendingCancellations' => $pendingCancellations,
+        ]);
+    }
+
+    #[Route('/order-history/{id}/payment-status', name: 'order_payment_status', requirements: ['id' => '\d+'], methods: ['GET'])]
+    public function paymentStatus(int $id, CustomerOrderRepository $orders): JsonResponse
+    {
+        $user = $this->getUser();
+        if (!$user instanceof User || $user->getRole() !== 'customer') {
+            throw $this->createAccessDeniedException();
+        }
+
+        $order = $orders->find($id);
+        if (!$order || $order->getUser() !== $user) {
+            throw $this->createNotFoundException('Order not found.');
+        }
+
+        return $this->json([
+            'payment_status' => $order->getPaymentStatus(),
+            'payment_verified_at' => $order->getPaymentVerifiedAt()?->format(DATE_ATOM),
+            'order_status' => $order->getStatus(),
         ]);
     }
 
     #[Route('/order-history/{id}/cancel', name: 'order_cancel', requirements: ['id' => '\d+'], methods: ['POST'])]
-    public function cancelOrder(int $id, Request $request, OrderItemRepository $orders, OrderStatusManager $orderStatusManager): Response
+    public function cancelOrder(
+        int $id,
+        Request $request,
+        OrderItemRepository $orders,
+        CancellationManager $cancellations,
+        CancellationActionPresenter $actionPresenter,
+    ): Response
     {
         $user = $this->getUser();
         if (!$user instanceof User || $user->getRole() !== 'customer') {
             throw $this->createAccessDeniedException();
         }
         if (!$this->isCsrfTokenValid('order_cancel_'.$id, (string) $request->request->get('_token'))) {
+            if ($request->isXmlHttpRequest()) {
+                return $this->json(['success' => false, 'message' => 'Invalid security token. Refresh the page and try again.'], 403);
+            }
             throw $this->createAccessDeniedException('Invalid security token.');
         }
         $order = $orders->find($id);
@@ -84,75 +116,47 @@ class AccountController extends AbstractController
             throw $this->createNotFoundException('Order not found.');
         }
 
-        if ($order->getCustomerOrder()?->getStatus() !== 'Pending') {
-            $this->addFlash('error', 'Only pending orders can be cancelled.');
-
-            return $this->redirectToRoute('order_history');
-        }
-
         try {
-            $orderStatusManager->updateStatus($order, 'Cancelled', 'Cancelled by customer');
-            $this->addFlash('success', 'Order cancelled and stock restored.');
+            $action = $cancellations->beginOrderCancellation($order, $user);
+            $payload = [
+                'success' => true,
+                'message' => 'Order cancellation pending.',
+                'action' => $actionPresenter->present($action),
+            ];
         } catch (\DomainException $exception) {
-            $this->addFlash('error', $exception->getMessage());
+            $payload = ['success' => false, 'message' => $exception->getMessage()];
         }
 
-        return $this->redirectToRoute('order_history');
+        return $this->respondCancellation($request, $payload, $payload['success'] ? 200 : 409, 'order_history');
     }
 
     #[Route('/order-history/{id}/edit', name: 'order_edit', requirements: ['id' => '\d+'], methods: ['POST'])]
-    public function editOrder(
-        int $id,
-        Request $request,
-        OrderItemRepository $orders,
-        OrderEditManager $orderEditManager,
-    ): Response {
+    public function editOrder(int $id): Response
+    {
         $user = $this->getUser();
         if (!$user instanceof User || $user->getRole() !== 'customer') {
             throw $this->createAccessDeniedException();
         }
 
-        $order = $orders->find($id);
-        if (!$order instanceof OrderItem || $order->getUser() !== $user) {
-            throw $this->createNotFoundException('Order not found.');
-        }
-
-        $form = $this->createForm(OrderEditType::class)->handleRequest($request);
-        if (!$form->isSubmitted() || !$form->isValid()) {
-            $errors = [];
-            foreach ($form->getErrors(true) as $error) {
-                $errors[] = $error->getMessage();
-            }
-            $this->addFlash('error', $errors[0] ?? 'Enter a valid quantity and delivery address.');
-
-            return $this->redirectToRoute('order_history');
-        }
-
-        try {
-            $orderEditManager->updatePendingOrder(
-                $order,
-                (int) $form->get('quantity')->getData(),
-                (string) $form->get('address')->getData(),
-            );
-            $this->addFlash('success', sprintf(
-                'Order #%d updated successfully.',
-                $order->getCustomerOrder()?->getId(),
-            ));
-        } catch (\DomainException $exception) {
-            $this->addFlash('error', $exception->getMessage());
-        }
-
-        return $this->redirectToRoute('order_history');
+        throw $this->createAccessDeniedException('Customers may view or cancel eligible orders, but cannot edit order history.');
     }
 
     #[Route('/appointments/{id}/cancel', name: 'appointment_cancel', requirements: ['id' => '\d+'], methods: ['POST'])]
-    public function cancelAppointment(int $id, Request $request, ServiceBookingRepository $bookings, EntityManagerInterface $entityManager): Response
-    {
+    public function cancelAppointment(
+        int $id,
+        Request $request,
+        ServiceBookingRepository $bookings,
+        CancellationManager $cancellations,
+        CancellationActionPresenter $actionPresenter,
+    ): Response {
         $user = $this->getUser();
-        if (!$user instanceof User) {
+        if (!$user instanceof User || $user->getRole() !== 'customer') {
             throw $this->createAccessDeniedException();
         }
         if (!$this->isCsrfTokenValid('appointment_cancel_'.$id, (string) $request->request->get('_token'))) {
+            if ($request->isXmlHttpRequest()) {
+                return $this->json(['success' => false, 'message' => 'Invalid security token. Refresh the page and try again.'], 403);
+            }
             throw $this->createAccessDeniedException('Invalid security token.');
         }
 
@@ -160,14 +164,28 @@ class AccountController extends AbstractController
         if (!$booking || $booking->getUser() !== $user) {
             throw $this->createNotFoundException('Appointment not found.');
         }
-        if (strtolower(trim((string) $booking->getStatus())) !== 'pending') {
-            $this->addFlash('error', 'Only pending appointments can be cancelled.');
-        } else {
-            $entityManager->remove($booking);
-            $entityManager->flush();
-            $this->addFlash('success', 'Appointment cancelled.');
+        try {
+            $action = $cancellations->beginAppointmentCancellation($booking, $user);
+            $payload = [
+                'success' => true,
+                'message' => 'Appointment cancellation pending.',
+                'action' => $actionPresenter->present($action),
+            ];
+        } catch (\DomainException $exception) {
+            $payload = ['success' => false, 'message' => $exception->getMessage()];
         }
 
-        return $this->redirectToRoute('appointment_history');
+        return $this->respondCancellation($request, $payload, $payload['success'] ? 200 : 409, 'appointment_history');
+    }
+
+    private function respondCancellation(Request $request, array $payload, int $status, string $route): Response
+    {
+        if ($request->isXmlHttpRequest() || str_contains((string) $request->headers->get('Accept'), 'application/json')) {
+            return $this->json($payload, $status);
+        }
+
+        $this->addFlash($payload['success'] ? 'success' : 'error', $payload['message']);
+
+        return $this->redirectToRoute($route);
     }
 }

@@ -1,0 +1,10 @@
+<header class="main-header">
+    <h2>{{ title }}</h2>
+    {% if action is defined %}
+        <a class="btn-primary" id="{{ action.id }}" href="{{ action.url }}" data-create-url="{{ action.url }}"><i class="fas fa-plus" aria-hidden="true"></i> {{ action.label }}</a>
+    {% elseif headerInfo is defined %}
+        <div class="admin-user-info"><span>{{ headerInfo }}</span></div>
+    {% elseif showWelcome|default(true) %}
+        <div class="admin-user-info"><span>Welcome back, Admin</span></div>
+    {% endif %}
+</header>

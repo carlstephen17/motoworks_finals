@@ -1,13 +1,13 @@
 {% if registrationForm is defined and forgotPasswordForm is defined %}
-    <div id="login-modal" class="auth-modal" style="display: none;">
+    <div id="login-modal" class="auth-modal" style="display: {{ app.request.pathinfo == '/login' ? 'flex' : 'none' }};">
         <div class="auth-modal-content">
             <button type="button" class="auth-modal-close" onclick="closeModal('login-modal')">&times;</button>
             <h2 class="modal-heading-lg">Log In</h2>
             <div id="login-modal-alert" class="modal-alert"></div>
-            <form id="ajax-login-form" class="auth-form" action="{{ path('app_login') }}" method="post">
+            <form id="ajax-login-form" class="auth-form" action="{{ path('app_login') }}" method="post" data-turbo="false">
                 <input type="hidden" name="_csrf_token" value="{{ csrf_token('authenticate') }}">
                 <input type="hidden" name="_target_path" id="login-target-path" value="">
-                <input type="text" name="username" placeholder="Username or Email" required autocomplete="username" class="auth-input auth-input-padded">
+                <input type="text" name="username" placeholder="Username or Email" value="{{ last_username|default('') }}" required autocomplete="username" class="auth-input auth-input-padded">
                 <div class="password-container mb-sm">
                     <input type="password" id="login-password" name="password" placeholder="Password" required autocomplete="current-password" class="auth-input auth-input-padded-r">
                     <button type="button" class="toggle-password" onclick="togglePasswordVisibility('login-password', this)">
@@ -35,7 +35,7 @@
             <button type="button" class="auth-modal-close" onclick="closeModal('register-modal')">&times;</button>
             <h2 class="modal-heading-lg">Create Account</h2>
             <div id="register-modal-alert" class="modal-alert"></div>
-            {{ form_start(registrationForm, {action: path('app_register'), attr: {id: 'ajax-register-form', class: 'auth-form'}}) }}
+            {{ form_start(registrationForm, {action: path('app_register'), attr: {id: 'ajax-register-form', class: 'auth-form', 'data-turbo': 'false'}}) }}
                 {{ form_widget(registrationForm.username, {attr: {placeholder: 'Username', autocomplete: 'username', class: 'auth-input auth-input-mb'}}) }}
                 <div class="form-row-2col">
                     {{ form_widget(registrationForm.firstName, {attr: {placeholder: 'First Name', class: 'auth-input auth-input-half'}}) }}
@@ -44,12 +44,17 @@
                 {{ form_widget(registrationForm.email, {attr: {placeholder: 'Email Address', autocomplete: 'email', class: 'auth-input auth-input-mb'}}) }}
                 {{ form_widget(registrationForm.phone, {attr: {placeholder: 'Phone Number', autocomplete: 'tel', class: 'auth-input auth-input-mb'}}) }}
                 <div class="password-container mb-md">
-                    {{ form_widget(registrationForm.plainPassword.first, {attr: {id: 'register-password', placeholder: 'Password', autocomplete: 'new-password', class: 'auth-input auth-input-padded-r'}}) }}
-                    <button type="button" class="toggle-password" onclick="togglePasswordVisibility('{{ registrationForm.plainPassword.first.vars.id }}', this)">
+                    {{ form_widget(registrationForm.plainPassword.first, {attr: {placeholder: 'Password', autocomplete: 'new-password', class: 'auth-input auth-input-padded-r'}}) }}
+                    <button type="button" class="toggle-password" aria-label="Show or hide password" aria-pressed="false" onclick="togglePasswordVisibility('{{ registrationForm.plainPassword.first.vars.id }}', this)">
                         <i class="fa-solid fa-eye"></i>
                     </button>
                 </div>
-                {{ form_widget(registrationForm.plainPassword.second, {attr: {placeholder: 'Confirm Password', autocomplete: 'new-password', class: 'auth-input auth-input-mb'}}) }}
+                <div class="password-container mb-md">
+                    {{ form_widget(registrationForm.plainPassword.second, {attr: {placeholder: 'Confirm Password', autocomplete: 'new-password', class: 'auth-input auth-input-padded-r'}}) }}
+                    <button type="button" class="toggle-password" aria-label="Show or hide confirm password" aria-pressed="false" onclick="togglePasswordVisibility('{{ registrationForm.plainPassword.second.vars.id }}', this)">
+                        <i class="fa-solid fa-eye"></i>
+                    </button>
+                </div>
                 <button type="submit" class="btn btn-primary btn-block auth-btn btn-full-width">Sign Up</button>
             {{ form_end(registrationForm) }}
             <p class="auth-modal-footer">
@@ -83,7 +88,7 @@
                 <p>Schedule your vehicle maintenance with Bencalo MotoWorks</p>
             </div>
             <div id="service-booking-modal-alert" class="modal-alert"></div>
-            <form id="ajax-service-booking-form" action="{{ path('booking_new') }}" method="post">
+            <form id="ajax-service-booking-form" action="{{ path('booking_new') }}" method="post" data-turbo="false">
                 <input type="hidden" name="form[_token]" value="{{ csrf_token('form') }}">
                 <input type="hidden" id="booking-service-id" name="form[serviceId]">
                 <div style="background: rgba(255,255,255,0.05); padding: 12px 15px; border-radius: 6px; margin-bottom: 20px; border: 1px solid rgba(255,255,255,0.1);">
@@ -172,7 +177,7 @@
             <button type="button" class="auth-modal-close" onclick="closeModal('cart-modal')">&times;</button>
             <h3>Add to Cart</h3>
             <div id="cart-modal-alert" class="modal-alert"></div>
-            <form id="ajax-cart-form" class="auth-form" method="post" data-action-template="{{ path('cart_add', {id: 0}) }}">
+            <form id="ajax-cart-form" class="auth-form" method="post" data-turbo="false" data-action-template="{{ path('cart_add', {id: 0}) }}">
                 <input type="hidden" name="action" value="add">
                 <input type="hidden" id="cart-product-id" name="product_id">
                 <input type="hidden" id="cart-csrf-token" name="_token">
@@ -203,10 +208,12 @@
                 id="ajax-buy-form"
                 class="auth-form"
                 method="post"
+                data-turbo="false"
                 data-action-template="{{ path('checkout_buy_now', {id: 0}) }}"
             >
                 <input type="hidden" name="_token" id="buy-csrf-token">
                 <input type="hidden" name="product_id" id="buy-product-id">
+                <input type="hidden" name="submission_key" id="buy-submission-key">
                 <input type="hidden" name="checkout_type" value="buy_now">
                 <div class="form-group">
                     <label for="buy-quantity">Quantity</label>
@@ -267,6 +274,40 @@
                     <a href="{{ path('order_history') }}" class="btn btn-primary" style="text-decoration: none;"><i class="fa-solid fa-receipt"></i> View order history</a>
                     <button type="button" class="btn btn-secondary" onclick="closeModal('buy-modal')">Done</button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <div
+        id="payment-confirmation-modal"
+        class="auth-modal"
+        style="display: none;"
+        data-status-url-template="{{ path('order_payment_status', {id: 0}) }}"
+    >
+        <div class="auth-modal-content modal-sm">
+            <button type="button" class="auth-modal-close" onclick="closeModal('payment-confirmation-modal')">&times;</button>
+            <h2 class="modal-heading">Order Payment Details</h2>
+            <div id="payment-confirmation-modal-alert" class="modal-alert"></div>
+            <p>Payment status: <strong id="payment-confirmation-status">Pending</strong> until authorized staff confirms receipt.</p>
+            <p id="payment-confirmation-instructions">This site does not process payments or collect card details. Contact staff to complete payment.</p>
+            <div class="confirmation-detail-list">
+                <div><span>Order</span><strong id="payment-confirmation-order"></strong></div>
+                <div><span>Order status</span><strong id="payment-confirmation-order-status"></strong></div>
+                <div><span>Customer</span><strong id="payment-confirmation-customer"></strong></div>
+                <div><span>Items</span><strong id="payment-confirmation-items"></strong></div>
+                <div><span>Amount</span><strong id="payment-confirmation-amount"></strong></div>
+                <div><span>Payment method</span><strong id="payment-confirmation-method"></strong></div>
+                <div><span>Order date</span><strong id="payment-confirmation-date"></strong></div>
+            </div>
+            <div style="padding: 14px; border: 1px dashed #2ed573; border-radius: 6px; background: rgba(46, 213, 115, 0.08);">
+                <span style="display: block; color: #9ae6b4; font-size: 12px; text-transform: uppercase;">Order / payment reference</span>
+                <strong id="payment-confirmation-reference" style="display: block; margin-top: 5px; font-size: 1.15rem; letter-spacing: 1px;"></strong>
+                <button type="button" id="copy-payment-reference" class="btn btn-secondary" style="margin-top: 10px;">Copy reference</button>
+            </div>
+            <p>Payment status last checked: <span id="payment-confirmation-checked">Not checked</span></p>
+            <div style="display: flex; gap: 10px; justify-content: center; margin-top: 20px; flex-wrap: wrap;">
+                <a href="{{ path('order_history') }}" class="btn btn-primary" style="text-decoration: none;">View order history</a>
+                <button type="button" class="btn btn-secondary" onclick="closeModal('payment-confirmation-modal')">Done</button>
             </div>
         </div>
     </div>

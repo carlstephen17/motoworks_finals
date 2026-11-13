@@ -2,13 +2,20 @@
 {% block site_header %}{% include 'admin/_sidebar.html.twig' %}{% endblock %}
 {% block title %}Users | Admin{% endblock %}
 {% block body %}
-<main>
-    <h1>Users &amp; Customers Management</h1>
-    {% for message in app.flashes('success') %}<p role="status">{{ message }}</p>{% endfor %}
-    {% for message in app.flashes('error') %}<p role="alert">{{ message }}</p>{% endfor %}
-    <p><a href="{{ path('admin_user_new') }}">Create user</a></p>
+<main class="admin-main">
+    {% include 'admin/_header.html.twig' with {title: 'Users & Customers Management', headerInfo: 'Account Directory'} %}
+    <div class="admin-content-body">
+    {% for message in app.flashes('success') %}<p role="status" data-auto-dismiss>{{ message }}</p>{% endfor %}
+    {% for message in app.flashes('error') %}<p role="alert" data-auto-dismiss>{{ message }}</p>{% endfor %}
+    <details class="admin-user-create">
+        <summary>Create User or Staff Account</summary>
+        {{ form_start(createUserForm, {action: path('admin_user_new'), attr: {class: 'admin-user-create-grid'}}) }}
+            {{ form_widget(createUserForm) }}
+            <button type="submit" class="btn-primary">Create Account</button>
+        {{ form_end(createUserForm) }}
+    </details>
 
-    <section aria-label="Filter users">
+    <section class="table-filters" aria-label="Filter users">
         <label for="userSearch">Search username, name, email, or phone</label>
         <input id="userSearch" type="search">
         <label for="userRole">Role</label>
@@ -21,7 +28,7 @@
     </section>
 
     <div class="table-responsive">
-        <table>
+        <table class="admin-table">
             <thead>
                 <tr><th>ID</th><th>Username</th><th>Name</th><th>Email</th><th>Phone</th><th>Role</th><th>Joined date</th><th>Actions</th></tr>
             </thead>
@@ -43,14 +50,14 @@
                     <td>{{ user.firstName }} {{ user.lastName }}</td>
                     <td>{{ user.email }}</td>
                     <td>{{ user.phone|default('N/A') }}</td>
-                    <td>{{ user.role|capitalize }}</td>
+                    <td><span class="role-badge role-{{ user.role }}">{{ user.role|capitalize }}</span></td>
                     <td>{{ user.createdAt|date('Y-m-d H:i') }}</td>
-                    <td>
-                        <button type="button" class="view-user" data-user="{{ userDetails|json_encode|e('html_attr') }}">View</button>
-                        <a href="{{ path('admin_user_edit', {id: user.id}) }}">Edit</a>
-                        <form method="post" action="{{ path('admin_user_delete', {id: user.id}) }}">
+                    <td class="table-row-actions">
+                        <button type="button" class="btn-sm btn-secondary view-user" data-user="{{ userDetails|json_encode|e('html_attr') }}"><i class="fas fa-eye" aria-hidden="true"></i> View</button>
+                        <a class="btn-sm btn-info user-edit" href="{{ path('admin_user_edit', {id: user.id}) }}" data-action="{{ path('admin_user_edit', {id: user.id}) }}" data-user="{{ userDetails|json_encode|e('html_attr') }}"><i class="fas fa-edit" aria-hidden="true"></i> Edit</a>
+                        <form method="post" action="{{ path('admin_user_delete', {id: user.id}) }}" data-deferred-action="delete" data-confirm-message="Delete this user? The change will be applied after the 3-second Undo window.">
                             <input type="hidden" name="_token" value="{{ csrf_token('admin_user_delete_' ~ user.id) }}">
-                            <button type="submit">Delete</button>
+                            <button type="submit" class="btn-sm btn-danger"><i class="fas fa-trash" aria-hidden="true"></i> Delete</button>
                         </form>
                     </td>
                 </tr>
@@ -62,8 +69,8 @@
         </table>
     </div>
 
-    <dialog id="userDetails">
-        <h2>User Profile Details</h2>
+    <dialog id="userDetails" class="modal-content">
+        <div class="modal-header"><h3>User Profile Details</h3></div>
         <dl>
             <dt>User ID</dt><dd data-detail="id"></dd>
             <dt>First name</dt><dd data-detail="firstName"></dd>
@@ -74,14 +81,30 @@
             <dt>Role</dt><dd data-detail="role"></dd>
             <dt>Joined date</dt><dd data-detail="createdAt"></dd>
         </dl>
-        <button type="button" id="closeUserDetails">Close</button>
+        <div class="modal-footer"><button type="button" id="closeUserDetails" class="btn-secondary">Close</button></div>
     </dialog>
+    <dialog id="userEditDialog" class="modal-content" aria-labelledby="userEditTitle">
+        <div class="modal-header">
+            <h3 id="userEditTitle">Edit User Account</h3>
+            <button type="button" class="close-btn" data-close-user-edit aria-label="Close">×</button>
+        </div>
+        {{ form_start(editUserForm, {action: path('admin_user_edit', {id: 0}), attr: {id: 'userEditForm'}}) }}
+            {{ form_widget(editUserForm) }}
+            <div class="modal-footer">
+                <button type="button" class="btn-secondary" data-close-user-edit>Cancel</button>
+                <button type="submit" class="btn-primary">Save Changes</button>
+            </div>
+        {{ form_end(editUserForm) }}
+    </dialog>
+</div>
 </main>
 <script>
     const userSearch = document.getElementById('userSearch');
     const userRole = document.getElementById('userRole');
     const userRows = [...document.querySelectorAll('.user-row')];
     const noFilteredUsers = document.getElementById('noFilteredUsers');
+    const userEditDialog = document.getElementById('userEditDialog');
+    const userEditForm = document.getElementById('userEditForm');
 
     function filterUsers() {
         const query = userSearch.value.trim().toLowerCase();
@@ -110,5 +133,20 @@
         });
     });
     document.getElementById('closeUserDetails').addEventListener('click', () => userDetails.close());
+    document.querySelectorAll('[data-close-user-edit]').forEach((button) => {
+        button.addEventListener('click', () => userEditDialog.close());
+    });
+    document.querySelectorAll('.user-edit').forEach((link) => {
+        link.addEventListener('click', (event) => {
+            event.preventDefault();
+            const user = JSON.parse(link.dataset.user);
+            userEditForm.reset();
+            userEditForm.action = link.dataset.action;
+            ['firstName', 'lastName', 'username', 'email', 'phone', 'role'].forEach((field) => {
+                userEditForm.elements.namedItem(`admin_user[${field}]`).value = user[field] ?? '';
+            });
+            userEditDialog.showModal();
+        });
+    });
 </script>
 {% endblock %}

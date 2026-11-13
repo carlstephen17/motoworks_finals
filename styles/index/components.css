@@ -170,16 +170,31 @@
   z-index: 100;
 }
 
-.user-menu a {
+.user-menu a,
+.user-menu button.logout-link {
   display: block;
+  width: 100%;
   padding: 10px 15px;
   color: #fff;
   text-decoration: none;
   font-size: 0.85rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  transition: background 0.2s;
 }
 
-.user-menu a:hover { background: #2c3e50; }
-.user-menu a.logout-link { color: #ff6b6b; }
+.user-menu form {
+  margin: 0;
+  padding: 0;
+}
+
+.user-menu a:hover,
+.user-menu button.logout-link:hover { background: #2c3e50; }
+.user-menu a.logout-link,
+.user-menu button.logout-link { color: #ff6b6b; }
 .user-dropdown:hover .user-menu { display: block; }
 
 /* ==========================================================================

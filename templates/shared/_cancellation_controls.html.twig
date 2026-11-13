@@ -1,0 +1,35 @@
+<div id="cancel-confirmation-modal" class="cancellation-modal" aria-hidden="true">
+    <section class="cancellation-modal-card" role="dialog" aria-modal="true" aria-labelledby="cancel-confirmation-title">
+        <h2 id="cancel-confirmation-title">Confirm Cancellation</h2>
+        <p>Cancel this transaction? You can undo the cancellation for 3 seconds.</p>
+        <div class="cancellation-modal-actions">
+            <button type="button" class="cancellation-button-secondary" data-cancel-confirm-no>No</button>
+            <button type="button" class="cancellation-button-primary" data-cancel-confirm-yes>Yes, Cancel</button>
+        </div>
+    </section>
+</div>
+
+<div id="history-notifications" class="history-notifications" role="region" aria-label="Transaction notifications">
+    {% for action in pendingCancellations %}
+        <div
+            class="history-notification history-notification-undo"
+            role="status"
+            aria-live="polite"
+            data-cancellation-action
+            data-action-id="{{ action.id }}"
+            data-record-type="{{ action.recordType }}"
+            data-record-id="{{ action.recordId }}"
+            data-expires-at="{{ action.expiresAt|date('c') }}"
+            data-remaining-ms="{{ max(0, (action.expiresAt.timestamp - 'now'|date('U')) * 1000) }}"
+            data-undo-url="{{ path('cancellation_undo', {id: action.id}) }}"
+            data-undo-token="{{ csrf_token('cancellation_undo') }}"
+            data-finalize-url="{{ path('cancellation_finalize', {id: action.id}) }}"
+            data-finalize-token="{{ csrf_token('cancellation_finalize') }}"
+        >
+            <span>Cancellation pending. Undo within <strong data-countdown>3.0</strong>s.</span>
+            <button type="button" class="cancellation-undo-button" data-cancel-undo>Undo</button>
+        </div>
+    {% endfor %}
+</div>
+
+<div id="history-toast-container" class="history-toast-container" aria-live="polite"></div>

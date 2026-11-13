@@ -1,0 +1,81 @@
+<section class="dashboard-activity-grid" aria-label="Recent activity">
+    <article class="dashboard-activity-panel">
+        <header class="dashboard-activity-heading">
+            <h3>Recent Orders</h3>
+            <a href="{{ path('admin_orders') }}">View all</a>
+        </header>
+        {% if recentOrders is defined and recentOrders is not empty %}
+            <ul class="dashboard-activity-list">
+                {% for order in recentOrders %}
+                    {% set orderId = order.orderGroupId %}
+                    {% set activityStatus = order.displayStatus %}
+                    <li>
+                        <div class="dashboard-activity-item-heading">
+                            <a href="{{ path('admin_orders') }}">Order #{{ orderId }}</a>
+                            <span class="dashboard-activity-status dashboard-activity-status--{{ activityStatus|lower|replace({' ': '-'}) }}">{{ activityStatus }}</span>
+                        </div>
+                        <span class="dashboard-activity-description">{{ order.firstName }} {{ order.lastName }} · {{ order.itemCount }} item(s)</span>
+                        <div class="dashboard-activity-meta">
+                            <time datetime="{{ order.createdAt|date('c') }}">{{ order.createdAt|date('M j, Y') }}</time>
+                            <strong>₱{{ order.orderTotal|number_format(2) }}</strong>
+                        </div>
+                    </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p class="dashboard-activity-empty">No orders yet.</p>
+        {% endif %}
+    </article>
+
+    <article class="dashboard-activity-panel">
+        <header class="dashboard-activity-heading">
+            <h3>Recent Appointments</h3>
+            <a href="{{ path('admin_appointments') }}">View all</a>
+        </header>
+        {% if recentAppointments is defined and recentAppointments is not empty %}
+            <ul class="dashboard-activity-list">
+                {% for booking in recentAppointments %}
+                    {% set activityStatus = booking.status in ['Confirmed', 'Cancellation Pending'] ? 'Pending' : (booking.status == 'Rejected' ? 'Cancelled' : booking.status|default('Pending')) %}
+                    <li>
+                        <div class="dashboard-activity-item-heading">
+                            <a href="{{ path('admin_appointments') }}">Appointment #{{ booking.id }}</a>
+                            <span class="dashboard-activity-status dashboard-activity-status--{{ activityStatus|lower|replace({' ': '-'}) }}">{{ activityStatus }}</span>
+                        </div>
+                        <span class="dashboard-activity-description">{{ booking.user.firstName }} {{ booking.user.lastName }} · {{ booking.service.name }}</span>
+                        <div class="dashboard-activity-meta">
+                            <time datetime="{{ booking.bookingDate|date('c') }}">{{ booking.bookingDate|date('M j, Y') }} · {{ booking.bookingTime|date('g:i A') }}</time>
+                        </div>
+                    </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p class="dashboard-activity-empty">No appointments yet.</p>
+        {% endif %}
+    </article>
+
+    <article class="dashboard-activity-panel">
+        <header class="dashboard-activity-heading">
+            <h3>Recent Promos</h3>
+            <a href="{{ path('admin_promos', {history: 1}) }}">View all</a>
+        </header>
+        {% if recentPromoClaims is defined and recentPromoClaims is not empty %}
+            <ul class="dashboard-activity-list">
+                {% for claim in recentPromoClaims %}
+                    {% set activityStatus = claim.status|default('Pending') %}
+                    <li>
+                        <div class="dashboard-activity-item-heading">
+                            <a href="{{ path('admin_promos', {history: 1}) }}">Promo #{{ claim.id }}</a>
+                            <span class="dashboard-activity-status dashboard-activity-status--{{ activityStatus|lower|replace({' ': '-'}) }}">{{ activityStatus }}</span>
+                        </div>
+                        <span class="dashboard-activity-description">{{ claim.fullName }} · {{ claim.promo ? claim.promo.title : claim.bundleSlug }}</span>
+                        <div class="dashboard-activity-meta">
+                            <time datetime="{{ claim.createdAt|date('c') }}">{{ claim.createdAt|date('M j, Y') }}</time>
+                        </div>
+                    </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p class="dashboard-activity-empty">No promo claims yet.</p>
+        {% endif %}
+    </article>
+</section>

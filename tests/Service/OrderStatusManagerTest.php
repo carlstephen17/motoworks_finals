@@ -74,6 +74,39 @@ class OrderStatusManagerTest extends TestCase
         self::assertSame('Staff cancellation', $orderGroup->getCancellationReason());
     }
 
+    public function testCancellationCanBeUndoneBeforeFinalizationWithoutChangingStock(): void
+    {
+        [$orderGroup, $items, $products] = $this->createGroupedOrder();
+        $manager = $this->createManager($items, $products);
+
+        $manager->markCancellationPending($orderGroup);
+
+        self::assertSame('Cancellation Pending', $orderGroup->getStatus());
+        self::assertSame(['Cancellation Pending', 'Cancellation Pending'], array_map(
+            static fn (OrderItem $item): ?string => $item->getStatus(),
+            $items,
+        ));
+        self::assertSame([10, 7], array_values(array_map(
+            static fn (Product $product): int => $product->getStock(),
+            $products,
+        )));
+
+        $manager->restorePendingCancellation($orderGroup);
+        self::assertSame('Pending', $orderGroup->getStatus());
+        self::assertSame([10, 7], array_values(array_map(
+            static fn (Product $product): int => $product->getStock(),
+            $products,
+        )));
+
+        $manager->markCancellationPending($orderGroup);
+        $manager->finalizePendingCancellation($orderGroup);
+        self::assertSame('Cancelled', $orderGroup->getStatus());
+        self::assertSame([12, 8], array_values(array_map(
+            static fn (Product $product): int => $product->getStock(),
+            $products,
+        )));
+    }
+
     /**
      * @param list<OrderItem> $items
      * @param array<int, Product> $products

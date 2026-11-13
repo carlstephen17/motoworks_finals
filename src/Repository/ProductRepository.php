@@ -46,4 +46,18 @@ class ProductRepository extends ServiceEntityRepository
             ->getQuery()
             ->getResult();
     }
+
+    /** @return array{active: int, inactive: int} */
+    public function getStatusCounts(): array
+    {
+        $active = (int) $this->createQueryBuilder('product')
+            ->select('COUNT(product.id)')
+            ->andWhere('product.active = :active')
+            ->setParameter('active', true)
+            ->getQuery()
+            ->getSingleScalarResult();
+        $total = $this->count([]);
+
+        return ['active' => $active, 'inactive' => $total - $active];
+    }
 }

@@ -107,13 +107,42 @@ body {
     border-top: 1px solid #2b2b40;
 }
 
-.sidebar-logout a {
-    color: #f64e60 !important;
+.sidebar-logout form {
+    margin: 0;
+    width: 100%;
 }
 
-.sidebar-logout a:hover {
+.sidebar-logout a,
+.sidebar-logout button {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    padding: 14px 25px;
+    color: #f64e60 !important;
+    background: transparent;
+    border: none;
+    border-left: 4px solid transparent;
+    text-decoration: none;
+    font-size: 0.95rem;
+    font-weight: 500;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.3s ease;
+}
+
+.sidebar-logout button i,
+.sidebar-logout a i {
+    margin-right: 15px;
+    font-size: 1.1rem;
+    width: 20px;
+    text-align: center;
+}
+
+.sidebar-logout a:hover,
+.sidebar-logout button:hover {
     background-color: rgba(246, 78, 96, 0.1) !important;
     border-left-color: #f64e60 !important;
+    color: #f64e60 !important;
 }
 
 /* Main Content Area */

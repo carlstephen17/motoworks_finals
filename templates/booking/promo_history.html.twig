@@ -36,25 +36,9 @@
         }
         .claim-modal-header h2 { margin: 0; color: #00d2d3; font-size: 1.25rem; }
         .claim-modal-close { border: 0; background: none; color: #8b949e; font-size: 1.5rem; cursor: pointer; }
-        .claim-modal-field { margin-bottom: 14px; }
-        .claim-modal-field label { display: block; margin-bottom: 5px; color: #c9d1d9; }
-        .claim-modal-field input, .claim-modal-field textarea {
-            box-sizing: border-box;
-            width: 100%;
-            padding: 9px 12px;
-            border: 1px solid #30363d;
-            border-radius: 6px;
-            background: #0d1117;
-            color: #f0f6fc;
-        }
         .claim-modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
         .claim-modal-actions button { padding: 8px 16px; border: 0; border-radius: 6px; cursor: pointer; }
         .claim-modal-secondary { background: #21262d; color: #f0f6fc; }
-        .claim-modal-primary { background: #0969da; color: #fff; }
-        .claim-modal-primary:disabled { opacity: 0.65; cursor: wait; }
-        .claim-alert { display: none; position: fixed; top: 20px; right: 20px; z-index: 12000; padding: 14px 18px; border-radius: 6px; color: #fff; }
-        .claim-alert.success { display: block; background: #2ed573; }
-        .claim-alert.error { display: block; background: #ff4757; }
     </style>
 {% endblock %}
 
@@ -65,85 +49,84 @@
             <h1 class="history-title">Promo Claim &amp; Appointment History</h1>
 
             {% for message in app.flashes('success') %}
-                <div class="success-alert" role="status">{{ message }}</div>
+                <div class="success-alert" role="status" data-auto-dismiss>{{ message }}</div>
             {% endfor %}
             {% for message in app.flashes('error') %}
-                <div class="success-alert" role="alert" style="border-color: #ff4757; color: #ff4757;">{{ message }}</div>
+                <div class="success-alert" role="alert" data-auto-dismiss style="border-color: #ff4757; color: #ff4757;">{{ message }}</div>
             {% endfor %}
 
             <div class="order-table-wrapper">
                 <table class="styled-table">
                     <thead>
                         <tr>
-                            <th>#</th>
-                            <th>Bundle / Promo</th>
+                            <th>Transaction</th>
+                            <th>Promotion / Bundle</th>
                             <th>Selected Option</th>
+                            <th>Transaction Date</th>
                             <th>Appointment</th>
                             <th>Phone</th>
-                            <th>Status</th>
+                            <th>Transaction Status</th>
+                            <th>Payment Status</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for claim in claims %}
-                            {% set statusClass = claim.status|lower == 'completed' ? 'badge-completed' : 'badge-pending' %}
-                            <tr>
-                                <td><strong>{{ loop.index }}</strong></td>
-                                <td><span class="bundle-name">{{ claim.bundleSlug }}</span></td>
+                            {% set statusClass = claim.status|lower == 'completed' ? 'badge-completed' : (claim.status|lower starts with 'cancel' ? 'badge-cancelled' : 'badge-pending') %}
+                            <tr data-transaction-key="{{ claim.type }}:{{ claim.id }}">
+                                <td><strong>{{ claim.type == 'promo_claim' ? 'PC' : 'SB' }}-{{ claim.id }}</strong></td>
+                                <td>
+                                    <span class="bundle-name">{{ claim.promoTitle ?: claim.bundleSlug }}</span>
+                                    {% if claim.promoId %}<span class="appointment-meta">Promo #{{ claim.promoId }}</span>{% endif %}
+                                    {% if claim.serviceName %}<span class="appointment-meta">{{ claim.serviceName }}</span>{% endif %}
+                                </td>
                                 <td>{{ claim.selectedOption }}</td>
+                                <td>{{ (claim.createdAt ?: claim.appointmentDate)|date('M j, Y g:i A') }}</td>
                                 <td>
                                     {{ claim.appointmentDate|date('F j, Y') }}
                                     <span class="appointment-meta">{{ claim.appointmentTime|date('g:i A') }}</span>
                                 </td>
                                 <td>{{ claim.phone ?: 'N/A' }}</td>
-                                <td><span class="badge {{ statusClass }}">{{ claim.status }}</span></td>
+                                <td><span class="badge {{ statusClass }}" data-transaction-status>{{ claim.status }}</span></td>
+                                <td>Not applicable</td>
                                 <td>
                                     <div class="table-actions">
                                         <button
                                             type="button"
                                             class="btn-view js-view-claim"
-                                            data-bundle="{{ claim.bundleSlug }}"
+                                            data-bundle="{{ claim.promoTitle ?: claim.bundleSlug }}"
+                                            data-promo-id="{{ claim.promoId ?? '' }}"
+                                            data-reference="{{ claim.type == 'promo_claim' ? 'PC' : 'SB' }}-{{ claim.id }}"
+                                            data-created="{{ (claim.createdAt ?: claim.appointmentDate)|date('M j, Y g:i A') }}"
                                             data-option="{{ claim.selectedOption }}"
                                             data-name="{{ claim.fullName }}"
                                             data-phone="{{ claim.phone ?? '' }}"
                                             data-date="{{ claim.appointmentDate|date('Y-m-d') }}"
                                             data-time="{{ claim.appointmentTime|date('H:i') }}"
                                             data-status="{{ claim.status }}"
+                                            data-payment-status="Not applicable"
+                                            data-service="{{ claim.serviceName ?? '' }}"
                                             data-vehicle="{{ claim.vehicleModel ?? '' }}"
                                         >
                                             <i class="fa-solid fa-eye"></i> View
                                         </button>
-                                        {% if claim.status|lower != 'completed' %}
-                                            <button
-                                                type="button"
-                                                class="btn-edit js-edit-claim"
-                                                data-id="{{ claim.id }}"
-                                                data-record-type="{{ claim.type }}"
-                                                data-bundle="{{ claim.bundleSlug }}"
-                                                data-option="{{ claim.selectedOption }}"
-                                                data-date="{{ claim.appointmentDate|date('Y-m-d') }}"
-                                                data-time="{{ claim.appointmentTime|date('H:i') }}"
-                                            >
-                                                <i class="fa-solid fa-pen"></i> Edit
-                                            </button>
+                                        {% if claim.status|lower in ['pending', 'cancellation pending'] %}
+                                            <form method="post" action="{{ path('promo_claim_delete', {type: claim.type, id: claim.id}) }}" data-cancel-form data-turbo="false" {% if claim.status|lower == 'cancellation pending' %}hidden{% endif %}>
+                                                <input type="hidden" name="_token" value="{{ csrf_token('promo_history_delete_' ~ claim.type ~ '_' ~ claim.id) }}">
+                                                <button type="submit" class="btn-cancel"><i class="fa-solid fa-ban"></i> Cancel</button>
+                                            </form>
                                         {% endif %}
-                                        <form method="post" action="{{ path('promo_claim_delete', {type: claim.type, id: claim.id}) }}" onsubmit="return confirm('Are you sure you want to cancel and delete this promo claim?');">
-                                            <input type="hidden" name="_token" value="{{ csrf_token('promo_history_delete_' ~ claim.type ~ '_' ~ claim.id) }}">
-                                            <button type="submit" class="btn-cancel"><i class="fa-solid fa-trash"></i> Cancel</button>
-                                        </form>
                                     </div>
                                 </td>
                             </tr>
                         {% else %}
-                            <tr><td colspan="7" class="empty-state">No promo claims found.</td></tr>
+                            <tr><td colspan="9" class="empty-state">No promo claims found.</td></tr>
                         {% endfor %}
                     </tbody>
                 </table>
             </div>
         </main>
     </div>
-
-    <div class="claim-alert" id="claim-alert" role="status" aria-live="polite"></div>
 
     <div class="claim-modal" id="view-claim-modal" aria-hidden="true">
         <section class="claim-modal-card" role="dialog" aria-modal="true" aria-labelledby="view-claim-title">
@@ -153,13 +136,18 @@
             </header>
             <div class="modal-details">
                 <p><strong>Bundle / Promo:</strong> <span id="view-claim-bundle"></span></p>
+                <p><strong>Transaction:</strong> <span id="view-claim-reference"></span></p>
+                <p><strong>Promotion ID:</strong> <span id="view-claim-promo-id"></span></p>
                 <p><strong>Selected Option:</strong> <span id="view-claim-option"></span></p>
+                <p><strong>Service:</strong> <span id="view-claim-service"></span></p>
                 <p><strong>Full Name:</strong> <span id="view-claim-name"></span></p>
                 <p><strong>Contact Phone:</strong> <span id="view-claim-phone"></span></p>
                 <p><strong>Vehicle Model:</strong> <span id="view-claim-vehicle"></span></p>
                 <p><strong>Appointment Date:</strong> <span id="view-claim-date"></span></p>
                 <p><strong>Time Slot:</strong> <span id="view-claim-time"></span></p>
                 <p><strong>Current Status:</strong> <span id="view-claim-status"></span></p>
+                <p><strong>Payment Status:</strong> <span id="view-claim-payment-status"></span></p>
+                <p><strong>Transaction Date:</strong> <span id="view-claim-created"></span></p>
             </div>
             <div class="claim-modal-actions">
                 <button type="button" class="claim-modal-secondary js-close-view-claim">Close</button>
@@ -167,128 +155,45 @@
         </section>
     </div>
 
-    <div class="claim-modal" id="edit-claim-modal" aria-hidden="true">
-        <section class="claim-modal-card" role="dialog" aria-modal="true" aria-labelledby="edit-claim-title">
-            <header class="claim-modal-header">
-                <h2 id="edit-claim-title">Edit Claim Appointment</h2>
-                <button type="button" class="claim-modal-close js-close-edit-claim" aria-label="Close">&times;</button>
-            </header>
-            <form id="edit-claim-form" method="post" action="{{ path('update_claim') }}">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token('update_claim') }}">
-                <input type="hidden" id="edit-claim-id" name="claim_id">
-                <input type="hidden" id="edit-claim-record-type" name="record_type">
-                <div class="claim-modal-field">
-                    <label for="edit-claim-bundle">Bundle / Promo</label>
-                    <input type="text" id="edit-claim-bundle" readonly>
-                </div>
-                <div class="claim-modal-field">
-                    <label for="edit-claim-option">Selected Option</label>
-                    <input type="text" id="edit-claim-option" name="selected_option" required maxlength="255">
-                </div>
-                <div class="claim-modal-field">
-                    <label for="edit-claim-date">Appointment Date</label>
-                    <input type="date" id="edit-claim-date" name="appointment_date" min="{{ 'now'|date('Y-m-d') }}" required>
-                </div>
-                <div class="claim-modal-field">
-                    <label for="edit-claim-time">Preferred Time Slot</label>
-                    <input type="time" id="edit-claim-time" name="appointment_time" required>
-                </div>
-                <div class="claim-modal-actions">
-                    <button type="button" class="claim-modal-secondary js-close-edit-claim">Cancel</button>
-                    <button type="submit" class="claim-modal-primary" id="submit-edit-claim">Save Changes</button>
-                </div>
-            </form>
-        </section>
-    </div>
+    {% include 'shared/_cancellation_controls.html.twig' %}
 
     <script>
+        (() => {
         const viewClaimModal = document.getElementById('view-claim-modal');
-        const editClaimModal = document.getElementById('edit-claim-modal');
-        const editClaimForm = document.getElementById('edit-claim-form');
 
         function setClaimModalOpen(modal, isOpen) {
             modal.classList.toggle('active', isOpen);
             modal.setAttribute('aria-hidden', String(!isOpen));
         }
 
-        let claimAlertTimeout;
-
-        function showClaimAlert(message, success) {
-            const alert = document.getElementById('claim-alert');
-            alert.textContent = message;
-            alert.className = 'claim-alert ' + (success ? 'success' : 'error');
-            window.clearTimeout(claimAlertTimeout);
-            claimAlertTimeout = window.setTimeout(() => {
-                alert.className = 'claim-alert';
-            }, 3000);
-        }
-
         document.querySelectorAll('.js-view-claim').forEach((button) => {
             button.addEventListener('click', () => {
                 const values = button.dataset;
                 document.getElementById('view-claim-bundle').textContent = values.bundle || 'N/A';
+                document.getElementById('view-claim-reference').textContent = values.reference || 'N/A';
+                document.getElementById('view-claim-promo-id').textContent = values.promoId || 'N/A';
                 document.getElementById('view-claim-option').textContent = values.option || 'N/A';
+                document.getElementById('view-claim-service').textContent = values.service || 'N/A';
                 document.getElementById('view-claim-name').textContent = values.name || 'N/A';
                 document.getElementById('view-claim-phone').textContent = values.phone || 'N/A';
                 document.getElementById('view-claim-vehicle').textContent = values.vehicle || 'N/A';
                 document.getElementById('view-claim-date').textContent = values.date || 'N/A';
                 document.getElementById('view-claim-time').textContent = values.time || 'N/A';
                 document.getElementById('view-claim-status').textContent = values.status || 'Pending';
+                document.getElementById('view-claim-payment-status').textContent = values.paymentStatus || 'Not applicable';
+                document.getElementById('view-claim-created').textContent = values.created || 'N/A';
                 setClaimModalOpen(viewClaimModal, true);
-            });
-        });
-
-        document.querySelectorAll('.js-edit-claim').forEach((button) => {
-            button.addEventListener('click', () => {
-                const values = button.dataset;
-                document.getElementById('edit-claim-id').value = values.id;
-                document.getElementById('edit-claim-record-type').value = values.recordType;
-                document.getElementById('edit-claim-bundle').value = values.bundle;
-                document.getElementById('edit-claim-option').value = values.option;
-                document.getElementById('edit-claim-date').value = values.date;
-                document.getElementById('edit-claim-time').value = values.time;
-                setClaimModalOpen(editClaimModal, true);
             });
         });
 
         document.querySelectorAll('.js-close-view-claim').forEach((button) => {
             button.addEventListener('click', () => setClaimModalOpen(viewClaimModal, false));
         });
-        document.querySelectorAll('.js-close-edit-claim').forEach((button) => {
-            button.addEventListener('click', () => setClaimModalOpen(editClaimModal, false));
-        });
-        [viewClaimModal, editClaimModal].forEach((modal) => {
-            modal.addEventListener('click', (event) => {
-                if (event.target === modal) {
-                    setClaimModalOpen(modal, false);
-                }
-            });
-        });
-
-        editClaimForm.addEventListener('submit', async (event) => {
-            event.preventDefault();
-            const submitButton = document.getElementById('submit-edit-claim');
-            submitButton.disabled = true;
-            try {
-                const response = await fetch(editClaimForm.action, {
-                    method: 'POST',
-                    body: new FormData(editClaimForm),
-                    headers: {'X-Requested-With': 'XMLHttpRequest'}
-                });
-                const result = await response.json();
-                if (!response.ok || !result.success) {
-                    showClaimAlert(result.message || 'Unable to update this promotion claim.', false);
-                    return;
-                }
-
-                setClaimModalOpen(editClaimModal, false);
-                showClaimAlert(result.message, true);
-                window.setTimeout(() => window.location.reload(), 3000);
-            } catch (error) {
-                showClaimAlert(error instanceof Error ? error.message : 'Unable to update this promotion claim.', false);
-            } finally {
-                submitButton.disabled = false;
+        viewClaimModal.addEventListener('click', (event) => {
+            if (event.target === viewClaimModal) {
+                setClaimModalOpen(viewClaimModal, false);
             }
         });
+        })();
     </script>
 {% endblock %}

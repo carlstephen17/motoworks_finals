@@ -2,28 +2,161 @@
 {% block site_header %}{% include 'staff/_nav.html.twig' %}{% endblock %}
 {% block title %}Service records | Staff{% endblock %}
 {% block body %}
-<main>
-    <h1>Service records</h1>
-    {% for message in app.flashes('success') %}<p role="status">{{ message }}</p>{% endfor %}
-    {% for message in app.flashes('error') %}<p role="alert">{{ message }}</p>{% endfor %}
-    <p><a href="{{ path('staff_service_record_new') }}">Create service record</a></p>
-    {% for record in records %}
-        <article>
-            <h2>{{ record.customer.firstName }} {{ record.customer.lastName }} — {{ record.service.name }}</h2>
-            <p>{{ record.motorcycleModel }}{% if record.plateNumber %} · {{ record.plateNumber }}{% endif %} · {{ record.serviceDate|date('M j, Y') }}</p>
-            <p>{{ record.workDescription }}</p><p>{{ record.status }}</p>
-            {% if is_granted('ROLE_ADMIN') or record.createdByStaff.id == app.user.id %}
-                <a href="{{ path('staff_service_record_edit', {id: record.id}) }}">Edit record details</a>
-            {% endif %}
-            <form method="post" action="{{ path('staff_service_record_update', {id: record.id}) }}">
-                <input type="hidden" name="_token" value="{{ csrf_token('staff_service_record_' ~ record.id) }}">
-                <select name="status">{% for status in ['In Progress','On Hold','Completed','Cancelled'] %}<option {{ record.status == status ? 'selected' : '' }}>{{ status }}</option>{% endfor %}</select>
-                <button>Update</button>
-            </form>
-            {% if is_granted('ROLE_ADMIN') or record.createdByStaff.id == app.user.id %}
-                <form method="post" action="{{ path('staff_service_record_delete', {id: record.id}) }}"><input type="hidden" name="_token" value="{{ csrf_token('staff_service_record_delete_' ~ record.id) }}"><button>Delete</button></form>
-            {% endif %}
-        </article>
-    {% else %}<p>No service records.</p>{% endfor %}
+<main class="admin-main">
+    {% include 'staff/_header.html.twig' with {title: 'Service Records'} %}
+    <div class="admin-content-body">
+        {% for message in app.flashes('success') %}<p role="status" class="alert-toast" data-auto-dismiss>{{ message }}</p>{% endfor %}
+        {% for message in app.flashes('error') %}<p role="alert" class="alert-toast alert-error" data-auto-dismiss>{{ message }}</p>{% endfor %}
+
+        <div class="table-filters" style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+            <div style="font-weight: 600; color: #475569;">
+                <span>Total Records: {{ records|length }}</span>
+            </div>
+            <a class="btn-primary" href="{{ path('staff_service_record_new') }}">
+                <i class="fas fa-plus" aria-hidden="true"></i> Create Service Record
+            </a>
+        </div>
+
+        <div class="table-responsive">
+            <table class="admin-table" id="serviceRecordTable">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Customer</th>
+                        <th>Service</th>
+                        <th>Motorcycle</th>
+                        <th>Date</th>
+                        <th>Cost</th>
+                        <th>Serviced By</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for record in records %}
+                    {% set canModify = is_granted('ROLE_ADMIN') or (record.createdByStaff and record.createdByStaff.id == app.user.id) %}
+                    {% set recordDetails = {
+                        id: '#' ~ record.id,
+                        customer: record.customer.firstName ~ ' ' ~ record.customer.lastName,
+                        phone: record.customer.phone|default('N/A'),
+                        email: record.customer.email,
+                        service: record.service.name,
+                        motorcycle: record.motorcycleModel ~ (record.plateNumber ? ' (' ~ record.plateNumber ~ ')' : ''),
+                        date: record.serviceDate|date('M j, Y'),
+                        workDescription: record.workDescription,
+                        partsUsed: record.partsUsed|default('—'),
+                        cost: record.cost ? ('₱' ~ record.cost|number_format(2)) : '—',
+                        servicedBy: record.createdByStaff.firstName ~ ' ' ~ record.createdByStaff.lastName,
+                        status: record.status,
+                        notes: record.notes|default('—')
+                    } %}
+                    <tr>
+                        <td><strong>#{{ record.id }}</strong></td>
+                        <td>
+                            <strong>{{ record.customer.firstName }} {{ record.customer.lastName }}</strong><br>
+                            <small class="text-muted">{{ record.customer.phone|default('N/A') }}</small>
+                        </td>
+                        <td>{{ record.service.name }}</td>
+                        <td>
+                            {{ record.motorcycleModel }}
+                            {% if record.plateNumber %}<br><small class="text-muted">{{ record.plateNumber }}</small>{% endif %}
+                        </td>
+                        <td>{{ record.serviceDate|date('M j, Y') }}</td>
+                        <td>{{ record.cost ? ('₱' ~ record.cost|number_format(2)) : '—' }}</td>
+                        <td><small>{{ record.createdByStaff.firstName }} {{ record.createdByStaff.lastName }}</small></td>
+                        <td>
+                            <span class="badge {{ record.status == 'Completed' ? 'badge-success' : (record.status == 'Cancelled' ? 'badge-danger' : 'badge-secondary') }}">
+                                {{ record.status }}
+                            </span>
+                        </td>
+                        <td class="table-row-actions">
+                            <button type="button" class="btn-sm btn-secondary view-service-record" data-record="{{ recordDetails|json_encode|e('html_attr') }}">
+                                <i class="fas fa-eye" aria-hidden="true"></i> View
+                            </button>
+                            {% if canModify %}
+                                <a class="btn-sm btn-info" href="{{ path('staff_service_record_edit', {id: record.id}) }}">
+                                    <i class="fas fa-edit" aria-hidden="true"></i> Edit
+                                </a>
+                                <form method="post" action="{{ path('staff_service_record_update', {id: record.id}) }}" data-deferred-cancel-status="Cancelled" data-confirm-message="Cancel this service record? The change will be applied after the 3-second Undo window." style="display:inline-flex; align-items:center; gap:4px; margin:0;">
+                                    <input type="hidden" name="_token" value="{{ csrf_token('staff_service_record_' ~ record.id) }}">
+                                    <select name="status" class="form-control" style="padding:4px 6px; font-size:0.8rem; height:auto; width:auto;" data-initial-status="{{ record.status }}">
+                                        {% for s in ['In Progress', 'On Hold', 'Completed', 'Cancelled'] %}
+                                            <option value="{{ s }}" {{ record.status == s ? 'selected' : '' }}>{{ s }}</option>
+                                        {% endfor %}
+                                    </select>
+                                    <button type="submit" class="btn-sm btn-primary">Update</button>
+                                </form>
+                                <form method="post" action="{{ path('staff_service_record_delete', {id: record.id}) }}" data-deferred-action="delete" data-confirm-message="Delete this service record? The change will be applied after the 3-second Undo window.">
+                                    <input type="hidden" name="_token" value="{{ csrf_token('staff_service_record_delete_' ~ record.id) }}">
+                                    <button type="submit" class="btn-sm btn-danger"><i class="fas fa-trash" aria-hidden="true"></i> Delete</button>
+                                </form>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% else %}
+                    <tr><td colspan="9">No service records found.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <dialog id="staffServiceRecordDetails" class="modal-content" aria-labelledby="staffServiceRecordTitle">
+            <div class="modal-header">
+                <h3 id="staffServiceRecordTitle">Service Record Details</h3>
+                <button type="button" class="close-btn" data-close-record-details aria-label="Close">×</button>
+            </div>
+            <dl>
+                <dt>Record ID</dt><dd data-detail="id"></dd>
+                <dt>Customer</dt><dd data-detail="customer"></dd>
+                <dt>Phone</dt><dd data-detail="phone"></dd>
+                <dt>Email</dt><dd data-detail="email"></dd>
+                <dt>Service</dt><dd data-detail="service"></dd>
+                <dt>Motorcycle</dt><dd data-detail="motorcycle"></dd>
+                <dt>Date</dt><dd data-detail="date"></dd>
+                <dt>Work Description</dt><dd data-detail="workDescription"></dd>
+                <dt>Parts Used</dt><dd data-detail="partsUsed"></dd>
+                <dt>Cost</dt><dd data-detail="cost"></dd>
+                <dt>Serviced By</dt><dd data-detail="servicedBy"></dd>
+                <dt>Status</dt><dd data-detail="status"></dd>
+                <dt>Notes</dt><dd data-detail="notes"></dd>
+            </dl>
+            <div class="modal-footer">
+                <button type="button" class="btn-secondary" data-close-record-details>Close</button>
+            </div>
+        </dialog>
+    </div>
 </main>
+<script>
+(() => {
+    const dialog = document.getElementById('staffServiceRecordDetails');
+    if (!dialog) return;
+
+    document.addEventListener('click', (event) => {
+        const viewBtn = event.target.closest('.view-service-record');
+        if (viewBtn) {
+            try {
+                const data = JSON.parse(viewBtn.dataset.record);
+                Object.keys(data).forEach((key) => {
+                    const el = dialog.querySelector(`[data-detail="${key}"]`);
+                    if (el) el.textContent = data[key] || '—';
+                });
+                if (typeof dialog.showModal === 'function') {
+                    dialog.showModal();
+                } else {
+                    dialog.setAttribute('open', '');
+                }
+            } catch (err) {
+                console.error(err);
+            }
+        }
+        if (event.target.closest('[data-close-record-details]')) {
+            if (typeof dialog.close === 'function') {
+                dialog.close();
+            } else {
+                dialog.removeAttribute('open');
+            }
+        }
+    });
+})();
+</script>
 {% endblock %}

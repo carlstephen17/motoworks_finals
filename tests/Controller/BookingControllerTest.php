@@ -23,7 +23,7 @@ class BookingControllerTest extends WebTestCase
         $this->assertSelectorExists('#ajax-service-booking-form');
     }
 
-    public function testCustomerCanViewHistoryAndPendingBookingEditModal(): void
+    public function testCustomerHistoryDoesNotExposeAppointmentEditing(): void
     {
         $client = static::createClient();
         $user = static::getContainer()->get(UserRepository::class)->find(3);
@@ -38,13 +38,11 @@ class BookingControllerTest extends WebTestCase
 
         $this->assertResponseIsSuccessful();
         $this->assertSelectorExists('.appointment-history-container');
-        if ($pendingBooking instanceof ServiceBooking) {
-            $this->assertSelectorExists('#editModal'.$pendingBooking->getId());
+        $this->assertSelectorNotExists('[id^="editModal"]');
+        $this->assertSelectorNotExists('.btn-edit');
 
-            $client->request('GET', '/appointments/'.$pendingBooking->getId().'/edit');
-            $this->assertResponseIsSuccessful();
-            $this->assertSelectorExists('#editModal'.$pendingBooking->getId().' form');
-        }
+        $client->request('GET', '/appointments/'.($pendingBooking?->getId() ?? 1).'/edit');
+        $this->assertResponseStatusCodeSame(403);
     }
 
     public function testCustomerCanOpenBookingFormWithSelectedService(): void
@@ -72,7 +70,8 @@ class BookingControllerTest extends WebTestCase
         $this->assertResponseIsSuccessful();
         $this->assertSelectorExists('.styled-table');
         $this->assertSelectorExists('#view-claim-modal');
-        $this->assertSelectorExists('#edit-claim-form');
+        $this->assertSelectorNotExists('#edit-claim-form');
+        $this->assertSelectorNotExists('.js-edit-claim');
     }
 
     public function testInvalidAjaxBookingReturnsValidationErrorWithoutCreatingBooking(): void
@@ -90,27 +89,15 @@ class BookingControllerTest extends WebTestCase
         self::assertFalse($response['success']);
     }
 
-    public function testInvalidAppointmentEditKeepsTheEditFormOpen(): void
+    public function testAppointmentEditEndpointRejectsCustomerUpdates(): void
     {
         $client = static::createClient();
         $user = static::getContainer()->get(UserRepository::class)->find(3);
         self::assertNotNull($user);
-        $pendingBooking = static::getContainer()
-            ->get(ServiceBookingRepository::class)
-            ->findOneBy(['user' => $user, 'status' => 'Pending']);
-
-        if (!$pendingBooking instanceof ServiceBooking) {
-            self::markTestSkipped('No pending appointment is available for this read-only form test.');
-        }
-
-        $id = $pendingBooking->getId();
         $client->loginUser($user);
-        $client->request('POST', '/appointments/'.$id.'/edit', [
-            'appointment_'.$id => ['_token' => 'invalid'],
-        ]);
+        $client->request('POST', '/appointments/1/edit', ['service' => 999]);
 
-        $this->assertResponseIsSuccessful();
-        $this->assertSelectorExists('#editModal'.$id.' form');
+        $this->assertResponseStatusCodeSame(403);
     }
 
     public function testCustomerPromoBookingIsSavedAndAppearsInBothHistories(): void
@@ -128,8 +115,8 @@ class BookingControllerTest extends WebTestCase
         self::assertNotSame([], $promo->getItemOptions());
 
         $client->loginUser($customer);
-        $promosPage = $client->request('GET', '/promos');
-        $token = $promosPage->filter('#claimForm input[name="form[_token]"]')->attr('value');
+        $bookingPage = $client->request('GET', '/book-service?service_id='.$service->getId());
+        $token = $bookingPage->filter('form input[name="form[_token]"]')->attr('value');
         self::assertNotNull($token);
         $connection = $entityManager->getConnection();
         $bookingId = null;
@@ -160,6 +147,7 @@ class BookingControllerTest extends WebTestCase
             self::assertInstanceOf(ServiceBooking::class, $booking);
             self::assertSame($customer->getId(), $booking->getUser()->getId());
             self::assertSame($service->getId(), $booking->getService()->getId());
+            self::assertSame($promo->getId(), $booking->getPromo()?->getId());
             self::assertSame($promo->getSlug(), $booking->getBundleSlug());
             self::assertSame($promo->getItemOptions()[0], $booking->getBundleOption());
 
@@ -169,12 +157,73 @@ class BookingControllerTest extends WebTestCase
 
             $client->request('GET', '/promo-history');
             $this->assertResponseIsSuccessful();
-            $this->assertSelectorTextContains('body', $promo->getSlug());
+            $this->assertSelectorTextContains('body', $promo->getTitle());
         } finally {
             $connection->rollBack();
             $entityManager->clear();
         }
 
         self::assertNull($entityManager->getRepository(ServiceBooking::class)->find($bookingId));
+    }
+
+    public function testCustomerCanUndoAppointmentCancellationWithinThreeSeconds(): void
+    {
+        $client = static::createClient();
+        $client->disableReboot();
+        $container = $client->getContainer();
+        $entityManager = $container->get(EntityManagerInterface::class);
+        $customer = $container->get(UserRepository::class)->find(3);
+        $service = $container->get(ServiceRepository::class)->findActiveServices()[0] ?? null;
+        self::assertNotNull($customer);
+        self::assertNotNull($service);
+
+        $booking = new ServiceBooking(
+            $customer,
+            $service,
+            'Cancellation test motorcycle',
+            new \DateTimeImmutable('tomorrow'),
+            new \DateTimeImmutable('09:00'),
+            null,
+            null,
+            null,
+        );
+        $connection = $entityManager->getConnection();
+        $connection->beginTransaction();
+        $bookingId = null;
+
+        try {
+            $entityManager->persist($booking);
+            $entityManager->flush();
+            $bookingId = $booking->getId();
+            self::assertNotNull($bookingId);
+            $client->loginUser($customer);
+            $history = $client->request('GET', '/appointment-history');
+            $form = $history->filter(sprintf('form[action="/appointments/%d/cancel"]', $bookingId))->form();
+
+            $client->xmlHttpRequest('POST', '/appointments/'.$bookingId.'/cancel', [
+                '_token' => $form->get('_token')->getValue(),
+            ]);
+
+            $this->assertResponseIsSuccessful();
+            $cancelResult = json_decode((string) $client->getResponse()->getContent(), true);
+            self::assertIsArray($cancelResult);
+            self::assertTrue($cancelResult['success']);
+            self::assertSame('Cancellation Pending', $entityManager->find(ServiceBooking::class, $bookingId)?->getStatus());
+
+            $action = $cancelResult['action'];
+            $client->xmlHttpRequest('POST', $action['undo_url'], ['_token' => $action['undo_token']]);
+
+            $this->assertResponseIsSuccessful();
+            self::assertSame('Pending', $entityManager->find(ServiceBooking::class, $bookingId)?->getStatus());
+
+            $client->request('GET', '/appointment-history');
+            $this->assertSelectorExists('[data-transaction-key="service_booking:'.$bookingId.'"]');
+        } finally {
+            $connection->rollBack();
+            $entityManager->clear();
+        }
+
+        self::assertNotNull($bookingId);
+        self::assertNull($entityManager->find(ServiceBooking::class, $bookingId));
     }
 }

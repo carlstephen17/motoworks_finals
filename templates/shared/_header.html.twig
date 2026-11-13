@@ -40,9 +40,9 @@
                         <a href="{{ path('appointment_history') }}"><i class="fa-solid fa-calendar-check" aria-hidden="true"></i> Appointments</a>
                         <a href="{{ path('order_history') }}"><i class="fa-solid fa-box" aria-hidden="true"></i> Order History</a>
                         <a href="{{ path('promo_history') }}"><i class="fa-solid fa-ticket" aria-hidden="true"></i> Promo History</a>
-                        <form method="post" action="{{ path('app_logout') }}">
+                        <form method="post" action="{{ path('app_logout') }}" data-turbo="false">
                             <input type="hidden" name="_csrf_token" value="{{ csrf_token('logout') }}">
-                            <button type="submit" class="logout-link" style="border: 0; background: none; cursor: pointer; font: inherit;"><i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i> Log Out</button>
+                            <button type="submit" class="logout-link"><i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i> Log Out</button>
                         </form>
                     </div>
                 </div>

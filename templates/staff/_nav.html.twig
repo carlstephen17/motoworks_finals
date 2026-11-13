@@ -1,8 +1,38 @@
-<nav aria-label="Staff navigation">
-    <a href="{{ path('staff_dashboard') }}">Dashboard</a>
-    <a href="{{ path('staff_appointments') }}">Appointments</a>
-    <a href="{{ path('staff_orders') }}">Orders</a>
-    <a href="{{ path('staff_promo_history') }}">Promotion claims</a>
-    <a href="{{ path('staff_service_records') }}">Service records</a>
-    <a href="{{ path('app_home') }}">View site</a>
-</nav>
+<div class="staff-sidebar-backdrop" data-sidebar-backdrop></div>
+<aside class="admin-sidebar" id="staff-sidebar">
+    <div class="sidebar-brand">
+        <a href="{{ path('staff_dashboard') }}"><h2>MotoWorks Staff</h2></a>
+    </div>
+    <nav aria-label="Staff navigation">
+        <ul class="sidebar-menu">
+            <li class="sidebar-section-label" aria-hidden="true">Overview</li>
+            {% set staffNavigation = [
+                {route: 'staff_appointments', label: 'Appointments', path: path('staff_appointments'), icon: 'fa-calendar-check'},
+                {route: 'staff_orders', label: 'Orders', path: path('staff_orders'), icon: 'fa-box-open'},
+                {route: 'staff_promo_history', label: 'Promo History', path: path('staff_promo_history'), icon: 'fa-clock-rotate-left'},
+                {route: 'staff_service_records', label: 'Service Records', path: path('staff_service_records'), icon: 'fa-screwdriver-wrench'}
+            ] %}
+            <li class="{{ app.request.attributes.get('_route') == 'staff_dashboard' ? 'active' : '' }}">
+                <a href="{{ path('staff_dashboard') }}" {{ app.request.attributes.get('_route') == 'staff_dashboard' ? 'aria-current="page"' : '' }}>
+                    <i class="fas fa-house" aria-hidden="true"></i> Dashboard
+                </a>
+            </li>
+            <li class="sidebar-section-label" aria-hidden="true">Operations</li>
+            {% for item in staffNavigation %}
+                {% set active = app.request.attributes.get('_route') == item.route or app.request.attributes.get('_route') starts with item.route ~ '_' %}
+                <li class="{{ active ? 'active' : '' }}">
+                    <a href="{{ item.path }}" {{ active ? 'aria-current="page"' : '' }}>
+                        <i class="fas {{ item.icon }}" aria-hidden="true"></i> {{ item.label }}
+                    </a>
+                </li>
+            {% endfor %}
+            <li><a href="{{ path('app_home') }}"><i class="fas fa-globe" aria-hidden="true"></i> View site</a></li>
+            <li class="sidebar-logout">
+                <form method="post" action="{{ path('app_logout') }}">
+                    <input type="hidden" name="_csrf_token" value="{{ csrf_token('logout') }}">
+                    <button type="submit"><i class="fas fa-sign-out-alt" aria-hidden="true"></i> Logout</button>
+                </form>
+            </li>
+        </ul>
+    </nav>
+</aside>

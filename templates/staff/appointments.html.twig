@@ -2,78 +2,204 @@
 {% block site_header %}{% include 'staff/_nav.html.twig' %}{% endblock %}
 {% block title %}Appointments | Staff{% endblock %}
 {% block body %}
-<main>
-    <h1>Appointments</h1>
-    {% for message in app.flashes('success') %}<p role="status">{{ message }}</p>{% endfor %}
-    {% for message in app.flashes('error') %}<p role="alert">{{ message }}</p>{% endfor %}
-    <p><a href="{{ path('staff_appointment_new') }}">Create appointment</a></p>
-    <section aria-label="Appointment totals">
-        <p>Total: {{ counts.total }}</p>
-        <p>Pending: {{ counts.pending }}</p>
-        <p>Completed: {{ counts.completed }}</p>
-        <p>Cancelled: {{ counts.cancelled }}</p>
-    </section>
-    <form method="get" action="{{ path('staff_appointments') }}">
-        <label for="appointmentSearch">Search by customer, vehicle, service, or appointment ID</label>
-        <input id="appointmentSearch" type="search" name="search" value="{{ filters.search }}">
-        <label for="appointmentStatus">Status</label>
-        <select id="appointmentStatus" name="status">
-            <option value="">All statuses</option>
-            {% for option in ['Pending', 'Cancelled', 'Completed'] %}
-                <option value="{{ option }}" {{ filters.status == option ? 'selected' : '' }}>{{ option }}</option>
-            {% endfor %}
-        </select>
-        <label for="appointmentDate">Date</label>
-        <input id="appointmentDate" type="date" name="date" value="{{ filters.date }}">
-        <label for="appointmentSource">Booking source</label>
-        <select id="appointmentSource" name="source">
-            <option value="">All sources</option>
-            <option value="online" {{ filters.source == 'online' ? 'selected' : '' }}>Customer online</option>
-            <option value="staff" {{ filters.source == 'staff' ? 'selected' : '' }}>Staff</option>
-            <option value="admin" {{ filters.source == 'admin' ? 'selected' : '' }}>Admin</option>
-        </select>
-        <button type="submit">Filter</button>
-        <a href="{{ path('staff_appointments') }}">Clear</a>
-    </form>
+<main class="admin-main">
+    {% include 'staff/_header.html.twig' with {title: 'Service Appointments'} %}
+    <div class="admin-content-body">
+        {% for message in app.flashes('success') %}<p role="status" class="alert-toast" data-auto-dismiss>{{ message }}</p>{% endfor %}
+        {% for message in app.flashes('error') %}<p role="alert" class="alert-toast alert-error" data-auto-dismiss>{{ message }}</p>{% endfor %}
 
-    <table>
-        <thead><tr><th>Appointment</th><th>Customer</th><th>Service</th><th>Motorcycle</th><th>Source</th><th>Status</th><th>Notes</th><th>Actions</th></tr></thead>
-        <tbody>
-        {% for booking in bookings %}
-            <tr>
-                <td>#{{ booking.id }}<br>{{ booking.bookingDate|date('M j, Y') }} {{ booking.bookingTime|date('g:i A') }}</td>
-                <td>{{ booking.user.firstName }} {{ booking.user.lastName }}<br>{{ booking.user.email }}<br>{{ booking.user.phone }}</td>
-                <td>{{ booking.service.name }}</td>
-                <td>{{ booking.vehicleModel }}{% if booking.motorcycle and booking.motorcycle.plateNumber %}<br>{{ booking.motorcycle.plateNumber }}{% endif %}</td>
-                <td>{{ booking.source|default('Not recorded') }}{% if booking.createdByStaff %}<br>{{ booking.createdByStaff.firstName }} {{ booking.createdByStaff.lastName }}{% endif %}</td>
-                <td>{{ booking.status }}</td>
-                <td>{{ booking.notes }}{% if booking.rejectionReason %}<br>{{ booking.rejectionReason }}{% endif %}</td>
-                <td>
-                    <a href="{{ path('staff_appointment_edit', {id: booking.id}) }}">Edit details</a>
-                    {% if booking.status != 'Completed' %}
-                        <form method="post" action="{{ path('staff_appointment_update', {id: booking.id}) }}">
-                            <input type="hidden" name="_token" value="{{ csrf_token('staff_appointment_update_' ~ booking.id) }}">
-                            <select name="status">
-                                {% for option in ['Pending', 'Confirmed', 'Completed', 'Cancelled', 'Rejected'] %}
-                                    <option value="{{ option }}" {{ booking.status == option ? 'selected' : '' }}>{{ option }}</option>
-                                {% endfor %}
-                            </select>
-                            <label>Cancellation reason
-                                <textarea name="rejectionReason" maxlength="1000">{{ booking.rejectionReason }}</textarea>
-                            </label>
-                            <button type="submit">Update status</button>
-                        </form>
+        <section class="order-stats appointment-stats" aria-label="Appointment totals">
+            {% for key, label in { total: 'All Appointments', pending: 'Pending', cancelled: 'Cancelled', completed: 'Completed' } %}
+                <article class="stat-card" data-appointment-count="{{ key }}">
+                    <div class="stat-info">
+                        <h3>{{ counts[key] }}</h3>
+                        <p>{{ label }}</p>
+                    </div>
+                </article>
+            {% endfor %}
+        </section>
+
+        <form id="appointmentFilters" class="table-filters" method="get" action="{{ path('staff_appointments') }}">
+            <label class="visually-hidden" for="appointmentSearch">Search</label>
+            <input id="appointmentSearch" type="search" name="search" value="{{ filters.search }}" placeholder="Search customer, vehicle, service, or ID..." autocomplete="off">
+
+            <label class="visually-hidden" for="appointmentStatus">Status</label>
+            <select id="appointmentStatus" name="status">
+                <option value="">All statuses</option>
+                {% for option in ['Pending', 'Cancelled', 'Completed'] %}
+                    <option value="{{ option }}" {{ filters.status == option ? 'selected' : '' }}>{{ option }}</option>
+                {% endfor %}
+            </select>
+
+            <label class="visually-hidden" for="appointmentDate">Date</label>
+            <input id="appointmentDate" type="date" name="date" value="{{ filters.date }}">
+
+            <label class="visually-hidden" for="appointmentSource">Booking source</label>
+            <select id="appointmentSource" name="source">
+                <option value="">All sources</option>
+                <option value="online" {{ filters.source == 'online' ? 'selected' : '' }}>Customer online</option>
+                <option value="staff" {{ filters.source == 'staff' ? 'selected' : '' }}>Staff</option>
+                <option value="admin" {{ filters.source == 'admin' ? 'selected' : '' }}>Admin</option>
+            </select>
+
+            <button type="submit" class="btn-primary"><i class="fas fa-filter" aria-hidden="true"></i> Filter</button>
+            <a href="{{ path('staff_appointments') }}" class="btn-secondary">Clear</a>
+            <a class="btn-primary" href="{{ path('staff_appointment_new') }}"><i class="fas fa-plus" aria-hidden="true"></i> Create appointment</a>
+        </form>
+
+        <div class="table-responsive">
+            <table class="admin-table" id="appointmentTable">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Customer</th>
+                        <th>Vehicle</th>
+                        <th>Service</th>
+                        <th>Date &amp; Time</th>
+                        <th>Source</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for booking in bookings %}
+                    {% set displayStatus = booking.status in ['Confirmed', 'Cancellation Pending'] ? 'Pending' : (booking.status == 'Rejected' ? 'Cancelled' : booking.status) %}
+                    {% set bookingSource = booking.source == 'staff' ? 'Staff-Created' ~ (booking.createdByStaff ? ' (' ~ booking.createdByStaff.firstName ~ ' ' ~ booking.createdByStaff.lastName ~ ')' : '') : (booking.source == 'admin' ? 'Admin-Created' : 'Customer Online') %}
+                    {% set vehicle = booking.vehicleModel %}
+                    {% if booking.motorcycle and booking.motorcycle.plateNumber %}
+                        {% set vehicle = vehicle ~ ' (' ~ booking.motorcycle.plateNumber ~ ')' %}
                     {% endif %}
-                    <form method="post" action="{{ path('staff_appointment_delete', {id: booking.id}) }}" onsubmit="return confirm('Delete this appointment?')">
-                        <input type="hidden" name="_token" value="{{ csrf_token('staff_appointment_delete_' ~ booking.id) }}">
-                        <button type="submit">Delete</button>
-                    </form>
-                </td>
-            </tr>
-        {% else %}
-            <tr><td colspan="8">No appointments found for these filters.</td></tr>
-        {% endfor %}
-        </tbody>
-    </table>
+                    {% set canModify = is_granted('ROLE_ADMIN') or not booking.createdByStaff or booking.createdByStaff.id == app.user.id %}
+                    {% set appointmentDetails = {
+                        id: '#' ~ booking.id,
+                        customer: booking.user.firstName ~ ' ' ~ booking.user.lastName,
+                        email: booking.user.email,
+                        phone: booking.user.phone|default('N/A'),
+                        vehicle: vehicle,
+                        service: booking.service.name,
+                        price: '₱' ~ booking.service.price|number_format(2, '.', ','),
+                        date: booking.bookingDate|date('M j, Y'),
+                        time: booking.bookingTime|date('g:i A'),
+                        status: displayStatus,
+                        notes: booking.notes|default('—'),
+                        cancellationReason: booking.rejectionReason|default('—'),
+                        source: bookingSource
+                    } %}
+                    <tr class="appointment-row" data-id="{{ booking.id }}">
+                        <td><strong>#{{ booking.id }}</strong></td>
+                        <td>
+                            <strong>{{ booking.user.firstName }} {{ booking.user.lastName }}</strong><br>
+                            <small class="text-muted">{{ booking.user.email }}</small><br>
+                            <small class="text-muted">{{ booking.user.phone|default('N/A') }}</small>
+                        </td>
+                        <td>{{ vehicle }}</td>
+                        <td>
+                            {{ booking.service.name }}<br>
+                            <small class="text-muted">₱{{ booking.service.price|number_format(2) }}</small>
+                        </td>
+                        <td class="appointment-date-time">
+                            <span>{{ booking.bookingDate|date('M j, Y') }}</span>
+                            <span>{{ booking.bookingTime|date('g:i A') }}</span>
+                        </td>
+                        <td>
+                            <small>{{ bookingSource }}</small>
+                        </td>
+                        <td>
+                            <span class="badge {{ displayStatus == 'Completed' ? 'badge-success' : (displayStatus == 'Cancelled' ? 'badge-danger' : 'badge-secondary') }}">{{ displayStatus }}</span>
+                        </td>
+                        <td class="table-row-actions">
+                            <button type="button" class="btn-sm btn-secondary view-appointment" data-appointment="{{ appointmentDetails|json_encode|e('html_attr') }}">
+                                <i class="fas fa-eye" aria-hidden="true"></i> View
+                            </button>
+                            {% if canModify and booking.status not in ['Completed', 'Cancellation Pending'] %}
+                                <a class="btn-sm btn-info edit-appointment" href="{{ path('staff_appointment_edit', {id: booking.id}) }}">
+                                    <i class="fas fa-edit" aria-hidden="true"></i> Edit
+                                </a>
+                            {% endif %}
+                            {% if canModify and booking.status != 'Completed' %}
+                                <form method="post" action="{{ path('staff_appointment_update', {id: booking.id}) }}" data-deferred-cancel-status="Cancelled" data-confirm-message="Cancel this appointment? The change will be applied after the 3-second Undo window." style="display:inline-flex; align-items:center; gap:4px; margin:0;">
+                                    <input type="hidden" name="_token" value="{{ csrf_token('staff_appointment_update_' ~ booking.id) }}">
+                                    <select name="status" class="form-control" style="padding:4px 6px; font-size:0.8rem; height:auto; width:auto;" data-initial-status="{{ booking.status }}">
+                                        {% for option in ['Pending', 'Confirmed', 'Completed', 'Cancelled', 'Rejected'] %}
+                                            <option value="{{ option }}" {{ booking.status == option ? 'selected' : '' }}>{{ option }}</option>
+                                        {% endfor %}
+                                    </select>
+                                    <textarea name="rejectionReason" style="display:none;" maxlength="1000">{{ booking.rejectionReason }}</textarea>
+                                    <button type="submit" class="btn-sm btn-primary">Update</button>
+                                </form>
+                            {% endif %}
+                            {% if canModify and booking.status != 'Cancellation Pending' %}
+                                <form method="post" action="{{ path('staff_appointment_delete', {id: booking.id}) }}" data-deferred-action="delete" data-confirm-message="Delete this appointment? The change will be applied after the 3-second Undo window.">
+                                    <input type="hidden" name="_token" value="{{ csrf_token('staff_appointment_delete_' ~ booking.id) }}">
+                                    <button type="submit" class="btn-sm btn-danger"><i class="fas fa-trash" aria-hidden="true"></i> Delete</button>
+                                </form>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% else %}
+                    <tr><td colspan="8">No appointments found for these filters.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <dialog id="staffAppointmentDetails" class="modal-content" aria-labelledby="staffAppointmentDetailsTitle">
+            <div class="modal-header">
+                <h3 id="staffAppointmentDetailsTitle">Appointment Details</h3>
+                <button type="button" class="close-btn" data-close-appointment-details aria-label="Close">×</button>
+            </div>
+            <dl>
+                <dt>Appointment ID</dt><dd data-detail="id"></dd>
+                <dt>Customer</dt><dd data-detail="customer"></dd>
+                <dt>Email</dt><dd data-detail="email"></dd>
+                <dt>Phone</dt><dd data-detail="phone"></dd>
+                <dt>Vehicle</dt><dd data-detail="vehicle"></dd>
+                <dt>Service</dt><dd data-detail="service"></dd>
+                <dt>Price</dt><dd data-detail="price"></dd>
+                <dt>Date</dt><dd data-detail="date"></dd>
+                <dt>Time</dt><dd data-detail="time"></dd>
+                <dt>Source</dt><dd data-detail="source"></dd>
+                <dt>Status</dt><dd data-detail="status"></dd>
+                <dt>Notes</dt><dd data-detail="notes"></dd>
+                <dt>Cancellation reason</dt><dd data-detail="cancellationReason"></dd>
+            </dl>
+            <div class="modal-footer">
+                <button type="button" class="btn-secondary" data-close-appointment-details>Close</button>
+            </div>
+        </dialog>
+    </div>
 </main>
+<script>
+(() => {
+    const dialog = document.getElementById('staffAppointmentDetails');
+    if (!dialog) return;
+
+    document.addEventListener('click', (event) => {
+        const viewBtn = event.target.closest('.view-appointment');
+        if (viewBtn) {
+            try {
+                const data = JSON.parse(viewBtn.dataset.appointment);
+                Object.keys(data).forEach((key) => {
+                    const el = dialog.querySelector(`[data-detail="${key}"]`);
+                    if (el) el.textContent = data[key] || '—';
+                });
+                if (typeof dialog.showModal === 'function') {
+                    dialog.showModal();
+                } else {
+                    dialog.setAttribute('open', '');
+                }
+            } catch (err) {
+                console.error(err);
+            }
+        }
+        if (event.target.closest('[data-close-appointment-details]')) {
+            if (typeof dialog.close === 'function') {
+                dialog.close();
+            } else {
+                dialog.removeAttribute('open');
+            }
+        }
+    });
+})();
+</script>
 {% endblock %}

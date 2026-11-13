@@ -1,0 +1,285 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="960" viewBox="0 0 1440 960" role="img" aria-labelledby="title description">
+  <title id="title">MotoWorks dark admin products dashboard with view, edit, and undo states</title>
+  <desc id="description">A dark products dashboard with a read-only product details dialog in front of an edit form, and a delete undo notification.</desc>
+  <defs>
+    <linearGradient id="pageGlow" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#14223a"/>
+      <stop offset="1" stop-color="#0b1220"/>
+    </linearGradient>
+    <linearGradient id="blueButton" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#398bff"/>
+      <stop offset="1" stop-color="#2166df"/>
+    </linearGradient>
+    <linearGradient id="greenGlow" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#16845e"/>
+      <stop offset="1" stop-color="#116548"/>
+    </linearGradient>
+    <filter id="panelShadow" x="-30%" y="-30%" width="160%" height="170%">
+      <feDropShadow dx="0" dy="18" stdDeviation="24" flood-color="#000814" flood-opacity=".5"/>
+    </filter>
+    <filter id="softBlur">
+      <feGaussianBlur stdDeviation="2.2"/>
+    </filter>
+    <filter id="toastShadow" x="-30%" y="-30%" width="160%" height="170%">
+      <feDropShadow dx="0" dy="10" stdDeviation="18" flood-color="#020617" flood-opacity=".55"/>
+    </filter>
+  </defs>
+
+  <rect width="1440" height="960" fill="#09111e"/>
+
+  <g filter="url(#softBlur)">
+    <rect x="260" width="1180" height="960" fill="url(#pageGlow)"/>
+    <rect width="260" height="960" fill="#111a2b"/>
+
+    <rect x="0" y="0" width="260" height="106" fill="#0d1728"/>
+    <rect x="27" y="30" width="44" height="44" rx="13" fill="url(#blueButton)"/>
+    <path d="M37 55h6l4-9h8l4 9h6M39 59h20M43 63h12" fill="none" stroke="#fff" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="84" y="49" fill="#f3f7ff" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="17" font-weight="750" letter-spacing=".15">MOTOWORKS</text>
+    <text x="84" y="68" fill="#7788a6" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="10" font-weight="650" letter-spacing="2.1">ADMIN CONSOLE</text>
+    <text x="28" y="139" fill="#6c7d9d" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="10" font-weight="700" letter-spacing="1.7">MANAGEMENT</text>
+
+    <rect x="10" y="158" width="240" height="48" rx="10" fill="#1e3453"/>
+    <rect x="0" y="166" width="4" height="32" rx="2" fill="#4a9cff"/>
+    <g fill="none" stroke="#68b1ff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="29" y="173" width="16" height="16" rx="2"/>
+      <path d="M29 179h16M34 173v16M40 173v16"/>
+    </g>
+    <text x="59" y="187" fill="#f4f8ff" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="14" font-weight="650">Products</text>
+
+    <g fill="none" stroke="#8292ad" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M28 238h20l-2 17H30zM25 234h4l2 4M36 238l4 8 4-8"/>
+    </g>
+    <text x="59" y="250" fill="#a8b4c9" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="14" font-weight="550">Orders</text>
+
+    <g fill="none" stroke="#8292ad" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M27 303h22M30 303c0-6 3-10 8-10s8 4 8 10M32 307h14M35 311h8"/>
+      <path d="M37 290v-3M29 295l-2-2M45 295l2-2"/>
+    </g>
+    <text x="59" y="307" fill="#a8b4c9" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="14" font-weight="550">Services</text>
+
+    <g fill="none" stroke="#8292ad" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="28" y="347" width="20" height="19" rx="3"/>
+      <path d="M33 344v6M43 344v6M28 353h20M33 359l3 3 6-7"/>
+    </g>
+    <text x="59" y="361" fill="#a8b4c9" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="14" font-weight="550">Appointments</text>
+
+    <g fill="none" stroke="#8292ad" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M29 408l6-6h13v13l-6 6-13-13z"/>
+      <circle cx="40" cy="408" r="1.4" fill="#8292ad" stroke="none"/>
+    </g>
+    <text x="59" y="420" fill="#a8b4c9" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="14" font-weight="550">Promo</text>
+
+    <g fill="none" stroke="#8292ad" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M28 463l5-5h12l5 5v12l-5 5H33l-5-5z"/>
+      <circle cx="39" cy="464" r="1.3" fill="#8292ad" stroke="none"/>
+      <path d="M31 467l10 10M34 464l10 10"/>
+    </g>
+    <text x="59" y="478" fill="#a8b4c9" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="14" font-weight="550">Promo History</text>
+
+    <line x1="24" y1="881" x2="236" y2="881" stroke="#243149"/>
+    <circle cx="46" cy="914" r="17" fill="#253b59"/>
+    <text x="46" y="919" text-anchor="middle" fill="#d9e7ff" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12" font-weight="700">A</text>
+    <text x="73" y="911" fill="#e1e9f5" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12" font-weight="650">Administrator</text>
+    <text x="73" y="928" fill="#7586a1" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="10">Store management</text>
+
+    <rect x="260" y="0" width="1180" height="78" fill="#0d1728" opacity=".8"/>
+    <text x="304" y="47" fill="#8fa0ba" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12">Management</text>
+    <path d="M384 42l4 4-4 4" fill="none" stroke="#52617b" stroke-width="1.5"/>
+    <text x="399" y="47" fill="#e8eef8" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12" font-weight="600">Products</text>
+    <rect x="1114" y="22" width="192" height="36" rx="10" fill="#131f32" stroke="#293750"/>
+    <circle cx="1132" cy="40" r="5" fill="none" stroke="#7889a5" stroke-width="1.5"/>
+    <path d="M1136 44l5 5" stroke="#7889a5" stroke-width="1.5" stroke-linecap="round"/>
+    <text x="1150" y="44" fill="#74849d" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="11">Search anything...</text>
+    <circle cx="1340" cy="40" r="17" fill="#20334d"/>
+    <text x="1340" y="44" text-anchor="middle" fill="#d7e6fb" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="10" font-weight="700">AD</text>
+    <text x="1367" y="44" fill="#e7edf7" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="11" font-weight="600">Admin</text>
+
+    <text x="304" y="133" fill="#f2f6fd" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="27" font-weight="720">Products Management</text>
+    <text x="304" y="158" fill="#8595ae" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12">Manage your catalog, pricing, and stock levels.</text>
+    <rect x="1223" y="112" width="168" height="42" rx="10" fill="url(#blueButton)"/>
+    <path d="M1245 133h14M1252 126v14" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+    <text x="1270" y="137" fill="#fff" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12" font-weight="650">Add Product</text>
+
+    <rect x="304" y="184" width="1087" height="91" rx="14" fill="#111e30" stroke="#26364f"/>
+    <text x="328" y="215" fill="#8596b2" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="10" font-weight="700" letter-spacing="1">TOTAL PRODUCTS</text>
+    <text x="328" y="250" fill="#eef4fd" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="24" font-weight="700">128</text>
+    <rect x="496" y="203" width="1" height="52" fill="#27354b"/>
+    <text x="524" y="215" fill="#8596b2" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="10" font-weight="700" letter-spacing="1">ACTIVE ITEMS</text>
+    <text x="524" y="250" fill="#54d6a0" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="24" font-weight="700">114</text>
+    <rect x="690" y="203" width="1" height="52" fill="#27354b"/>
+    <text x="718" y="215" fill="#8596b2" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="10" font-weight="700" letter-spacing="1">LOW STOCK</text>
+    <text x="718" y="250" fill="#f6bd4b" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="24" font-weight="700">8</text>
+    <rect x="866" y="203" width="1" height="52" fill="#27354b"/>
+    <text x="894" y="215" fill="#8596b2" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="10" font-weight="700" letter-spacing="1">OUT OF STOCK</text>
+    <text x="894" y="250" fill="#ff7c84" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="24" font-weight="700">6</text>
+
+    <rect x="304" y="294" width="1087" height="54" rx="11" fill="#111e30" stroke="#26364f"/>
+    <circle cx="328" cy="321" r="5" fill="none" stroke="#8394ad" stroke-width="1.5"/>
+    <path d="M332 325l5 5" stroke="#8394ad" stroke-width="1.5" stroke-linecap="round"/>
+    <text x="346" y="325" fill="#74849d" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="11">Search products by name or SKU</text>
+    <rect x="1112" y="304" width="128" height="34" rx="8" fill="#17253a" stroke="#33445e"/>
+    <text x="1130" y="326" fill="#c7d2e3" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="11">All statuses</text>
+    <path d="M1222 318l4 4 4-4" fill="none" stroke="#8796ac" stroke-width="1.4" stroke-linecap="round"/>
+    <rect x="1252" y="304" width="114" height="34" rx="8" fill="#17253a" stroke="#33445e"/>
+    <path d="M1270 315h15M1273 321h12M1276 327h6" stroke="#9aabc2" stroke-width="1.4" stroke-linecap="round"/>
+    <text x="1292" y="326" fill="#c7d2e3" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="11">Filter</text>
+
+    <rect x="304" y="366" width="1087" height="477" rx="14" fill="#111e30" stroke="#26364f"/>
+    <rect x="304" y="366" width="1087" height="48" rx="14" fill="#15243a"/>
+    <path d="M304 400h1087" stroke="#26364f"/>
+    <text x="329" y="396" fill="#8192ad" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="10" font-weight="700" letter-spacing=".7">PRODUCT</text>
+    <text x="706" y="396" fill="#8192ad" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="10" font-weight="700" letter-spacing=".7">SKU</text>
+    <text x="839" y="396" fill="#8192ad" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="10" font-weight="700" letter-spacing=".7">PRICE</text>
+    <text x="970" y="396" fill="#8192ad" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="10" font-weight="700" letter-spacing=".7">STOCK</text>
+    <text x="1083" y="396" fill="#8192ad" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="10" font-weight="700" letter-spacing=".7">STATUS</text>
+    <text x="1210" y="396" fill="#8192ad" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="10" font-weight="700" letter-spacing=".7">ACTIONS</text>
+
+    <g font-family="Inter,Segoe UI,Arial,sans-serif">
+      <rect x="324" y="427" width="40" height="40" rx="9" fill="#392f26"/>
+      <path d="M338 437h12l3 5v13h-18v-13z" fill="#bc8d57" opacity=".9"/>
+      <path d="M337 442h15M340 450h9" stroke="#f4d0a1" stroke-width="1.4" stroke-linecap="round"/>
+      <text x="378" y="446" fill="#e4ebf6" font-size="12" font-weight="650">Premium Coffee Beans</text>
+      <text x="378" y="463" fill="#74849d" font-size="10">Organic dark roast coffee beans</text>
+      <text x="706" y="451" fill="#b5c3d8" font-size="11">CB-001</text>
+      <text x="839" y="451" fill="#e4ebf6" font-size="11" font-weight="600">$18.50</text>
+      <text x="970" y="451" fill="#b5c3d8" font-size="11">42 units</text>
+      <rect x="1075" y="435" width="68" height="23" rx="11" fill="#103d35"/>
+      <circle cx="1088" cy="446.5" r="3" fill="#39d49b"/>
+      <text x="1096" y="450" fill="#5cdbad" font-size="9" font-weight="650">Active</text>
+      <rect x="1191" y="433" width="52" height="28" rx="7" fill="#1c3554"/>
+      <path d="M1208 441c-4 0-7 3-7 7h14c0-4-3-7-7-7zM1205 450h6" fill="none" stroke="#69adff" stroke-width="1.3" stroke-linecap="round"/>
+      <rect x="1249" y="433" width="52" height="28" rx="7" fill="#1c2f4b"/>
+      <path d="M1265 452l9-9M1264 450l1 3 3 1" fill="none" stroke="#76a9fa" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+      <rect x="1307" y="433" width="52" height="28" rx="7" fill="#3e252f"/>
+      <path d="M1325 442h12M1327 442v11h8v-11M1329 439h4" fill="none" stroke="#ff7885" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M324 480h1048" stroke="#26354a"/>
+
+      <rect x="324" y="495" width="40" height="40" rx="9" fill="#202c43"/>
+      <path d="M336 508h16v13h-16zM340 505h8M338 521h12" fill="none" stroke="#8db7f7" stroke-width="1.5" stroke-linejoin="round"/>
+      <text x="378" y="513" fill="#e4ebf6" font-size="12" font-weight="650">Ceramic Brake Pads</text>
+      <text x="378" y="530" fill="#74849d" font-size="10">Front wheel replacement set</text>
+      <text x="706" y="519" fill="#b5c3d8" font-size="11">BP-118</text>
+      <text x="839" y="519" fill="#e4ebf6" font-size="11" font-weight="600">$34.00</text>
+      <text x="970" y="519" fill="#b5c3d8" font-size="11">18 units</text>
+      <rect x="1075" y="503" width="68" height="23" rx="11" fill="#103d35"/>
+      <circle cx="1088" cy="514.5" r="3" fill="#39d49b"/>
+      <text x="1096" y="518" fill="#5cdbad" font-size="9" font-weight="650">Active</text>
+      <path d="M1208 509c-4 0-7 3-7 7h14c0-4-3-7-7-7z" fill="none" stroke="#69adff" stroke-width="1.3"/>
+      <path d="M1265 520l9-9M1325 510h12M1327 510v11h8v-11" fill="none" stroke="#ff7885" stroke-width="1.3" stroke-linecap="round"/>
+      <path d="M324 548h1048" stroke="#26354a"/>
+
+      <rect x="324" y="563" width="40" height="40" rx="9" fill="#2a3326"/>
+      <path d="M337 576h14v14h-14zM334 580h3M351 580h3M341 573v3M347 573v3" fill="none" stroke="#a9ca75" stroke-width="1.5" stroke-linejoin="round"/>
+      <text x="378" y="581" fill="#e4ebf6" font-size="12" font-weight="650">Synthetic Engine Oil</text>
+      <text x="378" y="598" fill="#74849d" font-size="10">10W-40 full synthetic, 1L</text>
+      <text x="706" y="587" fill="#b5c3d8" font-size="11">EO-240</text>
+      <text x="839" y="587" fill="#e4ebf6" font-size="11" font-weight="600">$12.90</text>
+      <text x="970" y="587" fill="#f2c268" font-size="11">5 units</text>
+      <rect x="1075" y="571" width="68" height="23" rx="11" fill="#45351d"/>
+      <circle cx="1088" cy="582.5" r="3" fill="#f6bd4b"/>
+      <text x="1096" y="586" fill="#f5c769" font-size="9" font-weight="650">Low stock</text>
+      <path d="M1208 577c-4 0-7 3-7 7h14c0-4-3-7-7-7z" fill="none" stroke="#69adff" stroke-width="1.3"/>
+      <path d="M1265 588l9-9M1325 578h12M1327 578v11h8v-11" fill="none" stroke="#ff7885" stroke-width="1.3" stroke-linecap="round"/>
+      <path d="M324 616h1048" stroke="#26354a"/>
+
+      <rect x="324" y="631" width="40" height="40" rx="9" fill="#2d2839"/>
+      <path d="M334 648c0-7 4-12 10-12s10 5 10 12l-3 10h-14zM337 648h14M339 653h10" fill="none" stroke="#c0a3ed" stroke-width="1.5" stroke-linejoin="round"/>
+      <text x="378" y="649" fill="#e4ebf6" font-size="12" font-weight="650">Touring Helmet</text>
+      <text x="378" y="666" fill="#74849d" font-size="10">Matte graphite, medium</text>
+      <text x="706" y="655" fill="#b5c3d8" font-size="11">HM-405</text>
+      <text x="839" y="655" fill="#e4ebf6" font-size="11" font-weight="600">$89.00</text>
+      <text x="970" y="655" fill="#b5c3d8" font-size="11">23 units</text>
+      <rect x="1075" y="639" width="68" height="23" rx="11" fill="#103d35"/>
+      <circle cx="1088" cy="650.5" r="3" fill="#39d49b"/>
+      <text x="1096" y="654" fill="#5cdbad" font-size="9" font-weight="650">Active</text>
+      <path d="M1208 645c-4 0-7 3-7 7h14c0-4-3-7-7-7z" fill="none" stroke="#69adff" stroke-width="1.3"/>
+      <path d="M1265 656l9-9M1325 646h12M1327 646v11h8v-11" fill="none" stroke="#ff7885" stroke-width="1.3" stroke-linecap="round"/>
+      <path d="M324 684h1048" stroke="#26354a"/>
+      <text x="329" y="716" fill="#71819b" font-size="10">Showing 1-4 of 128 products</text>
+      <rect x="1280" y="697" width="32" height="30" rx="7" fill="#1d3453" stroke="#385577"/>
+      <text x="1296" y="717" text-anchor="middle" fill="#93bfff" font-size="11">1</text>
+      <rect x="1318" y="697" width="32" height="30" rx="7" fill="#17253a"/>
+      <text x="1334" y="717" text-anchor="middle" fill="#94a3b8" font-size="11">2</text>
+    </g>
+  </g>
+
+  <rect x="260" width="1180" height="960" fill="#030916" opacity=".63"/>
+  <rect x="260" width="1180" height="960" fill="#07101d" opacity=".13"/>
+
+  <g filter="url(#panelShadow)" opacity=".93">
+    <rect x="847" y="214" width="488" height="523" rx="18" fill="#121e30" stroke="#33435c"/>
+    <rect x="847" y="214" width="488" height="68" rx="18" fill="#17263b"/>
+    <path d="M847 264h488" stroke="#2b3a51"/>
+    <text x="878" y="252" fill="#eef4fd" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="17" font-weight="700">Edit Product Details</text>
+    <text x="878" y="302" fill="#8da0ba" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="10" font-weight="700" letter-spacing=".8">PRODUCT NAME</text>
+    <rect x="878" y="313" width="425" height="44" rx="8" fill="#0d1727" stroke="#35465f"/>
+    <text x="894" y="340" fill="#dce6f4" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12">Premium Coffee Beans</text>
+    <text x="878" y="386" fill="#8da0ba" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="10" font-weight="700" letter-spacing=".8">SKU</text>
+    <rect x="878" y="397" width="425" height="44" rx="8" fill="#0d1727" stroke="#35465f"/>
+    <text x="894" y="424" fill="#dce6f4" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12">CB-001</text>
+    <text x="878" y="470" fill="#8da0ba" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="10" font-weight="700" letter-spacing=".8">PRICE</text>
+    <rect x="878" y="481" width="425" height="44" rx="8" fill="#0d1727" stroke="#35465f"/>
+    <text x="894" y="508" fill="#dce6f4" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12">$18.50</text>
+    <text x="878" y="554" fill="#8da0ba" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="10" font-weight="700" letter-spacing=".8">DESCRIPTION</text>
+    <rect x="878" y="565" width="425" height="78" rx="8" fill="#0d1727" stroke="#35465f"/>
+    <text x="894" y="592" fill="#dce6f4" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12">Organic dark roast coffee beans</text>
+    <rect x="1105" y="669" width="91" height="38" rx="8" fill="#1b2b42" stroke="#344760"/>
+    <text x="1150" y="693" text-anchor="middle" fill="#bdc9d9" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="11" font-weight="600">Cancel</text>
+    <rect x="1206" y="669" width="97" height="38" rx="8" fill="url(#blueButton)"/>
+    <text x="1254" y="693" text-anchor="middle" fill="#fff" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="11" font-weight="650">Save changes</text>
+  </g>
+
+  <g filter="url(#panelShadow)">
+    <rect x="467" y="244" width="626" height="478" rx="19" fill="#172337" stroke="#52647f" stroke-width="1.2"/>
+    <rect x="467" y="244" width="626" height="76" rx="19" fill="#1c2b42"/>
+    <path d="M467 301h626" stroke="#34465f"/>
+    <circle cx="507" cy="282" r="20" fill="#1c4268"/>
+    <path d="M495 283c0-7 5-12 12-12s12 5 12 12-5 12-12 12h-8l-3 3v-8" fill="none" stroke="#7ab8ff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="507" cy="283" r="4" fill="none" stroke="#7ab8ff" stroke-width="1.6"/>
+    <text x="541" y="278" fill="#f3f7ff" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="18" font-weight="720">View Product Details</text>
+    <text x="541" y="297" fill="#8ea1bd" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="10">PRODUCT PROFILE · READ ONLY</text>
+    <rect x="1008" y="263" width="54" height="25" rx="12" fill="#102f46" stroke="#285176"/>
+    <circle cx="1021" cy="275.5" r="3" fill="#5db5ff"/>
+    <text x="1029" y="279" fill="#89c8ff" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="9" font-weight="700">VIEW</text>
+
+    <rect x="500" y="340" width="560" height="89" rx="12" fill="#111d2e" stroke="#2b3b53"/>
+    <rect x="516" y="355" width="58" height="58" rx="11" fill="#3a3026"/>
+    <path d="M536 365h18l5 7v26h-28v-26z" fill="#b88b55"/>
+    <path d="M532 374h26M536 385h18M538 391h14" stroke="#f4d1a1" stroke-width="1.5" stroke-linecap="round"/>
+    <text x="592" y="369" fill="#8496b0" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="9" font-weight="700" letter-spacing=".8">PRODUCT NAME</text>
+    <text x="592" y="393" fill="#f1f5fb" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="15" font-weight="700">Premium Coffee Beans</text>
+    <text x="592" y="411" fill="#91a2ba" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="10">Whole bean · Dark roast · 12 oz</text>
+
+    <text x="500" y="461" fill="#7f91ac" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="9" font-weight="700" letter-spacing=".9">SKU</text>
+    <text x="500" y="486" fill="#e6edf7" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="13" font-weight="600">CB-001</text>
+    <text x="696" y="461" fill="#7f91ac" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="9" font-weight="700" letter-spacing=".9">PRICE</text>
+    <text x="696" y="486" fill="#e6edf7" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="13" font-weight="600">$18.50</text>
+    <text x="885" y="461" fill="#7f91ac" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="9" font-weight="700" letter-spacing=".9">AVAILABILITY</text>
+    <rect x="885" y="471" width="73" height="22" rx="11" fill="#103d35"/>
+    <circle cx="899" cy="482" r="3" fill="#39d49b"/>
+    <text x="907" y="486" fill="#5cdbad" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="9" font-weight="650">In stock</text>
+
+    <text x="500" y="531" fill="#7f91ac" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="9" font-weight="700" letter-spacing=".9">DESCRIPTION</text>
+    <rect x="500" y="543" width="560" height="72" rx="10" fill="#111d2e" stroke="#2b3b53"/>
+    <text x="518" y="570" fill="#d5deeb" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12">Organic dark roast coffee beans, carefully sourced</text>
+    <text x="518" y="590" fill="#d5deeb" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12">and freshly roasted for a rich, smooth finish.</text>
+
+    <rect x="500" y="636" width="560" height="1" fill="#2e3c52"/>
+    <rect x="939" y="655" width="121" height="40" rx="9" fill="#1d2c42" stroke="#3b4c64"/>
+    <text x="999" y="680" text-anchor="middle" fill="#d1dbea" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="11" font-weight="650">Close</text>
+  </g>
+
+  <g filter="url(#toastShadow)">
+    <rect x="932" y="784" width="472" height="128" rx="15" fill="url(#greenGlow)" stroke="#34b884" stroke-width="1"/>
+    <circle cx="964" cy="819" r="16" fill="#0c523d"/>
+    <path d="M956 819l5 5 11-11" fill="none" stroke="#9af0c9" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="991" y="815" fill="#f2fff8" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="13" font-weight="700">Item "Coffee Beans" has been deleted.</text>
+    <text x="991" y="836" fill="#c0ead8" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="10">Delete action will be final if Undo is not selected.</text>
+    <rect x="991" y="854" width="83" height="35" rx="8" fill="#effff6"/>
+    <path d="M1009 871a9 9 0 1 1 3 7" fill="none" stroke="#13754f" stroke-width="1.7" stroke-linecap="round"/>
+    <path d="M1009 875v4h4" fill="none" stroke="#13754f" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="1021" y="876" fill="#126c4a" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="11" font-weight="750">Undo</text>
+    <text x="1375" y="813" text-anchor="end" fill="#b6e8d1" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="10">now</text>
+    <rect x="932" y="906" width="472" height="3" rx="1.5" fill="#a8f3d0" opacity=".8"/>
+  </g>
+</svg>

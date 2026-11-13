@@ -8,6 +8,7 @@
                 <div
                     class="product-card"
                     data-name="{{ product.name|lower }}"
+                    data-product-id="{{ product.id }}"
                     style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; padding: 25px; display: flex; flex-direction: column; justify-content: space-between;"
                 >
                     <div class="product-image" style="height: 160px; display: flex; align-items: center; justify-content: center; margin-bottom: 15px;">
@@ -24,48 +25,36 @@
                         ₱{{ product.price|number_format(2) }}
                     </div>
 
-                    <div class="product-stock" style="font-size: 0.85rem; margin: 5px 0 15px 0; color: {{ product.stock > 0 ? '#2e7d32' : '#c62828' }};">
-                        Stock: <strong>{{ product.stock }}</strong> available
+                    <div class="product-stock" data-stock-display style="font-size: 0.85rem; margin: 5px 0 15px 0; color: {{ product.stock > 0 ? '#2e7d32' : '#c62828' }};">
+                        {% if product.stock > 0 %}Stock: <strong>{{ product.stock }}</strong> available{% else %}Out of Stock{% endif %}
                     </div>
 
                     <div class="product-card-actions" style="display: flex; gap: 10px;">
-                        {% if product.stock > 0 %}
-                            <button
-                                type="button"
-                                class="btn btn-outline btn-cart-add"
-                                title="Add to Cart"
-                                onclick='openCartModal({{ product.id }}, {{ product.name|json_encode|e('html_attr') }}, {{ product.price|json_encode|e('html_attr') }}, {{ product.stock }}, {{ csrf_token('cart_add_' ~ product.id)|json_encode|e('html_attr') }})'
-                                style="flex: 0 0 50px; width: 50px;"
-                            >
-                                <i class="fa-solid fa-cart-plus"></i>
-                            </button>
-                            <button
-                                type="button"
-                                class="btn btn-primary btn-block"
-                                onclick='openBuyModal({{ product.id }}, {{ product.name|json_encode|e('html_attr') }}, {{ product.price|json_encode|e('html_attr') }}, {{ product.stock }}, {{ csrf_token('buy_now_' ~ product.id)|json_encode|e('html_attr') }})'
-                                style="flex: 1;"
-                            >
-                                Buy Now
-                            </button>
-                        {% else %}
-                            <button
-                                type="button"
-                                class="btn btn-outline"
-                                disabled
-                                title="Out of Stock"
-                                style="flex: 0 0 50px; width: 50px; opacity: 0.5; cursor: not-allowed;"
-                            >
-                                <i class="fa-solid fa-cart-plus"></i>
-                            </button>
-                            <button
-                                type="button"
-                                class="btn btn-secondary btn-block"
-                                disabled
-                                style="flex: 1; background: #ccc; cursor: not-allowed; border-color: #ccc;"
-                            >
-                                Out of Stock
-                            </button>
-                        {% endif %}
+                        <button
+                            type="button"
+                            class="btn btn-outline btn-cart-add js-add-to-cart"
+                            title="Add to Cart"
+                            data-product-id="{{ product.id }}"
+                            data-product-name="{{ product.name|e('html_attr') }}"
+                            data-product-price="{{ product.price }}"
+                            data-stock-limit="{{ product.stock }}"
+                            data-csrf-token="{{ csrf_token('cart_add_' ~ product.id) }}"
+                            style="flex: 0 0 50px; width: 50px; {{ product.stock <= 0 ? 'opacity: 0.5; cursor: not-allowed;' : '' }}"
+                            {{ product.stock <= 0 ? 'disabled' : '' }}
+                        >
+                            <i class="fa-solid fa-cart-plus"></i>
+                        </button>
+                        <button
+                            type="button"
+                            class="btn {{ product.stock > 0 ? 'btn-primary' : 'btn-secondary' }} btn-block js-buy-now"
+                            data-product-id="{{ product.id }}"
+                            data-product-name="{{ product.name|e('html_attr') }}"
+                            data-product-price="{{ product.price }}"
+                            data-stock-limit="{{ product.stock }}"
+                            data-csrf-token="{{ csrf_token('buy_now_' ~ product.id) }}"
+                            style="flex: 1; {{ product.stock <= 0 ? 'background: #ccc; cursor: not-allowed; border-color: #ccc;' : '' }}"
+                            {{ product.stock <= 0 ? 'disabled' : '' }}
+                        >{{ product.stock > 0 ? 'Buy Now' : 'Out of Stock' }}</button>
                     </div>
                 </div>
             {% endfor %}

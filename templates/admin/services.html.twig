@@ -2,11 +2,14 @@
 {% block site_header %}{% include 'admin/_sidebar.html.twig' %}{% endblock %}
 {% block title %}Services | Admin{% endblock %}
 {% block body %}
-<main>
-    <h1>Services</h1>
-    {% for message in app.flashes('success') %}<p role="status">{{ message }}</p>{% endfor %}
-    {% for message in app.flashes('error') %}<p role="alert">{{ message }}</p>{% endfor %}
-    <p><a href="{{ path('admin_service_new') }}" id="serviceCreate" data-create-url="{{ path('admin_service_new') }}">Create service</a></p>
+<main class="admin-main">
+    {% include 'admin/_header.html.twig' with {
+        title: 'Services Management',
+        action: {id: 'serviceCreate', url: path('admin_service_new'), label: 'Add Service'}
+    } %}
+    <div class="admin-content-body">
+    {% for message in app.flashes('success') %}<p role="status" data-auto-dismiss>{{ message }}</p>{% endfor %}
+    {% for message in app.flashes('error') %}<p role="alert" data-auto-dismiss>{{ message }}</p>{% endfor %}
     <div class="table-filters">
         <label for="serviceSearch">Search services</label>
         <input id="serviceSearch" type="search" placeholder="Search by ID, name, or description..." autocomplete="off">
@@ -17,6 +20,7 @@
             <option value="0">Inactive</option>
         </select>
     </div>
+    <div class="table-responsive">
     <table class="admin-table" id="serviceTable">
         <thead><tr><th>ID</th><th>Image</th><th>Service name</th><th>Description</th><th>Price</th><th>Status</th><th>Actions</th></tr></thead>
         <tbody>
@@ -33,13 +37,13 @@
                 <td>{{ service.name }}</td>
                 <td>{{ service.description }}</td>
                 <td>₱{{ service.price|number_format(2) }}</td>
-                <td>{{ service.active ? 'Active' : 'Inactive' }}</td>
-                <td>
-                    <button type="button" class="service-view" data-id="{{ service.id }}" data-name="{{ service.name }}" data-description="{{ service.description }}" data-price="{{ service.price }}" data-status="{{ service.active ? 'Active' : 'Inactive' }}" data-image="{{ service.image ? asset(service.image) : '' }}">View</button>
-                    <a href="{{ path('admin_service_edit', {id: service.id}) }}" class="service-edit" data-action="{{ path('admin_service_edit', {id: service.id}) }}" data-name="{{ service.name }}" data-description="{{ service.description }}" data-price="{{ service.price }}" data-active="{{ service.active ? '1' : '0' }}" data-featured="{{ service.featured ? '1' : '0' }}">Edit</a>
-                    <form method="post" action="{{ path('admin_service_delete', {id: service.id}) }}">
+                <td><span class="badge {{ service.active ? 'badge-success' : 'badge-danger' }}">{{ service.active ? 'Active' : 'Inactive' }}</span></td>
+                <td class="table-row-actions">
+                    <button type="button" class="btn-sm btn-secondary service-view" data-id="{{ service.id }}" data-name="{{ service.name }}" data-description="{{ service.description }}" data-price="{{ service.price }}" data-status="{{ service.active ? 'Active' : 'Inactive' }}" data-image="{{ service.image ? asset(service.image) : '' }}"><i class="fas fa-eye" aria-hidden="true"></i> View</button>
+                    <a href="{{ path('admin_service_edit', {id: service.id}) }}" class="btn-sm btn-info service-edit" data-action="{{ path('admin_service_edit', {id: service.id}) }}" data-name="{{ service.name }}" data-description="{{ service.description }}" data-price="{{ service.price }}" data-active="{{ service.active ? '1' : '0' }}" data-featured="{{ service.featured ? '1' : '0' }}"><i class="fas fa-edit" aria-hidden="true"></i> Edit</a>
+                    <form method="post" action="{{ path('admin_service_delete', {id: service.id}) }}" data-deferred-action="delete" data-confirm-message="Delete or deactivate this service? The change will be applied after the 3-second Undo window.">
                         <input type="hidden" name="_token" value="{{ csrf_token('admin_service_delete_' ~ service.id) }}">
-                        <button type="submit">Delete / deactivate</button>
+                        <button type="submit" class="btn-sm btn-danger"><i class="fas fa-trash" aria-hidden="true"></i> Delete</button>
                     </form>
                 </td>
             </tr>
@@ -48,25 +52,29 @@
         {% endfor %}
         </tbody>
     </table>
-    <dialog id="serviceDetails" aria-labelledby="serviceDetailsTitle">
-        <h2 id="serviceDetailsTitle">Service details</h2>
+    </div>
+    <dialog id="serviceDetails" class="modal-content" aria-labelledby="serviceDetailsTitle">
+        <div class="modal-header"><h3 id="serviceDetailsTitle">Service details</h3></div>
         <img data-service-image alt="" width="140" height="140" style="object-fit: contain;">
         <p><strong>ID:</strong> <span data-service-id></span></p>
         <p><strong>Name:</strong> <span data-service-name></span></p>
         <p><strong>Description:</strong> <span data-service-description></span></p>
         <p><strong>Price:</strong> <span data-service-price></span></p>
         <p><strong>Status:</strong> <span data-service-status></span></p>
-        <button type="button" data-close-service-details>Close</button>
+        <div class="modal-footer"><button type="button" class="btn-secondary" data-close-service-details>Close</button></div>
     </dialog>
-    <dialog id="serviceFormDialog" aria-labelledby="serviceFormTitle">
-        <h2 id="serviceFormTitle">Create service</h2>
+    <dialog id="serviceFormDialog" class="modal-content" aria-labelledby="serviceFormTitle">
+        <div class="modal-header"><h3 id="serviceFormTitle">Create service</h3></div>
         <p>When editing, leave the image empty to keep the current image.</p>
         {{ form_start(serviceForm, {action: path('admin_service_new'), attr: {id: 'serviceAdminForm'}}) }}
             {{ form_widget(serviceForm) }}
-            <button type="submit">Save service</button>
-            <button type="button" data-close-service-form>Cancel</button>
+            <div class="modal-footer">
+                <button type="submit" class="btn-primary">Save service</button>
+                <button type="button" class="btn-secondary" data-close-service-form>Cancel</button>
+            </div>
         {{ form_end(serviceForm) }}
     </dialog>
+</div>
 </main>
 <script>
 (() => {

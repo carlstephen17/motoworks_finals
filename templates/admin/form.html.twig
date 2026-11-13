@@ -4,12 +4,14 @@
 {% block title %}{{ title }} | Bencalo MotoWorks{% endblock %}
 
 {% block body %}
-    <main>
-        <h1>{{ title }}</h1>
-        {% for message in app.flashes('error') %}<p role="alert">{{ message }}</p>{% endfor %}
+    <main class="admin-main">
+        {% include 'admin/_header.html.twig' with {title: title} %}
+        <div class="admin-content-body">
+        {% for message in app.flashes('error') %}<p role="alert" data-auto-dismiss>{{ message }}</p>{% endfor %}
         {{ form_start(form) }}
             {{ form_widget(form) }}
             <button type="submit">Save</button>
         {{ form_end(form) }}
+        </div>
     </main>
 {% endblock %}

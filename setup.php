@@ -58,7 +58,7 @@ try {
                 `orderDeliveryAddress` TEXT DEFAULT NULL,
                 `orderPaymentMethod` VARCHAR(50) DEFAULT NULL,
                 `orderPaymentReference` VARCHAR(32) DEFAULT NULL,
-                `orderPaymentStatus` VARCHAR(32) NOT NULL DEFAULT 'Unverified',
+                `orderPaymentStatus` VARCHAR(32) NOT NULL DEFAULT 'Pending',
                 `orderStatus` VARCHAR(50) NOT NULL DEFAULT 'Pending',
                 `orderCancellationReason` TEXT DEFAULT NULL,
                 `orderCreatedByStaffId` INT(11) DEFAULT NULL,
@@ -126,7 +126,7 @@ try {
                  orderPaymentReference, orderPaymentStatus, orderStatus, orderCreatedAt)
             SELECT MIN(o.orderId), o.userId, MAX(u.userAddress), MAX(o.orderPaymentMethod),
                    o.orderPaymentReference,
-                   CASE WHEN MAX(o.orderPaymentMethod) = 'Cash on Delivery' THEN 'Due on delivery' ELSE 'Unverified' END,
+                   CASE WHEN MAX(o.orderPaymentMethod) = 'Cash on Delivery' THEN 'Due on delivery' ELSE 'Pending' END,
                    MAX(o.orderStatus), MIN(o.orderCreatedAt)
             FROM `order` o
             INNER JOIN `user` u ON u.userId = o.userId
@@ -144,7 +144,7 @@ try {
                 (orderGroupId, userId, orderDeliveryAddress, orderPaymentMethod,
                  orderPaymentReference, orderPaymentStatus, orderStatus, orderCreatedAt)
             SELECT o.orderId, o.userId, u.userAddress, o.orderPaymentMethod, NULL,
-                   CASE WHEN o.orderPaymentMethod = 'Cash on Delivery' THEN 'Due on delivery' ELSE 'Unverified' END,
+                   CASE WHEN o.orderPaymentMethod = 'Cash on Delivery' THEN 'Due on delivery' ELSE 'Pending' END,
                    o.orderStatus, o.orderCreatedAt
             FROM `order` o
             INNER JOIN `user` u ON u.userId = o.userId
@@ -181,6 +181,7 @@ try {
             SET o.orderStatus = co.orderStatus
             WHERE o.orderStatus <> co.orderStatus
         ");
+        $pdo->exec("UPDATE customer_order SET orderPaymentStatus = 'Pending' WHERE orderPaymentStatus = 'Unverified'");
     }
 
     $bookingTable = $pdo->query("SHOW TABLES LIKE 'service_booking'")->fetchColumn();

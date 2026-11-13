@@ -26,6 +26,7 @@ use App\Repository\ServiceRecordRepository;
 use App\Repository\ServiceRepository;
 use App\Repository\UserRepository;
 use App\Service\OrderStatusManager;
+use App\Service\PaymentStatusManager;
 use Doctrine\DBAL\LockMode;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -39,28 +40,43 @@ use Symfony\Component\Form\FormBuilderInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Security\Http\Attribute\IsGranted;
 use Symfony\Component\Validator\Constraints\Length;
 use Symfony\Component\Validator\Constraints\Count;
 use Symfony\Component\Validator\Constraints\NotBlank;
 use Symfony\Component\Validator\Constraints\Regex;
 
 #[Route('/staff')]
+#[IsGranted('ROLE_STAFF')]
 class StaffController extends AbstractController
 {
     #[Route('', name: 'staff_dashboard', methods: ['GET'])]
     public function dashboard(
+        ProductRepository $products,
         ServiceBookingRepository $bookings,
         CustomerOrderRepository $orders,
         PromoClaimRepository $claims,
         ServiceRecordRepository $records,
     ): Response {
+        $productCount = $products->count([]);
+        $appointmentCount = $bookings->count([]);
+        $orderCount = $orders->count([]);
+        $claimCount = $claims->count([]);
+        $recordCount = $records->count([]);
+
         return $this->render('staff/dashboard.html.twig', [
             'counts' => [
-                'appointments' => $bookings->count([]),
-                'orders' => $orders->count([]),
-                'promoClaims' => $claims->count([]),
-                'serviceRecords' => $records->count([]),
+                'products' => $productCount,
+                'appointments' => $appointmentCount,
+                'orders' => $orderCount,
+                'promoClaims' => $claimCount,
+                'serviceRecords' => $recordCount,
+                'totalRecords' => $productCount + $appointmentCount + $orderCount + $claimCount + $recordCount,
             ],
+            'recentAppointments' => $bookings->findRecentForAdmin(),
+            'recentOrders' => $orders->findRecentForAdmin(),
+            'recentPromoClaims' => $claims->findRecentForAdmin(),
+            'recentServiceRecords' => $records->findBy([], ['id' => 'DESC'], 5),
         ]);
     }
 
@@ -153,7 +169,13 @@ class StaffController extends AbstractController
     {
         $this->requireStaff();
         $booking = $bookings->find($id) ?? throw $this->createNotFoundException('Appointment not found.');
+        $this->assertAppointmentOwnership($booking);
         $this->assertCsrf($request, 'staff_appointment_update_'.$id);
+        if ($booking->getStatus() === 'Cancellation Pending') {
+            $this->addFlash('error', 'This appointment is awaiting the customer cancellation Undo period.');
+
+            return $this->redirectToRoute('staff_appointments');
+        }
         if ($booking->getStatus() === 'Completed') {
             $this->addFlash('error', 'Completed appointments cannot be edited.');
 
@@ -182,6 +204,12 @@ class StaffController extends AbstractController
     {
         $this->requireStaff();
         $booking = $bookings->find($id) ?? throw $this->createNotFoundException('Appointment not found.');
+        $this->assertAppointmentOwnership($booking);
+        if ($booking->getStatus() === 'Cancellation Pending') {
+            $this->addFlash('error', 'This appointment is awaiting the customer cancellation Undo period.');
+
+            return $this->redirectToRoute('staff_appointments');
+        }
         if ($booking->getStatus() === 'Completed') {
             $this->addFlash('error', 'Completed appointments cannot be edited.');
 
@@ -211,7 +239,13 @@ class StaffController extends AbstractController
     {
         $this->requireStaff();
         $booking = $bookings->find($id) ?? throw $this->createNotFoundException('Appointment not found.');
+        $this->assertAppointmentOwnership($booking);
         $this->assertCsrf($request, 'staff_appointment_delete_'.$id);
+        if ($booking->getStatus() === 'Cancellation Pending') {
+            $this->addFlash('error', 'This appointment is awaiting the customer cancellation Undo period.');
+
+            return $this->redirectToRoute('staff_appointments');
+        }
         $entityManager->remove($booking);
         $entityManager->flush();
         $this->addFlash('success', 'Appointment deleted.');
@@ -227,7 +261,7 @@ class StaffController extends AbstractController
         $status = $request->query->get('status');
         $status = is_string($status) && in_array($status, ['Pending', 'Cancelled', 'Completed'], true) ? $status : '';
         $paymentStatus = $request->query->get('payment_status');
-        $paymentStatus = is_string($paymentStatus) && in_array($paymentStatus, ['Due on delivery', 'Unverified'], true) ? $paymentStatus : '';
+        $paymentStatus = is_string($paymentStatus) && in_array($paymentStatus, ['Due on delivery', 'Pending', 'Paid'], true) ? $paymentStatus : '';
         $dateFrom = $this->parseDateFilter($request->query->get('date_from'));
         $dateTo = $this->parseDateFilter($request->query->get('date_to'));
         $page = filter_var($request->query->get('page', 1), FILTER_VALIDATE_INT);
@@ -243,6 +277,7 @@ class StaffController extends AbstractController
             'orders' => $groups,
             'itemsByOrder' => $orders->findItemsForGroups($groupIds),
             'counts' => $orders->getStatusCounts(),
+            'paymentVerifyRoute' => 'staff_order_payment_verify',
             'filters' => [
                 'search' => $search,
                 'status' => $status,
@@ -304,12 +339,13 @@ class StaffController extends AbstractController
                         }
                         $lockedProducts[$productId] = $product;
                     }
-                    $reference = 'MWO-'.(new \DateTimeImmutable())->format('Ymd').'-'.strtoupper(bin2hex(random_bytes(4)));
                     $paymentMethod = 'Cash on Delivery';
-                    $orderGroup = new CustomerOrder($customer, $deliveryAddress, $paymentMethod, $reference);
+                    $orderGroup = new CustomerOrder($customer, $deliveryAddress, $paymentMethod, 'PENDING');
                     $orderGroup->setCreatedByStaff($this->requireStaff());
                     $entityManager->persist($orderGroup);
                     $entityManager->flush();
+                    $reference = 'MWO-'.(new \DateTimeImmutable())->format('Ymd').'-'.$orderGroup->getId();
+                    $orderGroup->setPaymentReference($reference);
                     foreach ($requestedItems as $productId => $quantity) {
                         $product = $lockedProducts[$productId];
                         $unitPrice = $product->getPrice();
@@ -349,6 +385,7 @@ class StaffController extends AbstractController
     {
         $this->requireStaff();
         $order = $orders->find($id) ?? throw $this->createNotFoundException('Order not found.');
+        $this->assertOrderOwnership($order);
         $this->assertCsrf($request, 'staff_order_status_'.$id);
         $status = (string) $request->request->get('status');
         if (!in_array($status, ['Pending', 'Processing', 'Shipped', 'Completed', 'Cancelled'], true)) {
@@ -364,11 +401,34 @@ class StaffController extends AbstractController
         return $this->redirectToRoute('staff_orders');
     }
 
+    #[Route('/orders/{id}/payment/verify', name: 'staff_order_payment_verify', requirements: ['id' => '\d+'], methods: ['POST'])]
+    public function orderPaymentVerify(
+        int $id,
+        Request $request,
+        CustomerOrderRepository $orders,
+        PaymentStatusManager $paymentStatusManager,
+    ): Response {
+        $staff = $this->requireStaff();
+        $order = $orders->find($id) ?? throw $this->createNotFoundException('Order not found.');
+        $this->assertOrderOwnership($order);
+        $this->assertCsrf($request, 'staff_order_payment_verify_'.$id);
+
+        try {
+            $paymentStatusManager->verify($order, $staff);
+            $this->addFlash('success', 'Payment verified.');
+        } catch (\DomainException $exception) {
+            $this->addFlash('error', $exception->getMessage());
+        }
+
+        return $this->redirectToRoute('staff_orders');
+    }
+
     #[Route('/orders/{id}/delete', name: 'staff_order_delete', requirements: ['id' => '\d+'], methods: ['POST'])]
     public function orderDelete(int $id, Request $request, CustomerOrderRepository $orders, OrderStatusManager $orderStatusManager): Response
     {
         $this->requireStaff();
         $order = $orders->find($id) ?? throw $this->createNotFoundException('Order not found.');
+        $this->assertOrderOwnership($order);
         $this->assertCsrf($request, 'staff_order_delete_'.$id);
         try {
             $orderStatusManager->updateStatus($order, 'Cancelled', (string) $request->request->get('reason', ''));
@@ -423,6 +483,7 @@ class StaffController extends AbstractController
                     $date,
                     $time,
                 );
+                $claim->setPromo($promo);
                 $claim->setCreatedByStaff($this->requireStaff());
                 $entityManager->persist($claim);
                 $entityManager->flush();
@@ -440,7 +501,13 @@ class StaffController extends AbstractController
     {
         $this->requireStaff();
         $claim = $claims->find($id) ?? throw $this->createNotFoundException('Promotion claim not found.');
+        $this->assertPromoClaimOwnership($claim);
         $this->assertCsrf($request, 'staff_promo_claim_'.$id);
+        if ($claim->getStatus() === 'Cancellation Pending') {
+            $this->addFlash('error', 'This promotion claim is awaiting the customer cancellation Undo period.');
+
+            return $this->redirectToRoute('staff_promo_history');
+        }
         if ($claim->getStatus() === 'Completed') {
             $this->addFlash('error', 'Completed promotion claims cannot be edited.');
 
@@ -462,6 +529,12 @@ class StaffController extends AbstractController
     {
         $this->requireStaff();
         $claim = $claims->find($id) ?? throw $this->createNotFoundException('Promotion claim not found.');
+        $this->assertPromoClaimOwnership($claim);
+        if ($claim->getStatus() === 'Cancellation Pending') {
+            $this->addFlash('error', 'This promotion claim is awaiting the customer cancellation Undo period.');
+
+            return $this->redirectToRoute('staff_promo_history');
+        }
         if ($claim->getStatus() === 'Completed') {
             $this->addFlash('error', 'Completed promotion claims cannot be edited.');
 
@@ -478,6 +551,7 @@ class StaffController extends AbstractController
             if (!$promo || (!in_array($claim->getSelectedOption(), $promo->getItemOptions(), true) && !$unchangedHistoricalOption)) {
                 $this->addFlash('error', 'The selected promotion option is unavailable.');
             } else {
+                $claim->setPromo($promo);
                 $entityManager->flush();
                 $this->addFlash('success', 'Promotion claim updated.');
 
@@ -493,7 +567,13 @@ class StaffController extends AbstractController
     {
         $this->requireStaff();
         $claim = $claims->find($id) ?? throw $this->createNotFoundException('Promotion claim not found.');
+        $this->assertPromoClaimOwnership($claim);
         $this->assertCsrf($request, 'staff_promo_claim_'.$id);
+        if ($claim->getStatus() === 'Cancellation Pending') {
+            $this->addFlash('error', 'This promotion claim is awaiting the customer cancellation Undo period.');
+
+            return $this->redirectToRoute('staff_promo_history');
+        }
         $entityManager->remove($claim);
         $entityManager->flush();
         $this->addFlash('success', 'Promotion claim deleted.');
@@ -629,11 +709,47 @@ class StaffController extends AbstractController
     {
         $record = $records->find($id) ?? throw $this->createNotFoundException('Service record not found.');
         $staff = $this->requireStaff();
-        if (!$this->isGranted('ROLE_ADMIN') && $record->getCreatedByStaff() !== $staff) {
-            throw $this->createNotFoundException('Service record not found.');
+        if (!$this->isGranted('ROLE_ADMIN') && $record->getCreatedByStaff()->getId() !== $staff->getId()) {
+            throw $this->createAccessDeniedException('You are not authorized to modify service records created by another staff member.');
         }
 
         return $record;
+    }
+
+    private function assertAppointmentOwnership(ServiceBooking $booking): void
+    {
+        if ($this->isGranted('ROLE_ADMIN')) {
+            return;
+        }
+        $staff = $this->requireStaff();
+        $creator = $booking->getCreatedByStaff();
+        if ($creator !== null && $creator->getId() !== $staff->getId()) {
+            throw $this->createAccessDeniedException('You are not authorized to modify or delete appointments created by another staff member.');
+        }
+    }
+
+    private function assertOrderOwnership(CustomerOrder $order): void
+    {
+        if ($this->isGranted('ROLE_ADMIN')) {
+            return;
+        }
+        $staff = $this->requireStaff();
+        $creator = $order->getCreatedByStaff();
+        if ($creator !== null && $creator->getId() !== $staff->getId()) {
+            throw $this->createAccessDeniedException('You are not authorized to modify or delete orders created by another staff member.');
+        }
+    }
+
+    private function assertPromoClaimOwnership(PromoClaim $claim): void
+    {
+        if ($this->isGranted('ROLE_ADMIN')) {
+            return;
+        }
+        $staff = $this->requireStaff();
+        $creator = $claim->getCreatedByStaff();
+        if ($creator !== null && $creator->getId() !== $staff->getId()) {
+            throw $this->createAccessDeniedException('You are not authorized to modify or delete promotion claims created by another staff member.');
+        }
     }
 
     private function assertCsrf(Request $request, string $tokenId): void

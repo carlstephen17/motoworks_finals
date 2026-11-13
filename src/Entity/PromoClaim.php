@@ -27,6 +27,10 @@ class PromoClaim
     #[ORM\Column(name: 'claimBundleSlug', length: 100)]
     private string $bundleSlug;
 
+    #[ORM\ManyToOne(targetEntity: Promo::class)]
+    #[ORM\JoinColumn(name: 'claimPromoId', referencedColumnName: 'promoId', nullable: true, onDelete: 'SET NULL')]
+    private ?Promo $promo = null;
+
     #[ORM\Column(name: 'claimSelectedOption', length: 255)]
     private string $selectedOption;
 
@@ -90,6 +94,19 @@ class PromoClaim
         return $this->bundleSlug;
     }
 
+    public function getPromo(): ?Promo
+    {
+        return $this->promo;
+    }
+
+    public function setPromo(?Promo $promo): void
+    {
+        $this->promo = $promo;
+        if ($promo !== null) {
+            $this->bundleSlug = $promo->getSlug();
+        }
+    }
+
     public function setBundleSlug(string $bundleSlug): void
     {
         $this->bundleSlug = $bundleSlug;
@@ -110,6 +127,11 @@ class PromoClaim
         return $this->appointmentTime;
     }
 
+    public function getCreatedAt(): \DateTimeImmutable
+    {
+        return $this->createdAt;
+    }
+
     public function getStatus(): ?string
     {
         return $this->status;
@@ -123,6 +145,11 @@ class PromoClaim
     public function setCreatedByStaff(User $staff): void
     {
         $this->createdByStaff = $staff;
+    }
+
+    public function getCreatedByStaff(): ?User
+    {
+        return $this->createdByStaff;
     }
 
     public function setSelectedOption(string $selectedOption): void

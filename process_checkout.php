@@ -373,7 +373,7 @@ try {
         $address,
         $paymentMethod,
         $paymentReference,
-        $paymentMethod === 'Cash on Delivery' ? 'Due on delivery' : 'Unverified',
+        $paymentMethod === 'Cash on Delivery' ? 'Due on delivery' : 'Pending',
     ]);
     $orderGroupId = (int) $pdo->lastInsertId();
 

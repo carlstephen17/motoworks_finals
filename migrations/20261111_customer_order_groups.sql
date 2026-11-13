@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS `customer_order` (
   `orderDeliveryAddress` TEXT DEFAULT NULL,
   `orderPaymentMethod` VARCHAR(50) DEFAULT NULL,
   `orderPaymentReference` VARCHAR(32) DEFAULT NULL,
-  `orderPaymentStatus` VARCHAR(32) NOT NULL DEFAULT 'Unverified',
+  `orderPaymentStatus` VARCHAR(32) NOT NULL DEFAULT 'Pending',
   `orderStatus` VARCHAR(50) NOT NULL DEFAULT 'Pending',
   `orderCancellationReason` TEXT DEFAULT NULL,
   `orderCreatedAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -27,7 +27,7 @@ INSERT INTO `customer_order`
    orderPaymentReference, orderPaymentStatus, orderStatus, orderCreatedAt)
 SELECT MIN(o.orderId), o.userId, MAX(u.userAddress), MAX(o.orderPaymentMethod),
        o.orderPaymentReference,
-       CASE WHEN MAX(o.orderPaymentMethod) = 'Cash on Delivery' THEN 'Due on delivery' ELSE 'Unverified' END,
+       CASE WHEN MAX(o.orderPaymentMethod) = 'Cash on Delivery' THEN 'Due on delivery' ELSE 'Pending' END,
        MAX(o.orderStatus), MIN(o.orderCreatedAt)
 FROM `order` o
 INNER JOIN `user` u ON u.userId = o.userId
@@ -38,7 +38,7 @@ INSERT INTO `customer_order`
   (orderGroupId, userId, orderDeliveryAddress, orderPaymentMethod,
    orderPaymentReference, orderPaymentStatus, orderStatus, orderCreatedAt)
 SELECT o.orderId, o.userId, u.userAddress, o.orderPaymentMethod, NULL,
-       CASE WHEN o.orderPaymentMethod = 'Cash on Delivery' THEN 'Due on delivery' ELSE 'Unverified' END,
+       CASE WHEN o.orderPaymentMethod = 'Cash on Delivery' THEN 'Due on delivery' ELSE 'Pending' END,
        o.orderStatus, o.orderCreatedAt
 FROM `order` o
 INNER JOIN `user` u ON u.userId = o.userId

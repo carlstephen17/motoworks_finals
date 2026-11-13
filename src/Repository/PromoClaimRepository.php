@@ -21,6 +21,8 @@ class PromoClaimRepository extends ServiceEntityRepository
     public function findForUser(User $user): array
     {
         return $this->createQueryBuilder('claim')
+            ->leftJoin('claim.promo', 'promo')
+            ->addSelect('promo')
             ->andWhere('claim.user = :user')
             ->setParameter('user', $user)
             ->orderBy('claim.appointmentDate', 'ASC')
@@ -31,11 +33,28 @@ class PromoClaimRepository extends ServiceEntityRepository
     }
 
     /** @return list<PromoClaim> */
+    public function findRecentForAdmin(int $limit = 5): array
+    {
+        return $this->createQueryBuilder('claim')
+            ->leftJoin('claim.user', 'user')
+            ->addSelect('user')
+            ->leftJoin('claim.promo', 'promo')
+            ->addSelect('promo')
+            ->orderBy('claim.createdAt', 'DESC')
+            ->addOrderBy('claim.id', 'DESC')
+            ->setMaxResults(max(1, $limit))
+            ->getQuery()
+            ->getResult();
+    }
+
+    /** @return list<PromoClaim> */
     public function findForStaff(string $search, string $status): array
     {
         $query = $this->createQueryBuilder('claim')
             ->leftJoin('claim.user', 'user')
             ->addSelect('user')
+            ->leftJoin('claim.promo', 'promo')
+            ->addSelect('promo')
             ->orderBy('claim.id', 'DESC');
 
         if ($search !== '') {
@@ -45,12 +64,13 @@ class PromoClaimRepository extends ServiceEntityRepository
                 OR LOWER(claim.phone) LIKE :term
                 OR LOWER(claim.bundleSlug) LIKE :term
                 OR LOWER(claim.selectedOption) LIKE :term
+                OR LOWER(promo.title) LIKE :term
                 OR LOWER(user.username) LIKE :term'
             )->setParameter('term', $term);
         }
 
         if ($status === 'Pending') {
-            $query->andWhere('(claim.status = :status OR claim.status IS NULL)')->setParameter('status', 'Pending');
+            $query->andWhere('(claim.status IN (:statuses) OR claim.status IS NULL)')->setParameter('statuses', ['Pending', 'Cancellation Pending']);
         } elseif (in_array($status, ['Confirmed', 'Completed', 'Cancelled'], true)) {
             $query->andWhere('claim.status = :status')->setParameter('status', $status);
         }
@@ -72,7 +92,9 @@ class PromoClaimRepository extends ServiceEntityRepository
             $count = (int) $row['statusCount'];
             $counts['total'] += $count;
             $status = $row['status'] ?? 'Pending';
-            if (isset($counts[strtolower($status)])) {
+            if (in_array($status, ['Pending', 'Cancellation Pending'], true)) {
+                $counts['pending'] += $count;
+            } elseif (isset($counts[strtolower($status)])) {
                 $counts[strtolower($status)] += $count;
             }
         }

@@ -36,7 +36,7 @@ $perPage = 50;
 $offset = ($page - 1) * $perPage;
 
 $validStatuses = ['Pending', 'Cancelled', 'Completed'];
-$validPaymentStatuses = ['Due on delivery', 'Unverified'];
+$validPaymentStatuses = ['Due on delivery', 'Pending', 'Paid'];
 if (!in_array($statusFilter, $validStatuses, true)) {
     $statusFilter = '';
 }

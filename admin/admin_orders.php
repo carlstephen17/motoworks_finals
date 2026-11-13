@@ -17,7 +17,7 @@ $page = $page && $page > 0 ? $page : 1;
 $perPage = 50;
 
 $validStatuses = ['Pending', 'Cancelled', 'Completed'];
-$validPaymentStatuses = ['Due on delivery', 'Unverified'];
+$validPaymentStatuses = ['Due on delivery', 'Pending', 'Paid'];
 if (!in_array($statusFilter, $validStatuses, true)) {
     $statusFilter = '';
 }

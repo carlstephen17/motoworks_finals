@@ -1,0 +1,245 @@
+<dialog id="promoHistoryDialog" class="modal-content promo-history-modal" aria-labelledby="promoHistoryTitle">
+    <div class="modal-header">
+        <div>
+            <p class="promo-history-eyebrow">Manage and review</p>
+            <h2 id="promoHistoryTitle">Promotion History</h2>
+        </div>
+        <button type="button" class="close-btn" data-close-promo-history aria-label="Close promotion history">×</button>
+    </div>
+    <div class="promo-history-modal-body">
+    <p id="promoClaimNotification" class="alert-toast" role="status" aria-live="polite" hidden></p>
+    <div class="table-filters">
+        <label for="promoClaimSearch">Search claims</label>
+        <input id="promoClaimSearch" type="search" placeholder="Search customer, promotion, option, or ID..." autocomplete="off">
+        <label for="promoClaimStatus">Status</label>
+        <select id="promoClaimStatus">
+            <option value="">All statuses</option>
+            {% for option in ['Pending', 'Confirmed', 'Used', 'Completed', 'Cancelled'] %}
+                <option value="{{ option }}">{{ option }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="table-responsive">
+        <table class="admin-table" id="promoClaimTable">
+            <thead>
+                <tr><th>ID</th><th>Customer Name</th><th>Promo / Bundle</th><th>Appointment Date &amp; Time</th><th>Status</th><th>Actions</th></tr>
+            </thead>
+            <tbody>
+            {% for claim in claims %}
+                {% set claimDetails = {
+                    id: 'PC-' ~ claim.id,
+                    fullName: claim.fullName,
+                    phone: claim.phone,
+                    promotion: claim.promo ? claim.promo.title : claim.bundleSlug,
+                    bundle: claim.bundleSlug,
+                    selectedOption: claim.selectedOption,
+                    appointmentDate: claim.appointmentDate|date('M j, Y'),
+                    appointmentTime: claim.appointmentTime|date('g:i A'),
+                    status: claim.status,
+                    createdAt: claim.createdAt|date('M j, Y g:i A')
+                } %}
+                <tr class="promo-claim-row" data-id="{{ claim.id }}" data-status="{{ claim.status|default('')|e('html_attr') }}" data-search="{{ [claim.id, claim.fullName, claim.phone, claim.bundleSlug, claim.promo ? claim.promo.title : '', claim.selectedOption]|join(' ')|lower|e('html_attr') }}">
+                    <td><strong>#{{ claim.id }}</strong></td>
+                    <td>{{ claim.fullName }}<br>{{ claim.phone }}</td>
+                    <td>{{ claim.promo ? claim.promo.title : claim.bundleSlug }}</td>
+                    <td>{{ claim.appointmentDate|date('M j, Y') }}<br>{{ claim.appointmentTime|date('g:i A') }}</td>
+                    <td><span class="badge {{ claim.status == 'Pending' ? 'badge-pending' : (claim.status == 'Completed' ? 'badge-success' : (claim.status == 'Cancelled' ? 'badge-danger' : 'badge-secondary')) }}">{{ claim.status|default('Unknown') }}</span></td>
+                    <td class="table-row-actions">
+                        <button type="button" class="btn-sm btn-secondary view-promo-claim" data-claim="{{ claimDetails|json_encode|e('html_attr') }}"><i class="fas fa-eye" aria-hidden="true"></i> View</button>
+                        {% if claim.status not in ['Completed', 'Cancellation Pending'] %}
+                            <a class="btn-sm btn-info edit-promo-claim" href="{{ path('admin_promo_history_edit', {id: claim.id}) }}" data-action="{{ path('admin_promo_history_edit', {id: claim.id}) }}" data-promo-id="{{ claim.promo ? claim.promo.id : '' }}" data-status="{{ claim.status }}"><i class="fas fa-edit" aria-hidden="true"></i> Edit</a>
+                        {% endif %}
+                        <form method="post" action="{{ path('admin_promo_history_delete', {id: claim.id}) }}" data-deferred-action="delete" data-confirm-message="Delete this promotion claim? The change will be applied after the 3-second Undo window.">
+                            <input type="hidden" name="_token" value="{{ csrf_token('admin_promo_history_delete_' ~ claim.id) }}">
+                            <button type="submit" class="btn-sm btn-danger"><i class="fas fa-trash" aria-hidden="true"></i> Delete</button>
+                        </form>
+                    </td>
+                </tr>
+            {% else %}
+                <tr><td colspan="6">No promotion claims.</td></tr>
+            {% endfor %}
+                <tr id="noPromoClaimMatch" hidden><td colspan="6">No claims match these filters.</td></tr>
+            </tbody>
+        </table>
+    </div>
+    <dialog id="promoClaimDetails" class="modal-content promo-claim-details" aria-labelledby="promoClaimDetailsTitle">
+        <div class="modal-header"><h3 id="promoClaimDetailsTitle">Promotion claim details</h3></div>
+        <dl>
+            <dt>Transaction</dt><dd data-claim-detail="id"></dd>
+            <dt>Customer</dt><dd data-claim-detail="fullName"></dd>
+            <dt>Phone</dt><dd data-claim-detail="phone"></dd>
+            <dt>Promotion</dt><dd data-claim-detail="promotion"></dd>
+            <dt>Bundle</dt><dd data-claim-detail="bundle"></dd>
+            <dt>Selected option</dt><dd data-claim-detail="selectedOption"></dd>
+            <dt>Appointment date</dt><dd data-claim-detail="appointmentDate"></dd>
+            <dt>Appointment time</dt><dd data-claim-detail="appointmentTime"></dd>
+            <dt>Status</dt><dd data-claim-detail="status"></dd>
+            <dt>Created</dt><dd data-claim-detail="createdAt"></dd>
+        </dl>
+        <div class="modal-footer"><button type="button" id="closePromoClaimDetails" class="btn-secondary">Close</button></div>
+    </dialog>
+    <dialog id="promoClaimEdit" class="modal-content" aria-labelledby="promoClaimEditTitle">
+        <div class="modal-header">
+            <h3 id="promoClaimEditTitle">Edit Promo Claim</h3>
+            <button type="button" class="close-btn" data-close-promo-claim-edit aria-label="Close">×</button>
+        </div>
+        {{ form_start(claimUpdateForm, {attr: {id: 'promoClaimEditForm'}}) }}
+            <div class="form-group">
+                {{ form_label(claimUpdateForm.promo, 'Promo / Bundle') }}
+                {{ form_widget(claimUpdateForm.promo, {attr: {class: 'form-control', required: true}}) }}
+                {{ form_errors(claimUpdateForm.promo) }}
+            </div>
+            <div class="form-group">
+                {{ form_label(claimUpdateForm.status, 'Status') }}
+                {{ form_widget(claimUpdateForm.status, {attr: {class: 'form-control', required: true}}) }}
+                {{ form_errors(claimUpdateForm.status) }}
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-secondary" data-close-promo-claim-edit>Cancel</button>
+                <button type="submit" class="btn-primary">Save Changes</button>
+            </div>
+        {{ form_end(claimUpdateForm) }}
+    </dialog>
+</div>
+</dialog>
+<script>
+(() => {
+    const table = document.getElementById('promoClaimTable');
+    const search = document.getElementById('promoClaimSearch');
+    const status = document.getElementById('promoClaimStatus');
+    const dialog = document.getElementById('promoClaimDetails');
+    const editDialog = document.getElementById('promoClaimEdit');
+    const editForm = document.getElementById('promoClaimEditForm');
+    const notification = document.getElementById('promoClaimNotification');
+    const historyDialog = document.getElementById('promoHistoryDialog');
+    const historyCloseButton = historyDialog?.querySelector('[data-close-promo-history]');
+    if (!table || !search || !status || !dialog || !editDialog || !editForm || !notification || !historyDialog || !historyCloseButton) return;
+
+    document.querySelectorAll('[data-open-promo-history]').forEach((button) => {
+        button.addEventListener('click', () => historyDialog.showModal());
+    });
+    historyCloseButton.addEventListener('click', () => historyDialog.close());
+    historyDialog.addEventListener('click', (event) => {
+        if (event.target === historyDialog) historyDialog.close();
+    });
+    historyDialog.addEventListener('close', () => {
+        const url = new URL(window.location.href);
+        if (url.searchParams.get('history') === '1') {
+            url.searchParams.delete('history');
+            window.history.replaceState(null, '', url);
+        }
+    });
+    if (new URLSearchParams(window.location.search).get('history') === '1') {
+        historyDialog.showModal();
+    }
+
+    const rows = [...table.querySelectorAll('.promo-claim-row')];
+    const noMatches = document.getElementById('noPromoClaimMatch');
+    const filterRows = () => {
+        const query = search.value.trim().toLowerCase();
+        let visibleCount = 0;
+        rows.forEach((row) => {
+            const visible = row.dataset.search.includes(query)
+                && (!status.value || row.dataset.status === status.value);
+            row.hidden = !visible;
+            visibleCount += Number(visible);
+        });
+        if (noMatches) noMatches.hidden = visibleCount > 0;
+    };
+    search.addEventListener('input', filterRows);
+    status.addEventListener('change', filterRows);
+
+    table.addEventListener('click', (event) => {
+        const button = event.target.closest('.view-promo-claim');
+        if (button) {
+            const details = JSON.parse(button.dataset.claim);
+            Object.entries(details).forEach(([key, value]) => {
+                const target = dialog.querySelector(`[data-claim-detail="${key}"]`);
+                if (target) target.textContent = value || 'N/A';
+            });
+            dialog.showModal();
+            return;
+        }
+
+        const editButton = event.target.closest('.edit-promo-claim');
+        if (!editButton) return;
+        event.preventDefault();
+        editForm.action = editButton.dataset.action;
+        editForm.elements.namedItem('admin_promo_claim_update[promo]').value = editButton.dataset.promoId;
+        editForm.elements.namedItem('admin_promo_claim_update[status]').value = editButton.dataset.status;
+        editDialog.showModal();
+    });
+    document.getElementById('closePromoClaimDetails').addEventListener('click', () => dialog.close());
+    editDialog.querySelectorAll('[data-close-promo-claim-edit]').forEach((button) => {
+        button.addEventListener('click', () => editDialog.close());
+    });
+
+    let notificationTimer;
+    const showNotification = (message, success) => {
+        if (typeof window.showAdminToast === 'function') {
+            window.showAdminToast(message, success ? 'success' : 'error');
+            return;
+        }
+
+        if (notificationTimer) window.clearTimeout(notificationTimer);
+        notification.textContent = message;
+        notification.className = success ? 'alert-toast' : 'alert-toast alert-error';
+        notification.setAttribute('role', success ? 'status' : 'alert');
+        notification.hidden = false;
+        notificationTimer = window.setTimeout(() => {
+            notification.hidden = true;
+            notificationTimer = null;
+        }, 3000);
+    };
+
+    editForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        if (editForm.dataset.submitting === 'true') return;
+        editForm.dataset.submitting = 'true';
+        const submitButton = event.submitter;
+        if (submitButton) submitButton.disabled = true;
+
+        try {
+            const response = await fetch(editForm.action, {
+                method: 'POST',
+                body: new FormData(editForm),
+                headers: {
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                credentials: 'same-origin'
+            });
+            const result = await response.json();
+            if (!response.ok) {
+                throw new Error(result.message || `Claim update failed (${response.status}).`);
+            }
+
+            const claim = result.claim;
+            const row = table.querySelector(`.promo-claim-row[data-id="${claim.id}"]`);
+            if (!row) throw new Error('The updated claim row could not be found.');
+            row.dataset.status = claim.status || '';
+            row.dataset.search = [claim.id, claim.fullName, claim.phone, claim.bundleSlug, claim.promoTitle, claim.selectedOption].join(' ').toLowerCase();
+            row.cells[2].textContent = claim.promoTitle;
+            const badge = row.cells[4].querySelector('.badge');
+            badge.textContent = claim.status || 'Unknown';
+            badge.className = `badge ${claim.status === 'Pending' ? 'badge-pending' : (claim.status === 'Completed' ? 'badge-success' : (claim.status === 'Cancelled' ? 'badge-danger' : 'badge-secondary'))}`;
+            row.querySelector('.view-promo-claim').dataset.claim = JSON.stringify(claim.details);
+            const editButton = row.querySelector('.edit-promo-claim');
+            if (claim.status === 'Completed' && editButton) editButton.remove();
+            else if (editButton) {
+                editButton.dataset.promoId = String(claim.promoId || '');
+                editButton.dataset.status = claim.status || '';
+            }
+            filterRows();
+            editDialog.close();
+            showNotification(result.message || 'Promotion claim updated.', true);
+        } catch (error) {
+            console.error('Unable to update the promotion claim.', error);
+            showNotification(error.message || 'Unable to update the claim. Please try again.', false);
+        } finally {
+            editForm.dataset.submitting = 'false';
+            if (submitButton) submitButton.disabled = false;
+        }
+    });
+})();
+</script>

@@ -4,7 +4,7 @@ namespace App\Form;
 
 use App\Entity\Promo;
 use Symfony\Component\Form\AbstractType;
-use Symfony\Component\Form\Extension\Core\Type\CheckboxType;
+use Symfony\Component\Form\Extension\Core\Type\ChoiceType;
 use Symfony\Component\Form\Extension\Core\Type\TextareaType;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
 use Symfony\Component\Form\FormBuilderInterface;
@@ -43,7 +43,10 @@ class PromoType extends AbstractType
                 'required' => false,
                 'constraints' => [new Length(max: 100)],
             ])
-            ->add('active', CheckboxType::class, ['required' => false]);
+            ->add('active', ChoiceType::class, [
+                'label' => 'Status',
+                'choices' => ['Active' => true, 'Inactive' => false],
+            ]);
     }
 
     public function configureOptions(OptionsResolver $resolver): void

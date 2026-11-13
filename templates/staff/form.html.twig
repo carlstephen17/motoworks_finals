@@ -1,50 +1,71 @@
 {% extends 'base.html.twig' %}
 {% block site_header %}{% include 'staff/_nav.html.twig' %}{% endblock %}
-{% block title %}{{ title }} | Staff{% endblock %}
+{% block title %}Staff Panel | {{ title }}{% endblock %}
 {% block body %}
-<main>
-    <h1>{{ title }}</h1>
-    {% for message in app.flashes('error') %}<p role="alert">{{ message }}</p>{% endfor %}
-    {{ form_start(form) }}
-        {{ form_errors(form) }}
-        {% if form.motorcycleMode is defined %}
-            {{ form_row(form.customerId) }}
-            {{ form_row(form.serviceId) }}
-            {{ form_row(form.motorcycleMode) }}
-            <div data-existing-motorcycle>
-                {{ form_row(form.motorcycleId) }}
-            </div>
-            <div data-new-motorcycle hidden>
-                {{ form_row(form.motorcycleModel) }}
-                {{ form_row(form.plateNumber) }}
-            </div>
-            {% for field in form %}
-                {% if field.vars.name not in ['_token', 'customerId', 'serviceId', 'motorcycleMode', 'motorcycleId', 'motorcycleModel', 'plateNumber'] %}
-                    {{ form_row(field) }}
-                {% endif %}
-            {% endfor %}
-            {{ form_rest(form) }}
-        {% elseif form.items is defined %}
-            {{ form_row(form.customerId) }}
-            {{ form_row(form.deliveryAddress) }}
-            {{ form_errors(form.items) }}
-            <div id="order-items" data-prototype="{{ form_widget(form.items.vars.prototype)|e('html_attr') }}">
-                {% for item in form.items %}
-                    <div class="order-item-entry">
-                        {{ form_row(item.productId) }}
-                        {{ form_row(item.quantity) }}
-                        <button type="button" class="remove-order-item">Remove item</button>
+<main class="admin-main">
+    {% include 'staff/_header.html.twig' with {title: title} %}
+    <div class="admin-content-body">
+        {% for message in app.flashes('error') %}<p role="alert" class="alert-toast alert-error" data-auto-dismiss>{{ message }}</p>{% endfor %}
+        {% for message in app.flashes('success') %}<p role="status" class="alert-toast" data-auto-dismiss>{{ message }}</p>{% endfor %}
+
+        <div class="form-card" style="background: #ffffff; border-radius: 10px; border: 1px solid var(--border-color, #e2e8f0); padding: 24px 30px; max-width: 800px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
+            {{ form_start(form) }}
+                {{ form_errors(form) }}
+                {% if form.motorcycleMode is defined %}
+                    {{ form_row(form.customerId) }}
+                    {{ form_row(form.serviceId) }}
+                    {{ form_row(form.motorcycleMode) }}
+                    <div data-existing-motorcycle>
+                        {{ form_row(form.motorcycleId) }}
                     </div>
-                {% endfor %}
-            </div>
-            {% do form.items.setRendered %}
-            <button type="button" id="add-order-item">Add another item</button>
-            {{ form_rest(form) }}
-        {% else %}
-            {{ form_widget(form) }}
-        {% endif %}
-        <button type="submit">Save</button>
-    {{ form_end(form) }}
+                    <div data-new-motorcycle hidden>
+                        {{ form_row(form.motorcycleModel) }}
+                        {{ form_row(form.plateNumber) }}
+                    </div>
+                    {% for field in form %}
+                        {% if field.vars.name not in ['_token', 'customerId', 'serviceId', 'motorcycleMode', 'motorcycleId', 'motorcycleModel', 'plateNumber'] %}
+                            {{ form_row(field) }}
+                        {% endif %}
+                    {% endfor %}
+                    {{ form_rest(form) }}
+                {% elseif form.items is defined %}
+                    {{ form_row(form.customerId) }}
+                    {{ form_row(form.deliveryAddress) }}
+                    {{ form_errors(form.items) }}
+                    <div id="order-items" data-prototype="{{ form_widget(form.items.vars.prototype)|e('html_attr') }}">
+                        {% for item in form.items %}
+                            <div class="order-item-entry" style="display: flex; gap: 12px; align-items: flex-end; margin-bottom: 12px; padding: 12px; background: #f8fafc; border-radius: 6px;">
+                                <div style="flex: 1;">
+                                    {{ form_row(item.productId) }}
+                                </div>
+                                <div style="width: 120px;">
+                                    {{ form_row(item.quantity) }}
+                                </div>
+                                <button type="button" class="btn-sm btn-danger remove-order-item" style="margin-bottom: 8px;">
+                                    <i class="fas fa-trash" aria-hidden="true"></i> Remove item
+                                </button>
+                            </div>
+                        {% endfor %}
+                    </div>
+                    {% do form.items.setRendered %}
+                    <button type="button" class="btn-sm btn-secondary" id="add-order-item" style="margin: 12px 0 20px;">
+                        <i class="fas fa-plus" aria-hidden="true"></i> Add another item
+                    </button>
+                    {{ form_rest(form) }}
+                {% else %}
+                    {{ form_widget(form) }}
+                {% endif %}
+                <div class="form-actions" style="margin-top: 24px; display: flex; gap: 12px;">
+                    <button type="submit" class="btn-primary">
+                        <i class="fas fa-save" aria-hidden="true"></i> Save
+                    </button>
+                    <a href="javascript:history.back()" class="btn-secondary" style="display: inline-flex; align-items: center; justify-content: center;">
+                        Cancel
+                    </a>
+                </div>
+            {{ form_end(form) }}
+        </div>
+    </div>
 </main>
 {% if form.motorcycleMode is defined %}
     <script>
@@ -97,21 +118,23 @@
             if (orderItems.children.length >= 20) {
                 return;
             }
-
-            const entry = document.createElement('div');
-            entry.className = 'order-item-entry';
-            entry.innerHTML = orderItems.dataset.prototype.replaceAll('__name__', String(nextOrderItemIndex++));
-            const removeButton = document.createElement('button');
-            removeButton.type = 'button';
-            removeButton.className = 'remove-order-item';
-            removeButton.textContent = 'Remove item';
-            entry.append(removeButton);
-            orderItems.append(entry);
+            const template = orderItems.dataset.prototype.replaceAll('__name__', String(nextOrderItemIndex));
+            nextOrderItemIndex += 1;
+            const wrapper = document.createElement('div');
+            wrapper.className = 'order-item-entry';
+            wrapper.style.cssText = 'display: flex; gap: 12px; align-items: flex-end; margin-bottom: 12px; padding: 12px; background: #f8fafc; border-radius: 6px;';
+            wrapper.innerHTML = template + '<button type="button" class="btn-sm btn-danger remove-order-item" style="margin-bottom: 8px;"><i class="fas fa-trash" aria-hidden="true"></i> Remove item</button>';
+            orderItems.appendChild(wrapper);
         });
 
         orderItems.addEventListener('click', (event) => {
-            if (event.target instanceof Element && event.target.classList.contains('remove-order-item')) {
-                event.target.closest('.order-item-entry').remove();
+            const removeButton = event.target.closest('.remove-order-item');
+            if (!removeButton) {
+                return;
+            }
+            const entry = removeButton.closest('.order-item-entry');
+            if (entry && orderItems.children.length > 1) {
+                entry.remove();
             }
         });
     </script>

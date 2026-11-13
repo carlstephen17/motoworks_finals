@@ -18,6 +18,12 @@
     box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
 }
 
+.alert-toast.alert-error {
+    background: #fee2e2;
+    color: #991b1b;
+    border-color: #fecaca;
+}
+
 /* Table Container & Table Styles */
 .table-responsive {
     width: 100%;
@@ -51,6 +57,25 @@
     font-size: 0.9rem;
     border-bottom: 1px solid #f1f5f9;
     vertical-align: middle;
+}
+
+#appointmentTable th:nth-child(8),
+#appointmentTable td:nth-child(8) {
+    box-sizing: border-box;
+    width: 126px;
+    min-width: 126px;
+    padding-right: 12px;
+    padding-left: 12px;
+}
+
+#appointmentTable .appointment-date-time span {
+    display: block;
+    white-space: nowrap;
+}
+
+#appointmentTable .appointment-date-time span + span {
+    color: #64748b;
+    font-size: 0.82rem;
 }
 
 .admin-table tbody tr {
@@ -90,6 +115,133 @@
     margin-top: 10px;
 }
 
+.order-items {
+    min-width: 190px;
+}
+
+.order-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap: 16px;
+    margin: 0 0 20px;
+    padding: 0;
+}
+
+.stat-card {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    min-height: 88px;
+    width: 100%;
+    padding: 18px 20px;
+    border: 1px solid var(--border-color, #e2e8f0);
+    border-radius: 8px;
+    background: #ffffff;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+}
+
+.stat-info {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.stat-info h3 {
+    margin: 0;
+    color: #181c32;
+    font-size: 1.5rem;
+    font-weight: 700;
+    line-height: 1.1;
+}
+
+.stat-info p {
+    margin: 5px 0 0;
+    color: #64748b;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+}
+
+.appointment-stats {
+    margin-top: 0;
+}
+
+.order-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 5px;
+}
+
+.order-item img {
+    flex: 0 0 36px;
+    object-fit: cover;
+    border-radius: 6px;
+}
+
+.order-details-modal {
+    position: fixed;
+    inset: 0;
+    margin: auto;
+    width: min(560px, calc(100vw - 32px));
+    max-width: none;
+    max-height: 90vh;
+    padding: 0;
+    overflow: auto;
+    border: 0;
+    border-radius: 10px;
+    box-shadow: 0 20px 60px rgba(15, 23, 42, 0.3);
+}
+
+.order-details-modal::backdrop {
+    background: rgba(15, 23, 42, 0.58);
+}
+
+.order-details-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.order-details-modal-header h3 {
+    margin: 0;
+}
+
+.order-details-body {
+    padding: 20px;
+    white-space: normal;
+}
+
+.order-details-body ul {
+    padding-left: 20px;
+    margin: 8px 0;
+}
+
+.order-update-form {
+    display: grid;
+    gap: 10px;
+    margin-top: 14px;
+}
+
+.order-update-form label {
+    display: block;
+}
+
+.order-payment-form {
+    margin-top: 14px;
+}
+
+.order-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 4px;
+    color: #64748b;
+}
+
 /* Badges */
 .badge {
     display: inline-flex;
@@ -115,6 +267,309 @@
 .badge-secondary {
     background: #f1f5f9;
     color: #475569;
+}
+
+.badge-pending {
+    background: #fff7ed;
+    color: #c2410c;
+}
+
+.visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+.appointment-filter-toolbar,
+.order-filters,
+.table-filters {
+    display: flex;
+    align-items: end;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin: 0 0 20px;
+    padding: 18px;
+    background: #ffffff;
+    border: 1px solid var(--border-color, #e2e8f0);
+    border-radius: 10px;
+}
+
+.appointment-filter-toolbar input,
+.appointment-filter-toolbar select,
+.table-filters input,
+.table-filters select {
+    min-width: 190px;
+    padding: 10px 12px;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    font: inherit;
+}
+
+.appointment-filter-toolbar input {
+    flex: 1 1 300px;
+}
+
+.table-filters label {
+    color: #475569;
+    font-size: 0.88rem;
+    font-weight: 500;
+}
+
+.table-filters input {
+    flex: 1 1 220px;
+}
+
+.table-filters select {
+    min-width: 150px;
+}
+
+.appointment-filter-toolbar .btn-primary,
+.order-filters > .btn-primary {
+    white-space: nowrap;
+}
+
+.order-filters .form-group {
+    flex: 1 1 150px;
+    margin: 0;
+}
+
+.order-filters .form-control {
+    min-height: 40px;
+}
+
+.order-filters {
+    display: grid;
+    grid-template-columns: minmax(220px, 2fr) repeat(4, minmax(130px, 1fr));
+}
+
+.order-filters .form-group {
+    margin: 0;
+}
+
+@media (max-width: 1000px) {
+    .order-filters {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+.admin-user-create {
+    margin-bottom: 20px;
+    padding: 16px 20px;
+    background: #ffffff;
+    border: 1px solid var(--border-color, #e2e8f0);
+    border-radius: 10px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+}
+
+.admin-user-create summary {
+    color: #334155;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.admin-user-create-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 12px;
+    margin-top: 16px;
+}
+
+.admin-user-create-grid > div {
+    min-width: 0;
+}
+
+.admin-user-create-grid label,
+#userEditDialog form > div:not(.modal-footer) label {
+    display: block;
+    margin-bottom: 6px;
+    color: #475569;
+    font-size: 0.88rem;
+    font-weight: 500;
+}
+
+.admin-user-create-grid input,
+.admin-user-create-grid select,
+#userEditDialog form > div:not(.modal-footer) input,
+#userEditDialog form > div:not(.modal-footer) select {
+    width: 100%;
+    min-height: 40px;
+    padding: 9px 11px;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    background: #f8fafc;
+    font: inherit;
+}
+
+.admin-user-create-grid > button {
+    align-self: end;
+    justify-self: start;
+}
+
+.role-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: #eff6ff;
+    color: #1d4ed8;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.role-admin {
+    background: #f3e8ff;
+    color: #7e22ce;
+}
+
+.role-staff {
+    background: #e0f2fe;
+    color: #0369a1;
+}
+
+.role-customer {
+    background: #dcfce7;
+    color: #15803d;
+}
+
+#userEditDialog {
+    width: min(560px, calc(100vw - 32px));
+    max-width: none;
+    max-height: calc(100vh - 32px);
+    overflow-y: auto;
+}
+
+#userEditDialog,
+#promoDetails,
+#promoFormDialog,
+#promoClaimDetails,
+#promoClaimEdit,
+#appointmentDetails,
+#appointmentActionDialog,
+#promoHistoryDialog {
+    position: fixed;
+    inset: 0;
+    margin: auto;
+    max-height: calc(100vh - 32px);
+    overflow-y: auto;
+}
+
+#promoDetails,
+#promoFormDialog,
+#promoClaimDetails,
+#promoClaimEdit {
+    width: min(600px, calc(100vw - 32px));
+    max-width: none;
+}
+
+#appointmentDetails {
+    width: min(700px, calc(100vw - 32px));
+    max-width: none;
+}
+
+#appointmentActionDialog {
+    width: min(680px, calc(100vw - 32px));
+    max-width: none;
+}
+
+#promoHistoryDialog {
+    width: min(1100px, calc(100vw - 32px));
+    max-width: none;
+    overflow: hidden;
+}
+
+#promoHistoryDialog[open] {
+    display: flex;
+    flex-direction: column;
+}
+
+.promo-history-modal .modal-header {
+    flex: 0 0 auto;
+    align-items: flex-start;
+    padding-bottom: 16px;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.promo-history-modal .modal-header h2 {
+    margin: 0;
+    color: #0f172a;
+    font-size: 1.35rem;
+}
+
+.promo-history-eyebrow {
+    margin: 0 0 4px;
+    color: #64748b;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.promo-history-modal-body {
+    min-height: 0;
+    overflow: auto;
+    padding: 18px 2px 2px;
+}
+
+#userEditDialog::backdrop,
+#promoClaimDetails::backdrop,
+#appointmentDetails::backdrop,
+#promoDetails::backdrop,
+#promoFormDialog::backdrop,
+#promoClaimEdit::backdrop,
+#appointmentActionDialog::backdrop,
+#promoHistoryDialog::backdrop {
+    background: rgba(15, 23, 42, 0.55);
+}
+
+#userEditDialog form > div:not(.modal-footer) {
+    margin-bottom: 12px;
+}
+
+@media (max-width: 600px) {
+    #promoHistoryDialog {
+        width: calc(100vw - 20px);
+        max-height: calc(100vh - 20px);
+        padding: 16px;
+    }
+
+    .promo-history-modal-body {
+        padding-top: 12px;
+    }
+
+    .appointment-filter-toolbar,
+    .order-filters,
+    .table-filters {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .appointment-filter-toolbar input,
+    .appointment-filter-toolbar select,
+    .table-filters input,
+    .table-filters select {
+        width: 100%;
+    }
+
+    .admin-user-create-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .order-filters {
+        grid-template-columns: 1fr;
+    }
+}
+
+body.admin-page .admin-main .admin-content-body > section.order-stats {
+    margin-top: 0;
+    margin-bottom: 16px;
+    padding: 0 !important;
 }
 
 /* Buttons */
@@ -331,4 +786,170 @@
     color: #94a3b8;
     font-size: 0.85rem;
     font-style: italic;
+}
+
+dialog.modal-content {
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+dialog.modal-content::backdrop {
+    background: rgba(15, 23, 42, 0.6);
+    backdrop-filter: blur(3px);
+}
+
+.product-form-dialog {
+    position: fixed;
+    inset: 0;
+    width: min(640px, calc(100vw - 32px));
+    max-width: 640px;
+    max-height: 90vh;
+    margin: auto;
+    padding: 28px;
+    overflow-y: auto;
+    border: 1px solid #dbe3ee;
+    border-radius: 16px;
+    color: #172338;
+}
+
+.product-form-dialog .modal-header {
+    margin-bottom: 10px;
+    padding-bottom: 16px;
+    border-color: #e8edf4;
+}
+
+.product-form-dialog .modal-header h3 {
+    margin-top: 5px;
+    color: #172338;
+    font-size: 1.3rem;
+}
+
+.product-form-eyebrow {
+    color: #2563eb;
+    font-size: 0.68rem;
+    font-weight: 750;
+    letter-spacing: 1.1px;
+}
+
+.product-form-intro {
+    margin: 0 0 20px;
+    color: #64748b;
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+
+.product-form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 18px 16px;
+}
+
+.product-form-field {
+    min-width: 0;
+}
+
+.product-form-field-full {
+    grid-column: 1 / -1;
+}
+
+.product-form-field > label,
+.product-form-toggle label {
+    display: block;
+    margin-bottom: 7px;
+    color: #344256;
+    font-size: 0.84rem;
+    font-weight: 650;
+}
+
+.product-form-field .form-control {
+    min-height: 44px;
+    background: #f8fafc;
+}
+
+.product-form-field .product-form-file {
+    padding: 8px;
+    background: #fff;
+}
+
+.product-form-help {
+    display: block;
+    margin-top: 6px;
+    color: #748197;
+    font-size: 0.76rem;
+    line-height: 1.4;
+}
+
+.product-form-toggle {
+    display: flex;
+    align-items: flex-start;
+    gap: 11px;
+    padding: 14px;
+    border: 1px solid #e1e8f1;
+    border-radius: 9px;
+    background: #f8fafc;
+}
+
+.product-form-checkbox {
+    width: 17px;
+    height: 17px;
+    margin-top: 2px;
+    accent-color: #2563eb;
+}
+
+.product-form-toggle label {
+    margin: 0;
+}
+
+.product-form-toggle .product-form-help {
+    margin-top: 4px;
+}
+
+.product-form-dialog .modal-footer {
+    margin-top: 22px;
+    padding-top: 18px;
+    border-color: #e8edf4;
+}
+
+@media (max-width: 560px) {
+    .product-form-dialog {
+        padding: 21px;
+    }
+
+    .product-form-grid {
+        grid-template-columns: 1fr;
+        gap: 15px;
+    }
+
+    .product-form-field-full {
+        grid-column: auto;
+    }
+}
+
+#promoClaimDetails dl {
+    display: grid;
+    grid-template-columns: minmax(115px, auto) 1fr;
+    gap: 8px 14px;
+    margin: 0;
+}
+
+#promoClaimDetails dt {
+    color: #64748b;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+#promoClaimDetails dd {
+    margin: 0;
+    overflow-wrap: anywhere;
+}
+
+@media (max-width: 420px) {
+    #promoClaimDetails dl {
+        grid-template-columns: 1fr;
+        gap: 3px;
+    }
+
+    #promoClaimDetails dd {
+        margin-bottom: 8px;
+    }
 }

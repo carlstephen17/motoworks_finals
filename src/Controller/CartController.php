@@ -6,7 +6,10 @@ use App\Entity\CustomerOrder;
 use App\Entity\OrderItem;
 use App\Entity\Product;
 use App\Entity\User;
+use App\Repository\CustomerOrderRepository;
+use App\Repository\OrderItemRepository;
 use App\Repository\ProductRepository;
+use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\DBAL\LockMode;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -158,12 +161,17 @@ class CartController extends AbstractController
         int $id,
         Request $request,
         ProductRepository $products,
+        CustomerOrderRepository $customerOrders,
+        OrderItemRepository $orderItems,
         EntityManagerInterface $entityManager,
     ): Response {
         $isAjax = $request->isXmlHttpRequest();
-        $this->denyAccessUnlessGranted('ROLE_USER');
         $user = $this->getUser();
-        if (!$user instanceof User) {
+        if (!$user instanceof User || $user->getRole() !== 'customer') {
+            if ($isAjax) {
+                return $this->json(['success' => false, 'message' => 'Sign in with a customer account to place an order.'], Response::HTTP_UNAUTHORIZED);
+            }
+
             throw $this->createAccessDeniedException();
         }
 
@@ -175,9 +183,26 @@ class CartController extends AbstractController
             throw $this->createAccessDeniedException('Invalid security token.');
         }
 
-        $product = $products->find($id);
+        $submissionKey = $request->request->get('submission_key');
+        if ($submissionKey === null || $submissionKey === '') {
+            $submissionKey = bin2hex(random_bytes(16));
+        }
+        if (!is_string($submissionKey) || !preg_match('/^(?:[a-f0-9]{32}|[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12})$/i', $submissionKey)) {
+            return $this->json(['success' => false, 'message' => 'Invalid order submission. Please try again.'], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
         $quantity = filter_var($request->request->get('quantity', '1'), FILTER_VALIDATE_INT);
-        if (!$product || !$product->isActive() || $quantity === false || $quantity < 1 || $quantity > $product->getStock()) {
+        if ($quantity === false || $quantity < 1 || $quantity > 999) {
+            return $this->json(['success' => false, 'message' => 'Enter a valid order quantity.'], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        $existingOrder = $customerOrders->findBySubmissionKey($submissionKey);
+        if ($existingOrder instanceof CustomerOrder) {
+            return $this->existingBuyNowResponse($existingOrder, $user, $id, $quantity, $products, $orderItems);
+        }
+
+        $product = $products->find($id);
+        if (!$product || !$product->isActive() || $quantity > $product->getStock()) {
             if ($isAjax) {
                 return $this->json(['success' => false, 'message' => 'The selected product or quantity is unavailable.'], Response::HTTP_UNPROCESSABLE_ENTITY);
             }
@@ -188,28 +213,30 @@ class CartController extends AbstractController
         }
 
         $fullName = trim($user->getFirstName().' '.$user->getLastName());
-        $phone = trim((string) $user->getPhone());
+        $phone = trim((string) $request->request->get('phone', $user->getPhone() ?? ''));
         $address = trim((string) $request->request->get('address', ''));
         $paymentMethod = trim((string) $request->request->get('payment_method', 'Cash on Delivery'));
         if ($fullName === '' || !preg_match('/^09[0-9]{9}$/', $phone)) {
-            return $this->json(['success' => false, 'message' => 'Your account must have a valid name and phone number before checkout.'], Response::HTTP_UNPROCESSABLE_ENTITY);
+            return $this->json(['success' => false, 'message' => 'Enter a valid name and 11-digit Philippine phone number before checkout.'], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
-        if ($address === '') {
+        if ($address === '' || mb_strlen($address) > 2000) {
             return $this->json(['success' => false, 'message' => 'Please enter your delivery address.'], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
         if (!in_array($paymentMethod, ['Cash on Delivery', 'GCash', 'Card'], true)) {
             return $this->json(['success' => false, 'message' => 'Invalid payment method.'], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
-        $paymentReference = ($paymentMethod === 'Cash on Delivery' ? 'MWO-' : 'MWP-')
-            .(new \DateTimeImmutable())->format('Ymd').'-'.strtoupper(bin2hex(random_bytes(4)));
         $connection = $entityManager->getConnection();
         $connection->beginTransaction();
 
         try {
-            $order = new CustomerOrder($user, $address, $paymentMethod, $paymentReference);
+            $order = new CustomerOrder($user, $address, $paymentMethod, 'PENDING', $submissionKey);
             $entityManager->persist($order);
             $entityManager->flush();
+
+            $paymentReference = ($paymentMethod === 'Cash on Delivery' ? 'MWO-' : 'MWP-')
+                .(new \DateTimeImmutable())->format('Ymd').'-'.$order->getId();
+            $order->setPaymentReference($paymentReference);
 
             $lockedProduct = $entityManager->find(Product::class, $id, LockMode::PESSIMISTIC_WRITE);
             if (!$lockedProduct || !$lockedProduct->isActive() || $quantity > $lockedProduct->getStock()) {
@@ -219,7 +246,7 @@ class CartController extends AbstractController
             $unitPrice = $lockedProduct->getPrice();
             $lineTotal = number_format((float) $unitPrice * $quantity, 2, '.', '');
             $lockedProduct->setStock($lockedProduct->getStock() - $quantity);
-            $entityManager->persist(new OrderItem(
+            $createdItem = new OrderItem(
                 $user,
                 $lockedProduct,
                 $quantity,
@@ -228,8 +255,10 @@ class CartController extends AbstractController
                 $paymentReference,
                 $order,
                 $unitPrice,
-            ));
+            );
+            $entityManager->persist($createdItem);
             $user->setAddress($address);
+            $user->setPhone($phone);
             $entityManager->flush();
             $connection->commit();
         } catch (\DomainException $exception) {
@@ -237,22 +266,73 @@ class CartController extends AbstractController
             $entityManager->clear();
 
             return $this->json(['success' => false, 'message' => $exception->getMessage()], Response::HTTP_UNPROCESSABLE_ENTITY);
+        } catch (UniqueConstraintViolationException $exception) {
+            $connection->rollBack();
+            $entityManager->clear();
+            $existingOrder = $customerOrders->findBySubmissionKey($submissionKey);
+            if ($existingOrder instanceof CustomerOrder) {
+                return $this->existingBuyNowResponse($existingOrder, $user, $id, $quantity, $products, $orderItems);
+            }
+
+            throw $exception;
         } catch (\Throwable $exception) {
             $connection->rollBack();
             throw $exception;
         }
 
-        return $this->json([
+        return $this->json($this->buyNowPayload(
+            $order,
+            $createdItem,
+            $lockedProduct->getStock(),
+        ));
+    }
+
+    private function existingBuyNowResponse(
+        CustomerOrder $order,
+        User $user,
+        int $productId,
+        int $quantity,
+        ProductRepository $products,
+        OrderItemRepository $orderItems,
+    ): Response {
+        $item = $orderItems->findOneBy(['customerOrder' => $order]);
+        if (
+            $order->getUser()->getId() !== $user->getId()
+            || !$item instanceof OrderItem
+            || $item->getProduct()->getId() !== $productId
+            || $item->getQuantity() !== $quantity
+        ) {
+            return $this->json(['success' => false, 'message' => 'This order submission has already been used. Refresh the shop and try again.'], Response::HTTP_CONFLICT);
+        }
+
+        $currentProduct = $products->find($productId);
+
+        return $this->json($this->buyNowPayload($order, $item, $currentProduct?->getStock() ?? 0, true));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function buyNowPayload(CustomerOrder $order, OrderItem $item, int $remainingStock, bool $duplicate = false): array
+    {
+        return [
             'success' => true,
-            'message' => 'Order placed successfully!',
-            'payment_method' => $paymentMethod,
+            'message' => $duplicate ? 'This order was already recorded.' : 'Order placed successfully!',
+            'duplicate' => $duplicate,
+            'order_id' => $order->getId(),
+            'order_status' => $order->getStatus(),
+            'order_created_at' => $order->getCreatedAt()->format(DATE_ATOM),
+            'total_amount' => $item->getTotalAmount(),
+            'remaining_stock' => $remainingStock,
+            'product_id' => $item->getProduct()->getId(),
+            'payment_method' => $order->getPaymentMethod(),
             'payment_status' => $order->getPaymentStatus(),
-            'payment_reference' => $paymentReference,
-            'customer_name' => $fullName,
-            'phone' => $phone,
-            'address' => $address,
-            'items' => [['name' => $product->getName(), 'quantity' => $quantity]],
-        ]);
+            'payment_reference' => $order->getPaymentReference(),
+            'customer_name' => trim($order->getUser()->getFirstName().' '.$order->getUser()->getLastName()),
+            'phone' => $order->getUser()->getPhone() ?? '',
+            'address' => $order->getDeliveryAddress(),
+            'items' => [['name' => $item->getProduct()->getName(), 'quantity' => $item->getQuantity()]],
+        ];
     }
 
     #[Route('/checkout', name: 'checkout', methods: ['GET', 'POST'])]
@@ -300,16 +380,17 @@ class CartController extends AbstractController
             }
 
             $paymentMethod = (string) $form->get('paymentMethod')->getData();
-            $paymentReference = ($paymentMethod === 'Cash on Delivery' ? 'MWO-' : 'MWP-')
-                .(new \DateTimeImmutable())->format('Ymd').'-'.strtoupper(bin2hex(random_bytes(4)));
             $connection = $entityManager->getConnection();
             $connection->beginTransaction();
             $confirmationItems = [];
 
             try {
-                $order = new CustomerOrder($user, $address, $paymentMethod, $paymentReference);
+                $order = new CustomerOrder($user, $address, $paymentMethod, 'PENDING');
                 $entityManager->persist($order);
                 $entityManager->flush();
+                $paymentReference = ($paymentMethod === 'Cash on Delivery' ? 'MWO-' : 'MWP-')
+                    .(new \DateTimeImmutable())->format('Ymd').'-'.$order->getId();
+                $order->setPaymentReference($paymentReference);
 
                 foreach ($cart as $productId => $quantity) {
                     $product = $entityManager->find(Product::class, $productId, LockMode::PESSIMISTIC_WRITE);

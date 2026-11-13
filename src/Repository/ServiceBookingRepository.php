@@ -23,6 +23,8 @@ class ServiceBookingRepository extends ServiceEntityRepository
         $query = $this->createQueryBuilder('booking')
             ->leftJoin('booking.service', 'service')
             ->addSelect('service')
+            ->leftJoin('booking.promo', 'promo')
+            ->addSelect('promo')
             ->andWhere('booking.user = :user')
             ->setParameter('user', $user)
             ->orderBy('booking.id', 'DESC');
@@ -69,7 +71,7 @@ class ServiceBookingRepository extends ServiceEntityRepository
         }
 
         if ($status === 'Pending') {
-            $query->andWhere('booking.status IN (:statuses)')->setParameter('statuses', ['Pending', 'Confirmed']);
+            $query->andWhere('booking.status IN (:statuses)')->setParameter('statuses', ['Pending', 'Cancellation Pending', 'Confirmed']);
         } elseif ($status === 'Cancelled') {
             $query->andWhere('booking.status IN (:statuses)')->setParameter('statuses', ['Cancelled', 'Rejected']);
         } elseif ($status === 'Completed') {
@@ -103,6 +105,8 @@ class ServiceBookingRepository extends ServiceEntityRepository
             ->addSelect('service')
             ->leftJoin('booking.motorcycle', 'motorcycle')
             ->addSelect('motorcycle')
+            ->leftJoin('booking.createdByStaff', 'staff')
+            ->addSelect('staff')
             ->orderBy('booking.bookingDate', 'ASC')
             ->addOrderBy('booking.bookingTime', 'ASC');
 
@@ -129,7 +133,7 @@ class ServiceBookingRepository extends ServiceEntityRepository
         }
 
         if ($status === 'Pending') {
-            $query->andWhere('booking.status IN (:statuses)')->setParameter('statuses', ['Pending', 'Confirmed']);
+            $query->andWhere('booking.status IN (:statuses)')->setParameter('statuses', ['Pending', 'Cancellation Pending', 'Confirmed']);
         } elseif ($status === 'Cancelled') {
             $query->andWhere('booking.status IN (:statuses)')->setParameter('statuses', ['Cancelled', 'Rejected']);
         } elseif ($status === 'Completed') {
@@ -137,6 +141,21 @@ class ServiceBookingRepository extends ServiceEntityRepository
         }
 
         return $query->getQuery()->getResult();
+    }
+
+    /** @return list<ServiceBooking> */
+    public function findRecentForAdmin(int $limit = 5): array
+    {
+        return $this->createQueryBuilder('booking')
+            ->innerJoin('booking.user', 'customer')
+            ->addSelect('customer')
+            ->innerJoin('booking.service', 'service')
+            ->addSelect('service')
+            ->orderBy('booking.createdAt', 'DESC')
+            ->addOrderBy('booking.id', 'DESC')
+            ->setMaxResults(max(1, $limit))
+            ->getQuery()
+            ->getResult();
     }
 
     /** @return array{total: int, pending: int, cancelled: int, completed: int} */
@@ -153,7 +172,7 @@ class ServiceBookingRepository extends ServiceEntityRepository
             $count = (int) $row['statusCount'];
             $counts['total'] += $count;
 
-            if (in_array($row['status'], ['Pending', 'Confirmed'], true)) {
+            if (in_array($row['status'], ['Pending', 'Cancellation Pending', 'Confirmed'], true)) {
                 $counts['pending'] += $count;
             } elseif (in_array($row['status'], ['Cancelled', 'Rejected'], true)) {
                 $counts['cancelled'] += $count;

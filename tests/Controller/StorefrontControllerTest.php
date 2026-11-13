@@ -24,7 +24,7 @@ class StorefrontControllerTest extends WebTestCase
         $subject = $crawler->filter('input[name="form[subject]"]');
         $this->assertCount(1, $subject);
         $this->assertNull($subject->attr('required'));
-        $this->assertCount(1, $crawler->filter('button[type="submit"]'));
+        $this->assertCount(1, $crawler->filter('form.contact-form button[type="submit"]'));
     }
 
     public function testContactSubmissionAcceptsBlankSubjectAndApprovesTestimonial(): void

@@ -1,103 +1,151 @@
-<main>
-    <h1>{{ heading }}</h1>
-    {% for message in app.flashes('success') %}<p role="status">{{ message }}</p>{% endfor %}
-    {% for message in app.flashes('error') %}<p role="alert">{{ message }}</p>{% endfor %}
-    {% if createRoute %}<p><a href="{{ path(createRoute) }}">Create order</a></p>{% endif %}
+<main class="admin-main">
+    {% if app.request.pathinfo starts with '/staff' %}
+        {% include 'staff/_header.html.twig' with {title: heading} %}
+    {% else %}
+        {% include 'admin/_header.html.twig' with {title: heading, headerInfo: headerInfo|default('Welcome back, Admin')} %}
+    {% endif %}
+    <div class="admin-content-body">
+    {% for message in app.flashes('success') %}<p role="status" data-auto-dismiss>{{ message }}</p>{% endfor %}
+    {% for message in app.flashes('error') %}<p role="alert" data-auto-dismiss>{{ message }}</p>{% endfor %}
+    {% if createRoute %}<p><a class="btn-primary" href="{{ path(createRoute) }}"><i class="fas fa-plus" aria-hidden="true"></i> Create order</a></p>{% endif %}
 
-    <section aria-label="Order totals">
-        <p>All orders: {{ counts.total }}</p>
-        <p>Pending: {{ counts.pending }}</p>
-        <p>Cancelled: {{ counts.cancelled }}</p>
-        <p>Completed: {{ counts.completed }}</p>
+    <section class="order-stats" aria-label="Order totals">
+        {% for key, label in { total: 'All Orders', pending: 'Pending', cancelled: 'Cancelled', completed: 'Completed' } %}
+            <article class="stat-card" data-order-count="{{ key }}"><div class="stat-info"><h3>{{ counts[key] }}</h3><p>{{ label }}</p></div></article>
+        {% endfor %}
     </section>
 
-    <form method="get" action="{{ path(app.request.attributes.get('_route')) }}">
+    <form class="order-filters" method="get" action="{{ path(app.request.attributes.get('_route')) }}">
+        <div class="form-group">
         <label for="orderSearch">Search order, customer, or product</label>
-        <input id="orderSearch" name="search" value="{{ filters.search }}" placeholder="Order ID, name, email, phone, product">
+        <input class="form-control" id="orderSearch" name="search" value="{{ filters.search }}" placeholder="Order ID, name, email, phone, product">
+        </div><div class="form-group">
         <label for="orderStatus">Order status</label>
-        <select id="orderStatus" name="status">
+        <select class="form-control" id="orderStatus" name="status" data-auto-submit>
             <option value="">All statuses</option>
-            {% for option in ['Pending', 'Cancelled', 'Completed'] %}
+            {% for option in ['Pending', 'Processing', 'Cancelled', 'Completed'] %}
                 <option value="{{ option }}" {{ filters.status == option ? 'selected' : '' }}>{{ option }}</option>
             {% endfor %}
-        </select>
+        </select></div><div class="form-group">
         <label for="paymentStatus">Payment status</label>
-        <select id="paymentStatus" name="payment_status">
+        <select class="form-control" id="paymentStatus" name="payment_status" data-auto-submit>
             <option value="">All payment states</option>
-            {% for option in ['Due on delivery', 'Unverified'] %}
+            {% for option in ['Due on delivery', 'Pending', 'Paid'] %}
                 <option value="{{ option }}" {{ filters.paymentStatus == option ? 'selected' : '' }}>{{ option }}</option>
             {% endfor %}
-        </select>
+        </select></div><div class="form-group">
         <label for="dateFrom">From</label>
-        <input id="dateFrom" type="date" name="date_from" value="{{ filters.dateFrom }}">
+        <input class="form-control" id="dateFrom" type="date" name="date_from" value="{{ filters.dateFrom }}" data-auto-submit>
+        </div><div class="form-group">
         <label for="dateTo">To</label>
-        <input id="dateTo" type="date" name="date_to" value="{{ filters.dateTo }}">
-        <button type="submit">Filter</button>
-        <a href="{{ path(app.request.attributes.get('_route')) }}">Clear</a>
+        <input class="form-control" id="dateTo" type="date" name="date_to" value="{{ filters.dateTo }}" data-auto-submit>
+        </div>
     </form>
 
     <div class="table-responsive">
-        <table>
+        <table class="admin-table">
             <thead>
-                <tr><th>Order</th><th>Customer</th><th>Items</th><th>Total</th><th>Payment</th><th>Status</th><th>Placed</th><th>Actions</th></tr>
+                <tr><th>Order</th><th>Customer</th><th>Products</th><th>Total</th><th>Payment</th><th>Status</th><th>Date</th><th>Actions</th></tr>
             </thead>
             <tbody>
             {% for order in orders %}
                 {% set groupId = order.orderGroupId %}
                 {% set items = itemsByOrder[groupId]|default([]) %}
                 <tr>
-                    <td>#{{ groupId }}<br>{{ order.itemCount }} item(s)</td>
-                    <td>{{ order.firstName }} {{ order.lastName }}<br>{{ order.email }}<br>{{ order.phone }}</td>
-                    <td>
+                    <td><strong>#{{ groupId }}</strong><br><small>{{ order.itemCount }} item(s)</small></td>
+                    <td>{{ order.firstName }} {{ order.lastName }}<br><small>{{ order.email }}<br>{{ order.phone }}</small></td>
+                    <td class="order-items">
                         {% for item in items %}
-                            <div>
-                                {% if item.productImage %}<img src="{{ asset(item.productImage) }}" alt="" width="40" height="40">{% endif %}
-                                {{ item.productName }} × {{ item.quantity }}
+                            <div class="order-item">
+                                {% if item.productImage %}<img src="{{ asset(item.productImage) }}" alt="" width="36" height="36">{% endif %}
+                                <span>{{ item.productName }} × {{ item.quantity }}</span>
                             </div>
                         {% else %}
                             <span>No order items recorded</span>
                         {% endfor %}
                     </td>
                     <td>₱{{ order.orderTotal|number_format(2) }}</td>
-                    <td>{{ order.paymentMethod|default('Not recorded') }}<br>{{ order.paymentStatus }}</td>
-                    <td>{{ order.displayStatus }}</td>
+                    <td>{{ order.paymentMethod|default('Not recorded') }}<br><span class="badge badge-secondary">{{ order.paymentStatus }}</span></td>
+                    <td><span class="badge {{ order.displayStatus == 'Completed' ? 'badge-success' : (order.displayStatus == 'Cancelled' ? 'badge-danger' : 'badge-secondary') }}">{{ order.displayStatus }}</span></td>
                     <td>{{ order.createdAt|date('Y-m-d H:i') }}</td>
-                    <td>
-                        <button type="button" class="view-order" data-order-id="order-details-{{ groupId }}">View</button>
-                        {% if order.currentStatus != 'Completed' %}
-                            <form method="post" action="{{ path(statusRoute, {id: groupId}) }}" class="order-status-form">
-                                <input type="hidden" name="_token" value="{{ csrf_token(statusTokenPrefix ~ '_' ~ groupId) }}">
-                                <label>Status
-                                    <select name="status" required>
-                                        {% for option in ['Pending', 'Cancelled', 'Completed'] %}
-                                            <option value="{{ option }}" {{ order.displayStatus == option ? 'selected' : '' }}>{{ option }}</option>
-                                        {% endfor %}
-                                    </select>
-                                </label>
-                                <label>Cancellation reason
-                                    <textarea name="cancellationReason" maxlength="500" data-cancellation-reason></textarea>
-                                </label>
-                                <button type="submit">Update status</button>
+                    <td class="order-action-cell"><div class="table-row-actions">
+                        <button type="button" class="btn-sm btn-secondary" data-open-order-details="order-view-details-{{ groupId }}"><i class="fas fa-eye" aria-hidden="true"></i> View</button>
+                        {% set canModifyOrder = is_granted('ROLE_ADMIN') or not order.createdByStaffId or order.createdByStaffId == app.user.id %}
+                        {% if canModifyOrder and order.currentStatus != 'Completed' %}
+                            <button type="button" class="btn-sm btn-info" data-edit-order-details="order-edit-details-{{ groupId }}"><i class="fas fa-edit" aria-hidden="true"></i> Edit</button>
+                        {% endif %}
+                        {% if canModifyOrder and deleteRoute is defined and deleteRoute %}
+                            <form method="post" action="{{ path(deleteRoute, {id: groupId}) }}" data-deferred-action="delete" data-confirm-message="Permanently delete order #{{ groupId }}? Pending-order stock will be restored.">
+                                <input type="hidden" name="_token" value="{{ csrf_token(deleteRoute ~ '_' ~ groupId) }}">
+                                <button type="submit" class="btn-sm btn-danger"><i class="fas fa-trash" aria-hidden="true"></i> Delete</button>
                             </form>
                         {% endif %}
+                    </div>
                     </td>
                 </tr>
-                <tr id="order-details-{{ groupId }}" class="order-details" hidden>
-                    <td colspan="8">
-                        <h2>Order #{{ groupId }} details</h2>
+                <tr class="order-details-row"><td colspan="8">
+                <dialog class="order-details-modal" id="order-view-details-{{ groupId }}" aria-labelledby="order-view-details-title-{{ groupId }}">
+                    <div class="order-details-modal-header">
+                        <h3 id="order-view-details-title-{{ groupId }}">Order #{{ groupId }} Details</h3>
+                        <button class="btn-sm btn-danger" type="button" data-close-order-details aria-label="Close"><i class="fas fa-times" aria-hidden="true"></i></button>
+                    </div>
+                    <div class="order-details-body">
+                        <strong>Customer</strong>
                         <p>{{ order.firstName }} {{ order.lastName }} · {{ order.email }} · {{ order.phone }}</p>
-                        <p>Delivery address: {{ order.deliveryAddress|default('Not recorded') }}</p>
+                        <strong>Delivery address</strong>
+                        <p>{{ order.deliveryAddress|default('Not recorded') }}</p>
+                        <strong>Items</strong>
                         <ul>
                             {% for item in items %}
-                                <li>{{ item.productName }} × {{ item.quantity }} — ₱{{ item.unitPrice|number_format(2) }} each; line total ₱{{ item.totalAmount|number_format(2) }}</li>
+                                <li>{{ item.productName }} — {{ item.quantity }} × ₱{{ item.unitPrice|number_format(2) }} = ₱{{ item.totalAmount|number_format(2) }}</li>
                             {% else %}
                                 <li>No order items recorded.</li>
                             {% endfor %}
                         </ul>
-                        <p>Subtotal and total: ₱{{ order.orderTotal|number_format(2) }}<br>Delivery charge: ₱0.00<br>Payment reference: {{ order.paymentReference|default('Not recorded') }}<br>Payment status: {{ order.paymentStatus }}</p>
+                        <p>Subtotal and total: <strong>₱{{ order.orderTotal|number_format(2) }}</strong><br>
+                            Delivery fee: ₱0.00 (not configured)<br>
+                            Payment reference: {{ order.paymentReference|default('Not recorded') }}<br>
+                            Payment status: {{ order.paymentStatus }}{% if order.paymentVerifiedAt %}<br>Verified: {{ order.paymentVerifiedAt|date('Y-m-d H:i') }}{% endif %}</p>
+                        <p>Order status: {{ order.currentStatus }}</p>
                         {% if order.cancellationReason %}<p>Cancellation reason: {{ order.cancellationReason }}</p>{% endif %}
-                    </td>
-                </tr>
+                    </div>
+                </dialog>
+                {% if canModifyOrder and order.currentStatus != 'Completed' %}
+                <dialog class="order-details-modal" id="order-edit-details-{{ groupId }}" aria-labelledby="order-edit-details-title-{{ groupId }}">
+                    <div class="order-details-modal-header">
+                        <h3 id="order-edit-details-title-{{ groupId }}">Edit Order #{{ groupId }}</h3>
+                        <button class="btn-sm btn-secondary" type="button" data-close-order-details aria-label="Close"><i class="fas fa-times" aria-hidden="true"></i></button>
+                    </div>
+                    <div class="order-details-body">
+                        <p>Customer and product information is read-only. Update the order status{% if showPaymentVerification|default(false) %} or verify a pending payment{% endif %} below.</p>
+                        {% if order.currentStatus != 'Completed' %}
+                            {% set statusOptions = order.currentStatus == 'Cancelled' ? ['Pending', 'Processing'] : (order.currentStatus == 'Shipped' ? ['Pending', 'Completed'] : ['Pending', 'Processing', 'Cancelled', 'Completed']) %}
+                            <form method="post" action="{{ path(statusRoute, {id: groupId}) }}" class="order-update-form order-status-form" data-deferred-cancel-status="Cancelled" data-confirm-message="Cancel order #{{ groupId }}? The change will be applied after the 3-second Undo window.">
+                                <input type="hidden" name="_token" value="{{ csrf_token(statusTokenPrefix ~ '_' ~ groupId) }}">
+                                <label>Update order status
+                                    <select class="form-control" name="status" required data-order-status data-current-status="{{ order.displayStatus }}" data-initial-status="{{ order.displayStatus }}">
+                                        {% for option in statusOptions %}
+                                            <option value="{{ option }}" {{ order.displayStatus == option ? 'selected' : '' }}>{{ option }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </label>
+                                <label class="cancellation-reason" data-cancellation-reason-field>
+                                    Cancellation reason
+                                    <textarea class="form-control" name="cancellationReason" maxlength="500">{{ order.cancellationReason }}</textarea>
+                                </label>
+                                <button type="submit" class="btn-primary">Save status</button>
+                            </form>
+                        {% endif %}
+                        {% if showPaymentVerification|default(false) and order.paymentStatus == 'Pending' and order.currentStatus != 'Cancelled' %}
+                            <form method="post" action="{{ path(paymentVerifyRoute, {id: groupId}) }}" class="order-payment-form" data-confirm-payment>
+                                <input type="hidden" name="_token" value="{{ csrf_token(paymentVerifyRoute ~ '_' ~ groupId) }}">
+                                <button type="submit" class="btn-secondary"><i class="fas fa-check" aria-hidden="true"></i> Confirm payment received</button>
+                            </form>
+                        {% endif %}
+                    </div>
+                </dialog>
+                {% endif %}
+                </td></tr>
             {% else %}
                 <tr><td colspan="8">No customer orders match these filters.</td></tr>
             {% endfor %}
@@ -106,7 +154,7 @@
     </div>
 
     {% if totalPages > 1 %}
-        <nav aria-label="Order pages">
+        <nav class="order-pagination" aria-label="Order pages">
             <span>Page {{ page }} of {{ totalPages }} · {{ totalOrders }} orders</span>
             {% if page > 1 %}
                 <a href="{{ path(app.request.attributes.get('_route'), {search: filters.search, status: filters.status, payment_status: filters.paymentStatus, date_from: filters.dateFrom, date_to: filters.dateTo, page: page - 1}) }}">Previous</a>
@@ -116,22 +164,41 @@
             {% endif %}
         </nav>
     {% endif %}
+    </div>
 </main>
 <script>
-    document.querySelectorAll('.view-order').forEach((button) => {
-        button.addEventListener('click', () => {
-            const details = document.getElementById(button.dataset.orderId);
-            details.hidden = !details.hidden;
-        });
+    document.addEventListener('click', (event) => {
+        const target = event.target;
+        if (!(target instanceof Element)) return;
+        const closeButton = target.closest('[data-close-order-details]');
+        if (closeButton) {
+            closeButton.closest('dialog')?.close();
+            return;
+        }
+        const viewButton = target.closest('[data-open-order-details]');
+        const editButton = target.closest('[data-edit-order-details]');
+        const button = viewButton || editButton;
+        if (!button) return;
+        const dialog = document.getElementById(button.dataset.openOrderDetails || button.dataset.editOrderDetails);
+        if (!dialog) return;
+        dialog.showModal();
+        if (editButton) dialog.querySelector('[data-order-status]')?.focus();
     });
 
     document.querySelectorAll('.order-status-form').forEach((form) => {
         const status = form.querySelector('select[name="status"]');
-        const reason = form.querySelector('[data-cancellation-reason]');
+        const field = form.querySelector('[data-cancellation-reason-field]');
+        const reason = field.querySelector('textarea');
         const updateReasonRequirement = () => {
-            reason.required = status.value === 'Cancelled';
+            field.hidden = status.value !== 'Cancelled';
+            reason.required = status.value === 'Cancelled' && status.value !== status.dataset.initialStatus;
         };
         status.addEventListener('change', updateReasonRequirement);
         updateReasonRequirement();
+    });
+</script>
+<script>
+    document.querySelectorAll('.order-filters [data-auto-submit]').forEach((filter) => {
+        filter.addEventListener('change', () => filter.form?.requestSubmit());
     });
 </script>

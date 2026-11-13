@@ -2,63 +2,197 @@
 {% block site_header %}{% include 'staff/_nav.html.twig' %}{% endblock %}
 {% block title %}Promotion history | Staff{% endblock %}
 {% block body %}
-<main>
-    <h1>Promotion claims</h1>
-    {% for message in app.flashes('success') %}<p role="status">{{ message }}</p>{% endfor %}
-    {% for message in app.flashes('error') %}<p role="alert">{{ message }}</p>{% endfor %}
-    <p><a href="{{ path('staff_promo_claim_new') }}">Create claim</a></p>
-    <section aria-label="Promotion claim totals">
-        <p>All claims: {{ counts.total }}</p>
-        <p>Pending: {{ counts.pending }}</p>
-        <p>Confirmed: {{ counts.confirmed }}</p>
-        <p>Completed: {{ counts.completed }}</p>
-        <p>Cancelled: {{ counts.cancelled }}</p>
-    </section>
-    <form method="get" action="{{ path('staff_promo_history') }}">
-        <label for="claimSearch">Search customer, phone, promotion, option, or username</label>
-        <input id="claimSearch" type="search" name="search" value="{{ search }}">
-        <label for="claimStatus">Status</label>
-        <select id="claimStatus" name="status">
-            <option value="">All statuses</option>
-            {% for option in ['Pending', 'Confirmed', 'Completed', 'Cancelled'] %}
-                <option value="{{ option }}" {{ status == option ? 'selected' : '' }}>{{ option }}</option>
-            {% endfor %}
-        </select>
-        <button type="submit">Filter</button>
-        <a href="{{ path('staff_promo_history') }}">Clear</a>
-    </form>
+<main class="admin-main">
+    {% include 'staff/_header.html.twig' with {title: 'Promotion Claims'} %}
+    <div class="admin-content-body">
+        {% for message in app.flashes('success') %}<p role="status" class="alert-toast" data-auto-dismiss>{{ message }}</p>{% endfor %}
+        {% for message in app.flashes('error') %}<p role="alert" class="alert-toast alert-error" data-auto-dismiss>{{ message }}</p>{% endfor %}
 
-    <table>
-        <thead><tr><th>Claim</th><th>Customer</th><th>Promotion</th><th>Appointment</th><th>Status</th><th>Actions</th></tr></thead>
-        <tbody>
-        {% for claim in claims %}
-            <tr>
-                <td>#{{ claim.id }}<br>{{ claim.user ? claim.user.username : 'Guest claim' }}</td>
-                <td>{{ claim.fullName }}<br>{{ claim.phone }}</td>
-                <td>{{ claim.bundleSlug }}<br>{{ claim.selectedOption }}</td>
-                <td>{{ claim.appointmentDate|date('M j, Y') }} {{ claim.appointmentTime|date('g:i A') }}</td>
-                <td>{{ claim.status|default('Pending') }}</td>
-                <td>
-                    <a href="{{ path('staff_promo_claim_edit', {id: claim.id}) }}">Edit details</a>
-                    <form method="post" action="{{ path('staff_promo_claim_update', {id: claim.id}) }}">
-                        <input type="hidden" name="_token" value="{{ csrf_token('staff_promo_claim_' ~ claim.id) }}">
-                        <select name="status">
-                            {% for option in ['Pending', 'Confirmed', 'Used', 'Completed', 'Cancelled'] %}
-                                <option value="{{ option }}" {{ (claim.status|default('Pending')) == option ? 'selected' : '' }}>{{ option }}</option>
-                            {% endfor %}
-                        </select>
-                        <button type="submit">Update status</button>
-                    </form>
-                    <form method="post" action="{{ path('staff_promo_claim_delete', {id: claim.id}) }}" onsubmit="return confirm('Delete this promotion claim?')">
-                        <input type="hidden" name="_token" value="{{ csrf_token('staff_promo_claim_' ~ claim.id) }}">
-                        <button type="submit">Delete</button>
-                    </form>
-                </td>
-            </tr>
-        {% else %}
-            <tr><td colspan="6">No promo claims match these filters.</td></tr>
-        {% endfor %}
-        </tbody>
-    </table>
+        <section class="order-stats" aria-label="Promotion claim totals">
+            <article class="stat-card">
+                <div class="stat-info">
+                    <h3>{{ counts.total }}</h3>
+                    <p>All claims: {{ counts.total }}</p>
+                </div>
+            </article>
+            <article class="stat-card">
+                <div class="stat-info">
+                    <h3>{{ counts.pending }}</h3>
+                    <p>Pending</p>
+                </div>
+            </article>
+            <article class="stat-card">
+                <div class="stat-info">
+                    <h3>{{ counts.confirmed }}</h3>
+                    <p>Confirmed</p>
+                </div>
+            </article>
+            <article class="stat-card">
+                <div class="stat-info">
+                    <h3>{{ counts.completed }}</h3>
+                    <p>Completed</p>
+                </div>
+            </article>
+            <article class="stat-card">
+                <div class="stat-info">
+                    <h3>{{ counts.cancelled }}</h3>
+                    <p>Cancelled</p>
+                </div>
+            </article>
+        </section>
+
+        <form id="promoClaimFilters" class="table-filters" method="get" action="{{ path('staff_promo_history') }}">
+            <label class="visually-hidden" for="claimSearch">Search</label>
+            <input id="claimSearch" type="search" name="search" value="{{ search }}" placeholder="Search customer, phone, promo, or option..." autocomplete="off">
+
+            <label class="visually-hidden" for="claimStatus">Status</label>
+            <select id="claimStatus" name="status">
+                <option value="">All statuses</option>
+                {% for option in ['Pending', 'Confirmed', 'Completed', 'Cancelled'] %}
+                    <option value="{{ option }}" {{ status == option ? 'selected' : '' }}>{{ option }}</option>
+                {% endfor %}
+            </select>
+
+            <button type="submit" class="btn-primary"><i class="fas fa-filter" aria-hidden="true"></i> Filter</button>
+            <a href="{{ path('staff_promo_history') }}" class="btn-secondary">Clear</a>
+            <a class="btn-primary" href="{{ path('staff_promo_claim_new') }}"><i class="fas fa-plus" aria-hidden="true"></i> Create Claim</a>
+        </form>
+
+        <div class="table-responsive">
+            <table class="admin-table" id="promoClaimTable">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Customer</th>
+                        <th>Promotion &amp; Option</th>
+                        <th>Appointment Date &amp; Time</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for claim in claims %}
+                    {% set canModify = is_granted('ROLE_ADMIN') or not claim.createdByStaff or claim.createdByStaff.id == app.user.id %}
+                    {% set claimDetails = {
+                        id: 'PC-' ~ claim.id,
+                        fullName: claim.fullName,
+                        phone: claim.phone|default('N/A'),
+                        promotion: claim.promo ? claim.promo.title : claim.bundleSlug,
+                        bundle: claim.bundleSlug,
+                        selectedOption: claim.selectedOption,
+                        appointmentDate: claim.appointmentDate|date('M j, Y'),
+                        appointmentTime: claim.appointmentTime|date('g:i A'),
+                        status: claim.status|default('Pending'),
+                        creator: claim.createdByStaff ? (claim.createdByStaff.firstName ~ ' ' ~ claim.createdByStaff.lastName) : 'Customer Online'
+                    } %}
+                    <tr class="promo-claim-row" data-id="{{ claim.id }}">
+                        <td><strong>#{{ claim.id }}</strong></td>
+                        <td>
+                            <strong>{{ claim.fullName }}</strong><br>
+                            <small class="text-muted">{{ claim.phone|default('N/A') }}</small>
+                            {% if claim.user %}<br><small class="text-muted">@{{ claim.user.username }}</small>{% endif %}
+                        </td>
+                        <td>
+                            <strong>{{ claim.promo ? claim.promo.title : claim.bundleSlug }}</strong><br>
+                            <small class="text-muted">{{ claim.selectedOption }}</small>
+                        </td>
+                        <td>
+                            <span>{{ claim.appointmentDate|date('M j, Y') }}</span><br>
+                            <small class="text-muted">{{ claim.appointmentTime|date('g:i A') }}</small>
+                        </td>
+                        <td>
+                            <span class="badge {{ claim.status == 'Pending' ? 'badge-pending' : (claim.status == 'Completed' ? 'badge-success' : (claim.status == 'Cancelled' ? 'badge-danger' : 'badge-secondary')) }}">
+                                {{ claim.status|default('Pending') }}
+                            </span>
+                        </td>
+                        <td class="table-row-actions">
+                            <button type="button" class="btn-sm btn-secondary view-promo-claim" data-claim="{{ claimDetails|json_encode|e('html_attr') }}">
+                                <i class="fas fa-eye" aria-hidden="true"></i> View
+                            </button>
+                            {% if canModify and claim.status not in ['Completed', 'Cancellation Pending'] %}
+                                <a class="btn-sm btn-info edit-promo-claim" href="{{ path('staff_promo_claim_edit', {id: claim.id}) }}">
+                                    <i class="fas fa-edit" aria-hidden="true"></i> Edit
+                                </a>
+                            {% endif %}
+                            {% if canModify and claim.status != 'Completed' %}
+                                <form method="post" action="{{ path('staff_promo_claim_update', {id: claim.id}) }}" data-deferred-cancel-status="Cancelled" data-confirm-message="Cancel this promotion claim? The change will be applied after the 3-second Undo window." style="display:inline-flex; align-items:center; gap:4px; margin:0;">
+                                    <input type="hidden" name="_token" value="{{ csrf_token('staff_promo_claim_' ~ claim.id) }}">
+                                    <select name="status" class="form-control" style="padding:4px 6px; font-size:0.8rem; height:auto; width:auto;" data-initial-status="{{ claim.status|default('Pending') }}">
+                                        {% for option in ['Pending', 'Confirmed', 'Used', 'Completed', 'Cancelled'] %}
+                                            <option value="{{ option }}" {{ (claim.status|default('Pending')) == option ? 'selected' : '' }}>{{ option }}</option>
+                                        {% endfor %}
+                                    </select>
+                                    <button type="submit" class="btn-sm btn-primary">Update</button>
+                                </form>
+                            {% endif %}
+                            {% if canModify and claim.status != 'Cancellation Pending' %}
+                                <form method="post" action="{{ path('staff_promo_claim_delete', {id: claim.id}) }}" data-deferred-action="delete" data-confirm-message="Delete this promotion claim? The change will be applied after the 3-second Undo window.">
+                                    <input type="hidden" name="_token" value="{{ csrf_token('staff_promo_claim_' ~ claim.id) }}">
+                                    <button type="submit" class="btn-sm btn-danger"><i class="fas fa-trash" aria-hidden="true"></i> Delete</button>
+                                </form>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% else %}
+                    <tr><td colspan="6">No promo claims match these filters.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <dialog id="staffPromoClaimDetails" class="modal-content" aria-labelledby="staffPromoClaimDetailsTitle">
+            <div class="modal-header">
+                <h3 id="staffPromoClaimDetailsTitle">Promotion Claim Details</h3>
+                <button type="button" class="close-btn" data-close-promo-details aria-label="Close">×</button>
+            </div>
+            <dl>
+                <dt>Claim ID</dt><dd data-detail="id"></dd>
+                <dt>Customer</dt><dd data-detail="fullName"></dd>
+                <dt>Phone</dt><dd data-detail="phone"></dd>
+                <dt>Promotion</dt><dd data-detail="promotion"></dd>
+                <dt>Selected Option</dt><dd data-detail="selectedOption"></dd>
+                <dt>Appointment Date</dt><dd data-detail="appointmentDate"></dd>
+                <dt>Appointment Time</dt><dd data-detail="appointmentTime"></dd>
+                <dt>Created By</dt><dd data-detail="creator"></dd>
+                <dt>Status</dt><dd data-detail="status"></dd>
+            </dl>
+            <div class="modal-footer">
+                <button type="button" class="btn-secondary" data-close-promo-details>Close</button>
+            </div>
+        </dialog>
+    </div>
 </main>
+<script>
+(() => {
+    const dialog = document.getElementById('staffPromoClaimDetails');
+    if (!dialog) return;
+
+    document.addEventListener('click', (event) => {
+        const viewBtn = event.target.closest('.view-promo-claim');
+        if (viewBtn) {
+            try {
+                const data = JSON.parse(viewBtn.dataset.claim);
+                Object.keys(data).forEach((key) => {
+                    const el = dialog.querySelector(`[data-detail="${key}"]`);
+                    if (el) el.textContent = data[key] || '—';
+                });
+                if (typeof dialog.showModal === 'function') {
+                    dialog.showModal();
+                } else {
+                    dialog.setAttribute('open', '');
+                }
+            } catch (err) {
+                console.error(err);
+            }
+        }
+        if (event.target.closest('[data-close-promo-details]')) {
+            if (typeof dialog.close === 'function') {
+                dialog.close();
+            } else {
+                dialog.removeAttribute('open');
+            }
+        }
+    });
+})();
+</script>
 {% endblock %}

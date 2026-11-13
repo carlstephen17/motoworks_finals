@@ -8,6 +8,7 @@ use App\Repository\UserRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Bundle\SecurityBundle\Security;
+use Symfony\Component\Form\FormError;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Security\Http\Authentication\AuthenticationUtils;
@@ -29,7 +30,7 @@ class SecurityController extends AbstractController
         ]);
     }
 
-    #[Route('/logout', name: 'app_logout', methods: ['GET', 'POST'])]
+    #[Route('/logout', name: 'app_logout', methods: ['POST'])]
     public function logout(): never
     {
         throw new \LogicException('The logout route is handled by the security firewall.');
@@ -48,9 +49,14 @@ class SecurityController extends AbstractController
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
-            if ($users->findOneBy(['username' => $user->getUsername()]) || $users->findOneBy(['email' => $user->getEmail()])) {
-                $this->addFlash('error', 'That username or email address is already registered.');
+            $username = strtolower(trim($user->getUsername()));
+            $email = strtolower(trim($user->getEmail()));
+            if ($users->findByLoginIdentifier($username) || $users->findByEmailInsensitive($email)) {
+                $form->addError(new FormError('That username or email address is already registered.'));
             } else {
+                $user->setUsername($username);
+                $user->setEmail($email);
+                $user->setRole('customer');
                 $user->setPassword($passwordHasher->hashPassword($user, $form->get('plainPassword')->getData()));
                 $entityManager->persist($user);
                 $entityManager->flush();

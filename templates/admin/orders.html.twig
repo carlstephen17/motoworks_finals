@@ -3,9 +3,11 @@
 {% block title %}Orders | Admin{% endblock %}
 {% block body %}
     {% include 'orders/_group_list.html.twig' with {
-        heading: 'Orders',
+        heading: 'Customer Orders',
+        headerInfo: 'Shared customer checkout orders',
         createRoute: null,
         statusRoute: 'admin_order_status',
+        deleteRoute: 'admin_order_delete',
         statusTokenPrefix: 'admin_order_status'
     } %}
 {% endblock %}

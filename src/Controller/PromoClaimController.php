@@ -8,6 +8,8 @@ use App\Entity\User;
 use App\Repository\PromoClaimRepository;
 use App\Repository\PromoRepository;
 use App\Repository\ServiceBookingRepository;
+use App\Service\CancellationActionPresenter;
+use App\Service\CancellationManager;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -31,6 +33,7 @@ class PromoClaimController extends AbstractController
             return $this->json(['success' => false, 'message' => 'Invalid security token. Refresh the page and try again.'], 403);
         }
 
+        $promoId = filter_var($request->request->get('promo_id'), FILTER_VALIDATE_INT);
         $slug = trim((string) $request->request->get('bundle_slug', ''));
         $option = trim((string) $request->request->get('selected_option', ''));
         $name = trim((string) $request->request->get('fullname', $user->getFirstName().' '.$user->getLastName()));
@@ -39,10 +42,11 @@ class PromoClaimController extends AbstractController
         $timeInput = (string) $request->request->get('appointment_time', '');
         $date = \DateTimeImmutable::createFromFormat('!Y-m-d', $dateInput);
         $time = \DateTimeImmutable::createFromFormat('!H:i', $timeInput);
-        $promo = $promos->findOneBy(['slug' => $slug, 'active' => true]);
+        $promo = $promoId ? $promos->findOneBy(['id' => $promoId, 'active' => true]) : null;
 
         if (
             !$promo
+            || $promo->getSlug() !== $slug
             || $name === ''
             || mb_strlen($name) > 255
             || !preg_match('/^[0-9+(). -]{7,20}$/', $phone)
@@ -56,10 +60,21 @@ class PromoClaimController extends AbstractController
             return $this->json(['success' => false, 'message' => 'Please provide valid promotion and appointment details.'], 422);
         }
 
-        $entityManager->persist(new PromoClaim($user, $name, $phone, $slug, $option, $date, $time));
+        $claim = new PromoClaim($user, $name, $phone, $slug, $option, $date, $time);
+        $claim->setPromo($promo);
+        $entityManager->persist($claim);
         $entityManager->flush();
 
-        return $this->json(['success' => true, 'message' => 'Promotion successfully claimed.']);
+        return $this->json([
+            'success' => true,
+            'message' => 'Promotion successfully claimed.',
+            'claim_id' => $claim->getId(),
+            'promo_id' => $promo->getId(),
+            'promo_title' => $promo->getTitle(),
+            'bundle_slug' => $promo->getSlug(),
+            'selected_option' => $option,
+            'customer_id' => $user->getId(),
+        ]);
     }
 
     #[Route('/get-claim', name: 'get_claim', methods: ['GET'])]
@@ -105,6 +120,8 @@ class PromoClaimController extends AbstractController
                 'id' => $claim->getId(),
                 'type' => $type,
                 'bundleSlug' => $claim->getBundleSlug(),
+                'promoTitle' => $claim->getPromo()?->getTitle() ?? $claim->getBundleSlug(),
+                'promoId' => $claim->getPromo()?->getId(),
                 'selectedOption' => $claim->getSelectedOption(),
                 'appointmentDate' => $claim->getAppointmentDate(),
                 'appointmentTime' => $claim->getAppointmentTime(),
@@ -119,7 +136,6 @@ class PromoClaimController extends AbstractController
 
         return $this->render('booking/claim_detail.html.twig', [
             'record' => $record,
-            'canEdit' => $user->getRole() === 'customer' && strtolower(trim($record['status'])) !== 'completed',
         ]);
     }
 
@@ -130,13 +146,17 @@ class PromoClaimController extends AbstractController
         Request $request,
         ServiceBookingRepository $bookings,
         PromoClaimRepository $promoClaims,
-        EntityManagerInterface $entityManager,
+        CancellationManager $cancellations,
+        CancellationActionPresenter $actionPresenter,
     ): Response {
         $user = $this->getUser();
         if (!$user instanceof User || $user->getRole() !== 'customer') {
             throw $this->createAccessDeniedException();
         }
         if (!$this->isCsrfTokenValid('promo_history_delete_'.$type.'_'.$id, (string) $request->request->get('_token'))) {
+            if ($request->isXmlHttpRequest()) {
+                return $this->json(['success' => false, 'message' => 'Invalid security token. Refresh the page and try again.'], 403);
+            }
             throw $this->createAccessDeniedException('Invalid security token.');
         }
 
@@ -153,88 +173,38 @@ class PromoClaimController extends AbstractController
             throw $this->createNotFoundException('Promotion claim not found.');
         }
 
-        $entityManager->remove($record);
-        $entityManager->flush();
-        $this->addFlash('success', 'Promotion claim cancelled.');
-
-        return $this->redirectToRoute('promo_history');
-    }
-
-    #[Route('/update-claim', name: 'update_claim', methods: ['POST'])]
-    public function update(
-        Request $request,
-        ServiceBookingRepository $bookings,
-        PromoClaimRepository $promoClaims,
-        PromoRepository $promos,
-        EntityManagerInterface $entityManager,
-    ): Response {
-        $user = $this->getUser();
-        if (!$user instanceof User || $user->getRole() !== 'customer') {
-            return $this->respond($request, ['success' => false, 'message' => 'You are not allowed to update this claim.'], 403);
-        }
-        if (!$this->isCsrfTokenValid('update_claim', (string) $request->request->get('csrf_token'))) {
-            return $this->respond($request, ['success' => false, 'message' => 'Invalid security token.'], 403);
+        try {
+            $action = $record instanceof ServiceBooking
+                ? $cancellations->beginAppointmentCancellation($record, $user)
+                : $cancellations->beginPromoClaimCancellation($record, $user);
+            $payload = [
+                'success' => true,
+                'message' => 'Promotion cancellation pending.',
+                'action' => $actionPresenter->present($action),
+            ];
+        } catch (\DomainException $exception) {
+            $payload = ['success' => false, 'message' => $exception->getMessage()];
         }
 
-        $id = filter_var($request->request->get('claim_id'), FILTER_VALIDATE_INT);
-        $type = (string) $request->request->get('record_type', 'service_booking');
-        $record = match ($type) {
-            'service_booking' => $id ? $bookings->find($id) : null,
-            'promo_claim' => $id ? $promoClaims->find($id) : null,
-            default => null,
-        };
-        if (
-            (!$record instanceof ServiceBooking && !$record instanceof PromoClaim)
-            || $record->getUser() !== $user
-            || ($record instanceof ServiceBooking && $record->getBundleSlug() === null)
-        ) {
-            return $this->respond($request, ['success' => false, 'message' => 'Claim not found or you do not have permission to edit it.'], 404);
-        }
-        if (strtolower(trim((string) $record->getStatus())) === 'completed') {
-            return $this->respond($request, ['success' => false, 'message' => 'Completed promotion claims cannot be edited.'], 422);
-        }
-
-        $promo = $promos->findOneBy(['slug' => $record->getBundleSlug(), 'active' => true]);
-        $option = trim((string) $request->request->get('selected_option', ''));
-        $dateInput = (string) $request->request->get('appointment_date', '');
-        $timeInput = (string) $request->request->get('appointment_time', '');
-        $date = \DateTimeImmutable::createFromFormat('!Y-m-d', $dateInput);
-        $time = \DateTimeImmutable::createFromFormat('!H:i', $timeInput);
-
-        if (
-            !$promo
-            || !in_array($option, $promo->getItemOptions(), true)
-            || !$date
-            || $date->format('Y-m-d') !== $dateInput
-            || $date < new \DateTimeImmutable('today')
-            || !$time
-            || $time->format('H:i') !== $timeInput
-        ) {
-            return $this->respond($request, ['success' => false, 'message' => 'Enter valid appointment details and a current promotion option.'], 422);
-        }
-
-        if ($record instanceof ServiceBooking) {
-            $record->setBundleOption($option);
-            $record->setBookingDate($date);
-            $record->setBookingTime($time);
-        } else {
-            $record->setSelectedOption($option);
-            $record->setAppointmentDate($date);
-            $record->setAppointmentTime($time);
-        }
-        $entityManager->flush();
-
-        return $this->respond($request, ['success' => true, 'message' => 'Promotion appointment updated.']);
-    }
-
-    private function respond(Request $request, array $payload, int $status = 200): Response
-    {
         if ($request->isXmlHttpRequest() || str_contains((string) $request->headers->get('Accept'), 'application/json')) {
-            return $this->json($payload, $status);
+            return $this->json($payload, $payload['success'] ? 200 : 409);
         }
 
         $this->addFlash($payload['success'] ? 'success' : 'error', $payload['message']);
 
         return $this->redirectToRoute('promo_history');
+    }
+
+    #[Route('/update-claim', name: 'update_claim', methods: ['POST'])]
+    public function update(Request $request): Response
+    {
+        if ($request->isXmlHttpRequest() || str_contains((string) $request->headers->get('Accept'), 'application/json')) {
+            return $this->json([
+                'success' => false,
+                'message' => 'Customers may view or cancel eligible promotion transactions, but cannot edit promo history.',
+            ], 403);
+        }
+
+        throw $this->createAccessDeniedException('Customers may view or cancel eligible promotion transactions, but cannot edit promo history.');
     }
 }

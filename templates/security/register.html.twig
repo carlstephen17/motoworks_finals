@@ -18,7 +18,7 @@
                 </div>
             {% endfor %}
 
-            {{ form_start(form, {'attr': {'class': 'auth-form'}}) }}
+            {{ form_start(form, {'attr': {'id': 'register-page-form', 'class': 'auth-form'}}) }}
                 {{ form_errors(form) }}
 
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
@@ -53,8 +53,20 @@
                 </div>
 
                 <div>
-                    <label for="{{ form.plainPassword.vars.id }}" style="display: block; margin-bottom: 4px; font-size: 0.85rem; color: #94a3b8;">Password</label>
-                    {{ form_widget(form.plainPassword, {'attr': {'class': 'auth-input', 'placeholder': 'At least 8 characters'}}) }}
+                    {{ form_label(form.plainPassword.first, 'Password', {'label_attr': {'style': 'display: block; margin-bottom: 4px; font-size: 0.85rem; color: #94a3b8;'}}) }}
+                    <div class="password-container">
+                        {{ form_widget(form.plainPassword.first, {'attr': {'class': 'auth-input auth-input-padded-r', 'placeholder': 'At least 8 characters'}}) }}
+                        <button type="button" class="toggle-password" aria-label="Show or hide password" aria-pressed="false" onclick="togglePasswordVisibility('{{ form.plainPassword.first.vars.id }}', this)">
+                            <i class="fa-solid fa-eye"></i>
+                        </button>
+                    </div>
+                    {{ form_label(form.plainPassword.second, 'Confirm password', {'label_attr': {'style': 'display: block; margin: 8px 0 4px; font-size: 0.85rem; color: #94a3b8;'}}) }}
+                    <div class="password-container">
+                        {{ form_widget(form.plainPassword.second, {'attr': {'class': 'auth-input auth-input-padded-r'}}) }}
+                        <button type="button" class="toggle-password" aria-label="Show or hide confirm password" aria-pressed="false" onclick="togglePasswordVisibility('{{ form.plainPassword.second.vars.id }}', this)">
+                            <i class="fa-solid fa-eye"></i>
+                        </button>
+                    </div>
                     {{ form_errors(form.plainPassword) }}
                 </div>
 

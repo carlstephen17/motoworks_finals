@@ -2,12 +2,16 @@
 {% block site_header %}{% include 'admin/_sidebar.html.twig' %}{% endblock %}
 {% block title %}Promotions | Admin{% endblock %}
 {% block body %}
-<main>
-    <h1>Promo Management</h1>
-    {% for message in app.flashes('success') %}<p role="status">{{ message }}</p>{% endfor %}
-    {% for message in app.flashes('error') %}<p role="alert">{{ message }}</p>{% endfor %}
-    <p><a href="{{ path('admin_promo_new') }}">Add promo</a></p>
-    <section aria-label="Filter promotions">
+<main class="admin-main">
+    {% include 'admin/_header.html.twig' with {
+        title: 'Promo Management',
+        action: {id: 'promoCreate', url: path('admin_promo_new'), label: 'Add Promo'}
+    } %}
+    <div class="admin-content-body">
+    {% for message in app.flashes('success') %}<p role="status" data-auto-dismiss>{{ message }}</p>{% endfor %}
+    {% for message in app.flashes('error') %}<p role="alert" data-auto-dismiss>{{ message }}</p>{% endfor %}
+    <p id="promoNotifications" class="alert-toast" role="status" aria-live="polite" hidden></p>
+    <section class="table-filters" aria-label="Filter promotions">
         <label for="promoSearch">Search promos</label>
         <input id="promoSearch" type="search">
         <label for="promoStatus">Status</label>
@@ -16,9 +20,13 @@
             <option value="1">Active</option>
             <option value="0">Inactive</option>
         </select>
+        <button type="button" class="btn-sm btn-secondary" data-open-promo-history>
+            <i class="fas fa-clock-rotate-left" aria-hidden="true"></i> Promo History
+        </button>
     </section>
-    <table>
-        <thead><tr><th>ID</th><th>Promo</th><th>Discount</th><th>Status</th><th>Actions</th></tr></thead>
+    <div class="table-responsive">
+    <table class="admin-table" id="promoTable">
+        <thead><tr><th>ID</th><th>Promo</th><th>Discount</th><th>Active / Inactive</th><th>Actions</th></tr></thead>
         <tbody>
     {% for promo in promos %}
         {% set details = {
@@ -35,44 +43,73 @@
             serviceIcon: promo.storedServiceIcon,
             active: promo.active ? 'Active' : 'Inactive'
         } %}
-        <tr class="promo-row" data-status="{{ promo.active ? '1' : '0' }}" data-search="{{ [promo.title, promo.slug, promo.description]|join(' ')|lower|e('html_attr') }}">
+        {% set editData = {
+            slug: promo.slug,
+            title: promo.title,
+            badge: promo.badge,
+            description: promo.description,
+            itemLabel: promo.itemLabel,
+            itemOptions: promo.itemOptionsText,
+            perks: promo.perks,
+            productImage: promo.productImage,
+            serviceImage: promo.serviceImage,
+            productIcon: promo.storedProductIcon,
+            serviceIcon: promo.storedServiceIcon,
+            active: promo.active
+        } %}
+        <tr class="promo-row" data-id="{{ promo.id }}" data-status="{{ promo.active ? '1' : '0' }}" data-search="{{ [promo.title, promo.slug, promo.description]|join(' ')|lower|e('html_attr') }}">
             <td>{{ promo.id }}</td>
-            <td><strong>{{ promo.title }}</strong><br><small>{{ promo.slug }}</small></td>
-            <td>{{ promo.badge }}</td>
-            <td>
-                {{ promo.active ? 'Active' : 'Inactive' }}
-                <form method="post" action="{{ path('admin_promo_status', {id: promo.id}) }}">
-                    <input type="hidden" name="_token" value="{{ csrf_token('admin_promo_status_' ~ promo.id) }}">
-                    <input type="hidden" name="active" value="{{ promo.active ? '0' : '1' }}">
-                    <button type="submit">{{ promo.active ? 'Deactivate' : 'Activate' }}</button>
-                </form>
-            </td>
-            <td>
-                <button type="button" class="view-promo" data-promo="{{ details|json_encode|e('html_attr') }}">View</button>
-                <a href="{{ path('admin_promo_edit', {id: promo.id}) }}">Edit</a>
-                <form method="post" action="{{ path('admin_promo_delete', {id: promo.id}) }}" onsubmit="return confirm('Deactivate this promo and retain its claim history?')">
+            <td><strong data-promo-field="title">{{ promo.title }}</strong><br><small data-promo-field="slug">{{ promo.slug }}</small></td>
+            <td data-promo-field="badge">{{ promo.badge }}</td>
+            <td><span class="badge {{ promo.active ? 'badge-success' : 'badge-danger' }}" data-promo-status>{{ promo.active ? 'Active' : 'Inactive' }}</span></td>
+            <td class="table-row-actions">
+                <button type="button" class="btn-sm btn-secondary view-promo" data-promo="{{ details|json_encode|e('html_attr') }}"><i class="fas fa-eye" aria-hidden="true"></i> View</button>
+                <a href="{{ path('admin_promo_edit', {id: promo.id}) }}" class="btn-sm btn-info promo-edit" data-action="{{ path('admin_promo_edit', {id: promo.id}) }}" data-promo="{{ editData|json_encode|e('html_attr') }}"><i class="fas fa-edit" aria-hidden="true"></i> Edit</a>
+                <form method="post" action="{{ path('admin_promo_delete', {id: promo.id}) }}" data-deferred-action="delete" data-confirm-message="Delete this promotion and retain its claim history? The change will be applied after the 3-second Undo window.">
                     <input type="hidden" name="_token" value="{{ csrf_token('admin_promo_delete_' ~ promo.id) }}">
-                    <button type="submit">Deactivate</button>
+                    <button type="submit" class="btn-sm btn-danger"><i class="fas fa-trash" aria-hidden="true"></i> Delete</button>
                 </form>
             </td>
         </tr>
     {% else %}
-        <tr><td colspan="5">No promotions.</td></tr>
+        <tr id="noPromosEmpty"><td colspan="5" class="text-center">No promos found. Add a promo to display it to customers.</td></tr>
     {% endfor %}
         <tr id="noPromoMatch" hidden><td colspan="5">No promos match your search.</td></tr>
         </tbody>
     </table>
-    <dialog id="promoDetails">
-        <h2>Promo details</h2>
+    </div>
+    <dialog id="promoDetails" class="modal-content">
+        <div class="modal-header"><h3>Promo details</h3></div>
         <dl id="promoDetailsList"></dl>
-        <button type="button" id="closePromoDetails">Close</button>
+        <div class="modal-footer"><button type="button" id="closePromoDetails" class="btn-secondary">Close</button></div>
     </dialog>
+    <dialog id="promoFormDialog" class="modal-content" aria-labelledby="promoFormTitle">
+        <div class="modal-header">
+            <h3 id="promoFormTitle">Create promotion</h3>
+            <button type="button" class="close-btn" data-close-promo-form aria-label="Close">×</button>
+        </div>
+        {{ form_start(promoForm, {action: path('admin_promo_new'), attr: {id: 'promoAdminForm'}}) }}
+            {{ form_widget(promoForm) }}
+            <div class="modal-footer">
+                <button type="submit" class="btn-primary">Save promotion</button>
+                <button type="button" class="btn-secondary" data-close-promo-form>Cancel</button>
+            </div>
+        {{ form_end(promoForm) }}
+    </dialog>
+    {% include 'admin/_promo_history_modal.html.twig' %}
+</div>
 </main>
 <script>
+(() => {
+    const table = document.getElementById('promoTable');
     const promoSearch = document.getElementById('promoSearch');
     const promoStatus = document.getElementById('promoStatus');
-    const promoRows = [...document.querySelectorAll('.promo-row')];
+    let promoRows = [...document.querySelectorAll('.promo-row')];
     const noPromoMatch = document.getElementById('noPromoMatch');
+    const formDialog = document.getElementById('promoFormDialog');
+    const promoForm = document.getElementById('promoAdminForm');
+    const createLink = document.getElementById('promoCreate');
+    if (!table || !promoSearch || !promoStatus || !noPromoMatch || !formDialog || !promoForm || !createLink) return;
 
     function filterPromos() {
         const query = promoSearch.value.trim().toLowerCase();
@@ -92,9 +129,99 @@
 
     const promoDetails = document.getElementById('promoDetails');
     const promoDetailsList = document.getElementById('promoDetailsList');
-    document.querySelectorAll('.view-promo').forEach((button) => {
-        button.addEventListener('click', () => {
-            const promo = JSON.parse(button.dataset.promo);
+    document.getElementById('closePromoDetails').addEventListener('click', () => promoDetails.close());
+
+    const formTitle = document.getElementById('promoFormTitle');
+    const assignFormValue = (field, value) => {
+        const control = promoForm.elements.namedItem(`promo[${field}]`);
+        if (!control) return;
+        if (control.type === 'checkbox') control.checked = Boolean(value);
+        else if (field === 'active') control.value = value ? '1' : '0';
+        else control.value = value ?? '';
+    };
+
+    const makeIconButton = (label, className, iconClass) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = className;
+        const icon = document.createElement('i');
+        icon.className = iconClass;
+        icon.setAttribute('aria-hidden', 'true');
+        button.append(icon, document.createTextNode(` ${label}`));
+        return button;
+    };
+
+    const makePromoRow = (promo, deleteToken) => {
+        const row = document.createElement('tr');
+        row.className = 'promo-row';
+        row.dataset.id = String(promo.id);
+        row.dataset.status = promo.active ? '1' : '0';
+        row.dataset.search = [promo.title, promo.slug, promo.description].join(' ').toLowerCase();
+
+        const idCell = document.createElement('td');
+        idCell.textContent = String(promo.id);
+        const titleCell = document.createElement('td');
+        const title = document.createElement('strong');
+        title.dataset.promoField = 'title';
+        title.textContent = promo.title;
+        const slug = document.createElement('small');
+        slug.dataset.promoField = 'slug';
+        slug.textContent = promo.slug;
+        titleCell.append(title, document.createElement('br'), slug);
+        const badgeCell = document.createElement('td');
+        badgeCell.dataset.promoField = 'badge';
+        badgeCell.textContent = promo.badge;
+        const statusCell = document.createElement('td');
+        const statusBadge = document.createElement('span');
+        statusBadge.className = `badge ${promo.active ? 'badge-success' : 'badge-danger'}`;
+        statusBadge.dataset.promoStatus = '';
+        statusBadge.textContent = promo.active ? 'Active' : 'Inactive';
+        statusCell.append(statusBadge);
+
+        const actionCell = document.createElement('td');
+        actionCell.className = 'table-row-actions';
+        const details = {...promo, active: promo.active ? 'Active' : 'Inactive'};
+        const viewButton = makeIconButton('View', 'btn-sm btn-secondary view-promo', 'fas fa-eye');
+        viewButton.dataset.promo = JSON.stringify(details);
+        const editButton = document.createElement('a');
+        editButton.href = promo.editUrl;
+        editButton.className = 'btn-sm btn-info promo-edit';
+        editButton.dataset.action = editButton.href;
+        editButton.dataset.promo = JSON.stringify(promo);
+        const editIcon = document.createElement('i');
+        editIcon.className = 'fas fa-edit';
+        editIcon.setAttribute('aria-hidden', 'true');
+        editButton.append(editIcon, document.createTextNode(' Edit'));
+
+        const deleteForm = document.createElement('form');
+        deleteForm.method = 'post';
+        deleteForm.action = promo.deleteUrl;
+        deleteForm.dataset.deferredAction = 'delete';
+        deleteForm.dataset.confirmMessage = 'Delete this promotion and retain its claim history? The change will be applied after the 3-second Undo window.';
+        const token = document.createElement('input');
+        token.type = 'hidden';
+        token.name = '_token';
+        token.value = deleteToken;
+        const deleteButton = makeIconButton('Delete', 'btn-sm btn-danger', 'fas fa-trash');
+        deleteButton.type = 'submit';
+        deleteForm.append(token, deleteButton);
+        actionCell.append(viewButton, editButton, deleteForm);
+        row.append(idCell, titleCell, badgeCell, statusCell, actionCell);
+
+        return row;
+    };
+
+    createLink.addEventListener('click', (event) => {
+        event.preventDefault();
+        promoForm.reset();
+        promoForm.action = createLink.dataset.createUrl;
+        formTitle.textContent = 'Create promotion';
+        formDialog.showModal();
+    });
+    table.addEventListener('click', (event) => {
+        const viewButton = event.target.closest('.view-promo');
+        if (viewButton) {
+            const promo = JSON.parse(viewButton.dataset.promo);
             promoDetailsList.replaceChildren();
             Object.entries(promo).forEach(([label, value]) => {
                 const term = document.createElement('dt');
@@ -104,8 +231,106 @@
                 promoDetailsList.append(term, detail);
             });
             promoDetails.showModal();
-        });
+            return;
+        }
+
+        const link = event.target.closest('.promo-edit');
+        if (!link) return;
+        event.preventDefault();
+        const promo = JSON.parse(link.dataset.promo);
+        promoForm.reset();
+        Object.entries(promo).forEach(([field, value]) => assignFormValue(field, value));
+        promoForm.action = link.dataset.action;
+        formTitle.textContent = 'Edit promotion';
+        formDialog.showModal();
     });
-    document.getElementById('closePromoDetails').addEventListener('click', () => promoDetails.close());
+    formDialog.querySelectorAll('[data-close-promo-form]').forEach((button) => {
+        button.addEventListener('click', () => formDialog.close());
+    });
+
+    const notification = document.getElementById('promoNotifications');
+    let notificationTimeout;
+    const showNotification = (message, success) => {
+        if (typeof window.showAdminToast === 'function') {
+            window.showAdminToast(message, success ? 'success' : 'error');
+            return;
+        }
+
+        if (notificationTimeout) window.clearTimeout(notificationTimeout);
+        notification.textContent = message;
+        notification.className = success ? 'alert-toast' : 'alert-toast alert-error';
+        notification.setAttribute('role', success ? 'status' : 'alert');
+        notification.hidden = false;
+        notificationTimeout = window.setTimeout(() => {
+            notification.hidden = true;
+            notificationTimeout = null;
+        }, 3000);
+    };
+
+    promoForm.addEventListener('submit', async (event) => {
+        const editPath = new URL(promoForm.action, window.location.href).pathname;
+        const isEdit = /^\/admin\/promos\/\d+\/edit$/.test(editPath);
+        const isCreate = editPath === new URL(createLink.dataset.createUrl, window.location.href).pathname;
+        if (!isEdit && !isCreate) return;
+        event.preventDefault();
+        if (promoForm.dataset.submitting === 'true') return;
+        promoForm.dataset.submitting = 'true';
+        const submitButton = event.submitter;
+        if (submitButton) submitButton.disabled = true;
+
+        try {
+            const response = await fetch(promoForm.action, {
+                method: 'POST',
+                body: new FormData(promoForm),
+                headers: {
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                credentials: 'same-origin'
+            });
+            const contentType = response.headers.get('content-type') || '';
+            const result = contentType.includes('application/json') ? await response.json() : {};
+            if (!response.ok) {
+                throw new Error(result.message || `Promotion ${isCreate ? 'creation' : 'update'} failed (${response.status}).`);
+            }
+
+            const promo = result.promo;
+            if (!promo) throw new Error(`The server did not return the ${isCreate ? 'created' : 'updated'} promotion.`);
+            if (isCreate) {
+                const row = makePromoRow(promo, result.deleteToken);
+                const emptyRow = document.getElementById('noPromosEmpty');
+                if (emptyRow) emptyRow.remove();
+                table.querySelector('tbody').insertBefore(row, noPromoMatch);
+            } else {
+                const row = table.querySelector(`.promo-row[data-id="${promo.id}"]`);
+                if (!row) throw new Error('The updated promotion row could not be found.');
+                row.dataset.status = promo.active ? '1' : '0';
+                row.dataset.search = [promo.title, promo.slug, promo.description].join(' ').toLowerCase();
+                row.querySelector('[data-promo-field="title"]').textContent = promo.title;
+                row.querySelector('[data-promo-field="slug"]').textContent = promo.slug;
+                row.querySelector('[data-promo-field="badge"]').textContent = promo.badge;
+                const statusBadge = row.querySelector('[data-promo-status]');
+                statusBadge.textContent = promo.active ? 'Active' : 'Inactive';
+                statusBadge.classList.toggle('badge-success', promo.active);
+                statusBadge.classList.toggle('badge-danger', !promo.active);
+                row.querySelector('.view-promo').dataset.promo = JSON.stringify({
+                    ...promo,
+                    active: promo.active ? 'Active' : 'Inactive'
+                });
+                row.querySelector('.promo-edit').dataset.promo = JSON.stringify(promo);
+            }
+            promoRows = [...table.querySelectorAll('.promo-row')];
+            filterPromos();
+            formDialog.close();
+            showNotification(result.message || 'Promotion updated.', true);
+        } catch (error) {
+            console.error('Unable to update the promotion.', error);
+            showNotification(error.message || 'Unable to update the promotion. Please try again.', false);
+        } finally {
+            promoForm.dataset.submitting = 'false';
+            if (submitButton) submitButton.disabled = false;
+        }
+    });
+})();
 </script>
 {% endblock %}

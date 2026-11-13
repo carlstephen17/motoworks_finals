@@ -2,11 +2,14 @@
 {% block site_header %}{% include 'admin/_sidebar.html.twig' %}{% endblock %}
 {% block title %}Products | Admin{% endblock %}
 {% block body %}
-<main>
-    <h1>Products</h1>
-    {% for message in app.flashes('success') %}<p role="status">{{ message }}</p>{% endfor %}
-    {% for message in app.flashes('error') %}<p role="alert">{{ message }}</p>{% endfor %}
-    <p><a href="{{ path('admin_product_new') }}" id="productCreate" data-create-url="{{ path('admin_product_new') }}">Create product</a></p>
+<main class="admin-main">
+    {% include 'admin/_header.html.twig' with {
+        title: 'Products Management',
+        action: {id: 'productCreate', url: path('admin_product_new'), label: 'Add Product'}
+    } %}
+    <div class="admin-content-body">
+    {% for message in app.flashes('success') %}<p role="status" data-auto-dismiss>{{ message }}</p>{% endfor %}
+    {% for message in app.flashes('error') %}<p role="alert" data-auto-dismiss>{{ message }}</p>{% endfor %}
     <div class="table-filters">
         <label for="productSearch">Search products</label>
         <input id="productSearch" type="search" placeholder="Search products by name..." autocomplete="off">
@@ -17,6 +20,7 @@
             <option value="0">Inactive</option>
         </select>
     </div>
+    <div class="table-responsive">
     <table class="admin-table" id="productTable">
         <thead><tr><th>ID</th><th>Image</th><th>Product name</th><th>Price</th><th>Status</th><th>Stock</th><th>Actions</th></tr></thead>
         <tbody>
@@ -32,19 +36,14 @@
                 </td>
                 <td>{{ product.name }}</td>
                 <td>₱{{ product.price|number_format(2) }}</td>
-                <td>{{ product.active ? 'Active' : 'Inactive' }}</td>
+                <td><span class="badge {{ product.active ? 'badge-success' : 'badge-danger' }}">{{ product.active ? 'Active' : 'Inactive' }}</span></td>
                 <td>{{ product.stock }}</td>
-                <td>
-                    <button type="button" class="product-view" data-id="{{ product.id }}" data-name="{{ product.name }}" data-price="{{ product.price }}" data-stock="{{ product.stock }}" data-status="{{ product.active ? 'Active' : 'Inactive' }}" data-image="{{ product.image ? asset(product.image) : '' }}">View</button>
-                    <a href="{{ path('admin_product_edit', {id: product.id}) }}" class="product-edit" data-action="{{ path('admin_product_edit', {id: product.id}) }}" data-id="{{ product.id }}" data-name="{{ product.name }}" data-price="{{ product.price }}" data-stock="{{ product.stock }}" data-active="{{ product.active ? '1' : '0' }}">Edit</a>
-                    <form method="post" action="{{ path('admin_stock_update', {id: product.id}) }}">
-                        <input type="hidden" name="_token" value="{{ csrf_token('admin_stock_update_' ~ product.id) }}">
-                        <label>Stock <input name="stock" type="number" min="0" value="{{ product.stock }}" required></label>
-                        <button type="submit">Update stock</button>
-                    </form>
-                    <form method="post" action="{{ path('admin_product_delete', {id: product.id}) }}">
+                <td class="table-row-actions">
+                    <button type="button" class="btn-sm btn-secondary product-view" data-id="{{ product.id }}" data-name="{{ product.name }}" data-price="{{ product.price }}" data-stock="{{ product.stock }}" data-status="{{ product.active ? 'Active' : 'Inactive' }}" data-image="{{ product.image ? asset(product.image) : '' }}"><i class="fas fa-eye" aria-hidden="true"></i> View</button>
+                    <a href="{{ path('admin_product_edit', {id: product.id}) }}" class="btn-sm btn-info product-edit" data-action="{{ path('admin_product_edit', {id: product.id}) }}" data-id="{{ product.id }}" data-name="{{ product.name }}" data-price="{{ product.price }}" data-stock="{{ product.stock }}" data-active="{{ product.active ? '1' : '0' }}"><i class="fas fa-edit" aria-hidden="true"></i> Edit</a>
+                    <form method="post" action="{{ path('admin_product_delete', {id: product.id}) }}" data-deferred-action="delete" data-confirm-message="Delete or deactivate this product? The change will be applied after the 3-second Undo window.">
                         <input type="hidden" name="_token" value="{{ csrf_token('admin_product_delete_' ~ product.id) }}">
-                        <button type="submit">Delete / deactivate</button>
+                        <button type="submit" class="btn-sm btn-danger"><i class="fas fa-trash" aria-hidden="true"></i> Delete</button>
                     </form>
                 </td>
             </tr>
@@ -53,25 +52,64 @@
         {% endfor %}
         </tbody>
     </table>
-    <dialog id="productDetails" aria-labelledby="productDetailsTitle">
-        <h2 id="productDetailsTitle">Product details</h2>
+    </div>
+    <dialog id="productDetails" class="modal-content" aria-labelledby="productDetailsTitle">
+        <div class="modal-header"><h3 id="productDetailsTitle">Product details</h3></div>
         <img data-product-image alt="" width="100" height="100" style="object-fit: cover;">
         <p><strong>ID:</strong> <span data-product-id></span></p>
         <p><strong>Name:</strong> <span data-product-name></span></p>
         <p><strong>Price:</strong> <span data-product-price></span></p>
         <p><strong>Status:</strong> <span data-product-status></span></p>
         <p><strong>Stock:</strong> <span data-product-stock></span></p>
-        <button type="button" data-close-product-details>Close</button>
+        <div class="modal-footer"><button type="button" class="btn-secondary" data-close-product-details>Close</button></div>
     </dialog>
-    <dialog id="productFormDialog" aria-labelledby="productFormTitle">
-        <h2 id="productFormTitle">Create product</h2>
-        <p>When editing, leave the image empty to keep the current image.</p>
-        {{ form_start(productForm, {action: path('admin_product_new'), attr: {id: 'productAdminForm'}}) }}
-            {{ form_widget(productForm) }}
-            <button type="submit">Save product</button>
-            <button type="button" data-close-product-form>Cancel</button>
+    <dialog id="productFormDialog" class="modal-content product-form-dialog" aria-labelledby="productFormTitle" aria-describedby="productFormDescription">
+        <div class="modal-header">
+            <div>
+                <span class="product-form-eyebrow">PRODUCT CATALOG</span>
+                <h3 id="productFormTitle">Create product</h3>
+            </div>
+            <button type="button" class="close-btn" data-close-product-form aria-label="Close product form">×</button>
+        </div>
+        <p id="productFormDescription" class="product-form-intro">Add product details to make this item available in your catalog.</p>
+        {{ form_start(productForm, {action: path('admin_product_new'), attr: {id: 'productAdminForm', class: 'product-admin-form'}}) }}
+            <div class="product-form-grid">
+                <div class="product-form-field product-form-field-full">
+                    {{ form_label(productForm.name, 'Product name') }}
+                    {{ form_widget(productForm.name, {attr: {class: 'form-control', placeholder: 'e.g. Premium Coffee Beans'}}) }}
+                    {{ form_errors(productForm.name) }}
+                </div>
+                <div class="product-form-field">
+                    {{ form_label(productForm.price, 'Price') }}
+                    {{ form_widget(productForm.price, {attr: {class: 'form-control', placeholder: '0.00', inputmode: 'decimal'}}) }}
+                    {{ form_errors(productForm.price) }}
+                </div>
+                <div class="product-form-field">
+                    {{ form_label(productForm.stock, 'Stock quantity') }}
+                    {{ form_widget(productForm.stock, {attr: {class: 'form-control', min: 0, placeholder: '0'}}) }}
+                    {{ form_errors(productForm.stock) }}
+                </div>
+                <div class="product-form-field product-form-field-full">
+                    {{ form_label(productForm.imageFile, 'Product image') }}
+                    {{ form_widget(productForm.imageFile, {attr: {class: 'form-control product-form-file'}}) }}
+                    <small class="product-form-help">Optional. JPG, PNG, or WebP up to 5 MB.</small>
+                    {{ form_errors(productForm.imageFile) }}
+                </div>
+                <div class="product-form-toggle product-form-field-full">
+                    {{ form_widget(productForm.active, {attr: {class: 'product-form-checkbox'}}) }}
+                    <div>
+                        {{ form_label(productForm.active, 'Available for sale') }}
+                        <small class="product-form-help">Customers can see and purchase active products.</small>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-secondary" data-close-product-form>Cancel</button>
+                <button type="submit" class="btn-primary"><i class="fas fa-plus" aria-hidden="true"></i> Save product</button>
+            </div>
         {{ form_end(productForm) }}
     </dialog>
+</div>
 </main>
 <script>
 (() => {
@@ -114,6 +152,7 @@
         form.reset();
         form.action = createLink.dataset.createUrl;
         title.textContent = 'Create product';
+        document.getElementById('productFormDescription').textContent = 'Add product details to make this item available in your catalog.';
         formDialog.showModal();
     });
     table.addEventListener('click', event => {
@@ -127,9 +166,12 @@
         form.elements.namedItem('product[stock]').value = link.dataset.stock;
         form.elements.namedItem('product[active]').checked = link.dataset.active === '1';
         title.textContent = 'Edit product';
+        document.getElementById('productFormDescription').textContent = 'Update product details. Leave the image empty to keep the current image.';
         formDialog.showModal();
     });
-    formDialog.querySelector('[data-close-product-form]').addEventListener('click', () => formDialog.close());
+    formDialog.querySelectorAll('[data-close-product-form]').forEach(button => {
+        button.addEventListener('click', () => formDialog.close());
+    });
 })();
 </script>
 {% endblock %}

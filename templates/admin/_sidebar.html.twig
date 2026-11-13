@@ -1,11 +1,37 @@
-<nav aria-label="Admin navigation">
-    <a href="{{ path('admin_dashboard') }}">Dashboard</a>
-    <a href="{{ path('admin_users') }}">Users</a>
-    <a href="{{ path('admin_products') }}">Products</a>
-    <a href="{{ path('admin_orders') }}">Orders</a>
-    <a href="{{ path('admin_appointments') }}">Appointments</a>
-    <a href="{{ path('admin_services') }}">Services</a>
-    <a href="{{ path('admin_promos') }}">Promotions</a>
-    <a href="{{ path('admin_promo_history') }}">Promotion history</a>
-    <a href="{{ path('app_home') }}">View site</a>
-</nav>
+<aside class="admin-sidebar">
+    <div class="sidebar-brand">
+        <a href="{{ path('admin_dashboard') }}"><h2>MotoWorks Admin</h2></a>
+    </div>
+    <nav aria-label="Admin navigation">
+        <ul class="sidebar-menu">
+            {% set adminNavigation = [
+                {route: 'admin_dashboard', label: 'Dashboard', path: path('admin_dashboard'), icon: 'fa-house'},
+                {route: 'admin_products', label: 'Products', path: path('admin_products'), icon: 'fa-box'},
+                {route: 'admin_orders', label: 'Orders', path: path('admin_orders'), icon: 'fa-cart-shopping'},
+                {route: 'admin_services', label: 'Services', path: path('admin_services'), icon: 'fa-concierge-bell'},
+                {route: 'admin_appointments', label: 'Appointments', path: path('admin_appointments'), icon: 'fa-calendar-check'},
+                {route: 'admin_promos', label: 'Promo', path: path('admin_promos'), icon: 'fa-tags', history: false},
+                {route: 'admin_promos', label: 'Promo History', path: path('admin_promos', {history: 1}), icon: 'fa-tags', history: true},
+                {route: 'admin_users', label: 'Users', path: path('admin_users'), icon: 'fa-users'}
+            ] %}
+            {% for item in adminNavigation %}
+                {% set activeRoute = app.request.attributes.get('_route') %}
+                {% if item.route == 'admin_promos' %}
+                    {% set isHistoryPage = activeRoute starts with 'admin_promo_history' or (activeRoute == 'admin_promos' and app.request.query.get('history') == '1') %}
+                    {% set active = (activeRoute == 'admin_promos' or activeRoute starts with 'admin_promo_') and item.history == isHistoryPage %}
+                {% else %}
+                    {% set active = activeRoute == item.route or activeRoute starts with item.route ~ '_' %}
+                {% endif %}
+                <li class="{{ active ? 'active' : '' }}">
+                    <a href="{{ item.path }}" {{ active ? 'aria-current="page"' : '' }}><i class="fas {{ item.icon }}" aria-hidden="true"></i> {{ item.label }}</a>
+                </li>
+            {% endfor %}
+            <li class="sidebar-logout">
+                <form method="post" action="{{ path('app_logout') }}">
+                    <input type="hidden" name="_csrf_token" value="{{ csrf_token('logout') }}">
+                    <button type="submit"><i class="fas fa-sign-out-alt" aria-hidden="true"></i> Logout</button>
+                </form>
+            </li>
+        </ul>
+    </nav>
+</aside>

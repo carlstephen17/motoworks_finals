@@ -37,6 +37,10 @@ class ServiceBooking
     #[ORM\Column(name: 'bookingBundleOption', length: 255, nullable: true)]
     private ?string $bundleOption = null;
 
+    #[ORM\ManyToOne(targetEntity: Promo::class)]
+    #[ORM\JoinColumn(name: 'bookingPromoId', referencedColumnName: 'promoId', nullable: true, onDelete: 'SET NULL')]
+    private ?Promo $promo = null;
+
     #[ORM\Column(name: 'bookingStatus', length: 50, nullable: true)]
     private ?string $status = 'Pending';
 
@@ -141,6 +145,19 @@ class ServiceBooking
         return $this->bundleOption;
     }
 
+    public function getPromo(): ?Promo
+    {
+        return $this->promo;
+    }
+
+    public function setPromo(?Promo $promo): void
+    {
+        $this->promo = $promo;
+        if ($promo !== null) {
+            $this->bundleSlug = $promo->getSlug();
+        }
+    }
+
     public function setBundleOption(?string $bundleOption): void
     {
         $this->bundleOption = $bundleOption;
@@ -203,6 +220,11 @@ class ServiceBooking
     public function getRejectionReason(): ?string
     {
         return $this->rejectionReason;
+    }
+
+    public function getCreatedAt(): ?\DateTimeImmutable
+    {
+        return $this->createdAt;
     }
 
     public function setRejectionReason(?string $rejectionReason): void

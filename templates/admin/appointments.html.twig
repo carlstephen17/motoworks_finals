@@ -2,60 +2,358 @@
 {% block site_header %}{% include 'admin/_sidebar.html.twig' %}{% endblock %}
 {% block title %}Appointments | Admin{% endblock %}
 {% block body %}
-<main>
-    <h1>Appointments</h1>
-    {% for message in app.flashes('success') %}<p role="status">{{ message }}</p>{% endfor %}
-    {% for message in app.flashes('error') %}<p role="alert">{{ message }}</p>{% endfor %}
-    <p><a href="{{ path('admin_appointment_new') }}">Create appointment</a></p>
-    <section aria-label="Appointment totals">
-        <p>Total: {{ counts.total }}</p>
-        <p>Pending: {{ counts.pending }}</p>
-        <p>Cancelled: {{ counts.cancelled }}</p>
-        <p>Completed: {{ counts.completed }}</p>
-    </section>
-    <form method="get" action="{{ path('admin_appointments') }}">
-        <label for="appointmentSearch">Search by customer, vehicle, service, or appointment ID</label>
-        <input id="appointmentSearch" name="search" value="{{ search }}" autocomplete="off">
-        <label for="appointmentStatus">Status</label>
-        <select id="appointmentStatus" name="status">
-            <option value="">All statuses</option>
-            {% for option in ['Pending', 'Cancelled', 'Completed'] %}
-                <option value="{{ option }}" {{ status == option ? 'selected' : '' }}>{{ option }}</option>
+<main class="admin-main">
+    {% include 'admin/_header.html.twig' with {title: 'Service Appointments', headerInfo: 'Appointment Tracking'} %}
+    <div class="admin-content-body">
+        {% for message in app.flashes('success') %}<p role="status" data-auto-dismiss>{{ message }}</p>{% endfor %}
+        {% for message in app.flashes('error') %}<p role="alert" data-auto-dismiss>{{ message }}</p>{% endfor %}
+        <section class="order-stats appointment-stats" aria-label="Appointment totals">
+            {% for key, label in { total: 'All Appointments', pending: 'Pending', cancelled: 'Cancelled', completed: 'Completed' } %}
+                <article class="stat-card" data-appointment-count="{{ key }}"><div class="stat-info"><h3>{{ counts[key] }}</h3><p>{{ label }}</p></div></article>
             {% endfor %}
-        </select>
-        <button type="submit">Search</button>
-        <a href="{{ path('admin_appointments') }}">Clear</a>
-    </form>
-    <table>
-        <thead><tr><th>ID</th><th>Customer</th><th>Service</th><th>Vehicle</th><th>Date and time</th><th>Bundle</th><th>Status</th><th>Notes</th><th>Actions</th></tr></thead>
-        <tbody>
-    {% for booking in bookings %}
-        <tr>
-            <td>{{ booking.id }}</td>
-            <td>{{ booking.user.firstName }} {{ booking.user.lastName }}<br>{{ booking.user.email }}<br>{{ booking.user.phone }}</td>
-            <td>{{ booking.service.name }}</td>
-            <td>{{ booking.vehicleModel }}{% if booking.motorcycle and booking.motorcycle.plateNumber %}<br>{{ booking.motorcycle.plateNumber }}{% endif %}</td>
-            <td>{{ booking.bookingDate|date('M j, Y') }}<br>{{ booking.bookingTime|date('g:i A') }}</td>
-            <td>{{ booking.bundleSlug }}{% if booking.bundleOption %}<br>{{ booking.bundleOption }}{% endif %}</td>
-            <td>{{ booking.status }}{% if booking.rejectionReason %}<br>{{ booking.rejectionReason }}{% endif %}</td>
-            <td>{{ booking.notes }}</td>
-            <td>
-            <a href="{{ path('admin_appointment_edit', {id: booking.id}) }}">Edit</a>
-            <form method="post" action="{{ path('admin_appointment_status', {id: booking.id}) }}">
-                <input type="hidden" name="_token" value="{{ csrf_token('admin_appointment_status_' ~ booking.id) }}">
-                <select name="status">{% for status in ['Pending','Confirmed','Completed','Cancelled','Rejected'] %}<option {{ booking.status == status ? 'selected' : '' }}>{{ status }}</option>{% endfor %}</select>
-                <button type="submit">Update status</button>
-            </form>
-            <form method="post" action="{{ path('admin_appointment_delete', {id: booking.id}) }}" onsubmit="return confirm('Delete this appointment?')">
-                <input type="hidden" name="_token" value="{{ csrf_token('admin_appointment_delete_' ~ booking.id) }}">
-                <button type="submit">Delete</button>
-            </form>
-            </td>
-        </tr>
-    {% else %}
-        <tr><td colspan="9">No appointments match your filters.</td></tr>
-    {% endfor %}
-        </tbody>
-    </table>
+        </section>
+        <form id="appointmentFilters" class="appointment-filter-toolbar" method="get" action="{{ path('admin_appointments') }}">
+            <label class="visually-hidden" for="appointmentSearch">Search by customer, vehicle, service, or appointment ID</label>
+            <input id="appointmentSearch" name="search" value="{{ search }}" placeholder="Search by customer, vehicle, service, or appointment ID..." autocomplete="off">
+            <label class="visually-hidden" for="appointmentStatus">Status</label>
+            <select id="appointmentStatus" name="status">
+                <option value="">All statuses</option>
+                {% for option in ['Pending', 'Cancelled', 'Completed'] %}
+                    <option value="{{ option }}" {{ status == option ? 'selected' : '' }}>{{ option }}</option>
+                {% endfor %}
+            </select>
+            <button type="button" class="btn-primary" id="addAppointment" data-form-url="{{ path('admin_appointment_new') }}"><i class="fas fa-plus" aria-hidden="true"></i> Add Appointment</button>
+        </form>
+        <div class="table-responsive">
+            <table class="admin-table" id="appointmentTable">
+                <thead>
+                    <tr>
+                        <th>Appointment ID</th><th>Customer</th><th>Email</th><th>Contact</th>
+                        <th>Vehicle</th><th>Service</th><th>Price</th><th>Date / Time</th>
+                        <th>Notes</th><th>Status</th><th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for booking in bookings %}
+                    {% set displayStatus = booking.status in ['Confirmed', 'Cancellation Pending'] ? 'Pending' : (booking.status == 'Rejected' ? 'Cancelled' : booking.status) %}
+                    {% set bookingSource = booking.source == 'staff' ? 'Staff-Created Booking' ~ (booking.createdByStaff ? ' — ' ~ booking.createdByStaff.firstName ~ ' ' ~ booking.createdByStaff.lastName : '') : (booking.source == 'admin' ? 'Admin-Created Booking' : 'Customer Online Booking') %}
+                    {% set vehicle = booking.vehicleModel %}
+                    {% if booking.motorcycle and booking.motorcycle.plateNumber %}
+                        {% set vehicle = vehicle ~ ' (' ~ booking.motorcycle.plateNumber ~ ')' %}
+                    {% endif %}
+                    {% set appointmentDetails = {
+                        id: booking.id,
+                        customer: booking.user.firstName ~ ' ' ~ booking.user.lastName,
+                        email: booking.user.email,
+                        phone: booking.user.phone,
+                        vehicle: vehicle,
+                        service: booking.service.name,
+                        price: '₱' ~ booking.service.price|number_format(2, '.', ','),
+                        date: booking.bookingDate|date('M j, Y'),
+                        time: booking.bookingTime|date('g:i A'),
+                        bundle: booking.bundleSlug,
+                        bundleOption: booking.bundleOption,
+                        status: displayStatus,
+                        notes: booking.notes,
+                        cancellationReason: booking.rejectionReason,
+                        source: bookingSource
+                    } %}
+                    <tr class="appointment-row" data-id="{{ booking.id }}" data-sort="{{ booking.bookingDate|date('Y-m-d') }} {{ booking.bookingTime|date('H:i:s') }}" data-status="{{ displayStatus|default('')|e('html_attr') }}" data-search="{{ [booking.id, booking.user.firstName, booking.user.lastName, booking.user.email, booking.user.phone, booking.service.name, vehicle, booking.bundleSlug, booking.bundleOption, bookingSource]|join(' ')|lower|e('html_attr') }}">
+                        <td>{{ booking.id }}</td>
+                        <td>{{ appointmentDetails.customer }}</td>
+                        <td>{{ booking.user.email }}</td>
+                        <td>{{ booking.user.phone|default('N/A') }}</td>
+                        <td>{{ vehicle }}</td>
+                        <td>{{ booking.service.name }}</td>
+                        <td>₱{{ booking.service.price|number_format(2, '.', ',') }}</td>
+                        <td class="appointment-date-time"><span>{{ booking.bookingDate|date('M j, Y') }}</span><span>{{ booking.bookingTime|date('g:i A') }}</span></td>
+                        <td>{{ booking.notes|default('—') }}</td>
+                        <td><span class="badge {{ displayStatus == 'Completed' ? 'badge-success' : (displayStatus == 'Cancelled' ? 'badge-danger' : 'badge-secondary') }}">{{ displayStatus }}</span></td>
+                        <td class="table-row-actions">
+                            <button type="button" class="btn-sm btn-secondary view-appointment" data-appointment="{{ appointmentDetails|json_encode|e('html_attr') }}"><i class="fas fa-eye" aria-hidden="true"></i> View</button>
+                            {% if booking.status not in ['Completed', 'Cancellation Pending'] %}
+                                <a class="btn-sm btn-info edit-appointment" href="{{ path('admin_appointment_edit', {id: booking.id}) }}" data-form-url="{{ path('admin_appointment_edit', {id: booking.id}) }}"><i class="fas fa-edit" aria-hidden="true"></i> Edit</a>
+                            {% endif %}
+                            <form method="post" action="{{ path('admin_appointment_delete', {id: booking.id}) }}" data-deferred-action="delete" data-confirm-message="Delete this appointment? The change will be applied after the 3-second Undo window.">
+                                <input type="hidden" name="_token" value="{{ csrf_token('admin_appointment_delete_' ~ booking.id) }}">
+                                <button type="submit" class="btn-sm btn-danger"><i class="fas fa-trash" aria-hidden="true"></i> Delete</button>
+                            </form>
+                        </td>
+                    </tr>
+                {% else %}
+                    <tr id="noAppointmentsEmpty"><td colspan="11">No appointments match your filters.</td></tr>
+                {% endfor %}
+                    <tr id="noFilteredAppointments" hidden><td colspan="11">No appointments match these filters.</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <dialog id="appointmentDetails" class="modal-content" aria-labelledby="appointmentDetailsTitle">
+            <div class="modal-header"><h3 id="appointmentDetailsTitle">Appointment details</h3></div>
+            <dl>
+                {% for key, label in {
+                    id: 'Appointment ID',
+                    customer: 'Customer',
+                    email: 'Email',
+                    phone: 'Phone',
+                    service: 'Service',
+                    vehicleModel: 'Vehicle model',
+                    vehicle: 'Vehicle',
+                    price: 'Price',
+                    date: 'Date',
+                    time: 'Time',
+                    bundle: 'Bundle',
+                    bundleOption: 'Bundle option',
+                    status: 'Status',
+                    notes: 'Notes',
+                    cancellationReason: 'Cancellation reason',
+                    source: 'Source'
+                } %}
+                    <dt>{{ label }}</dt><dd data-appointment-detail="{{ key }}"></dd>
+                {% endfor %}
+            </dl>
+            <div class="modal-footer"><button type="button" class="btn-secondary" data-close-appointment-details>Close</button></div>
+        </dialog>
+        <p id="appointmentNotifications" class="alert-toast" role="status" aria-live="polite" hidden></p>
+        <dialog id="appointmentActionDialog" class="modal-content" aria-labelledby="appointmentActionTitle">
+            <div id="appointmentActionContent"></div>
+        </dialog>
+    </div>
 </main>
+<script>
+(() => {
+    const table = document.getElementById('appointmentTable');
+    const filters = document.getElementById('appointmentFilters');
+    const search = document.getElementById('appointmentSearch');
+    const status = document.getElementById('appointmentStatus');
+    const noMatches = document.getElementById('noFilteredAppointments');
+    const detailsDialog = document.getElementById('appointmentDetails');
+    if (!table || !filters || !search || !status || !detailsDialog) return;
+
+    let rows = [...table.querySelectorAll('.appointment-row')];
+    const filterRows = () => {
+        const query = search.value.trim().toLowerCase();
+        let visibleCount = 0;
+        rows.forEach((row) => {
+            const visible = row.dataset.search.includes(query)
+                && (!status.value || row.dataset.status === status.value);
+            row.hidden = !visible;
+            visibleCount += Number(visible);
+        });
+        if (noMatches) noMatches.hidden = visibleCount > 0;
+    };
+    search.addEventListener('input', filterRows);
+    status.addEventListener('change', filterRows);
+    filters.addEventListener('submit', (event) => {
+        event.preventDefault();
+        filterRows();
+    });
+
+    const showAppointmentDetails = (details) => {
+        Object.entries(details).forEach(([key, value]) => {
+            const target = detailsDialog.querySelector(`[data-appointment-detail="${key}"]`);
+            if (target) target.textContent = value || '—';
+        });
+        detailsDialog.showModal();
+    };
+
+    table.addEventListener('click', (event) => {
+        const viewButton = event.target.closest('.view-appointment');
+        if (viewButton) {
+            showAppointmentDetails(JSON.parse(viewButton.dataset.appointment));
+            return;
+        }
+        const editLink = event.target.closest('.edit-appointment');
+        if (!editLink) return;
+        event.preventDefault();
+        openAppointmentForm(editLink.dataset.formUrl);
+    });
+    detailsDialog.querySelector('[data-close-appointment-details]').addEventListener('click', () => detailsDialog.close());
+
+    const actionDialog = document.getElementById('appointmentActionDialog');
+    const actionContent = document.getElementById('appointmentActionContent');
+    const addButton = document.getElementById('addAppointment');
+    const notifications = document.getElementById('appointmentNotifications');
+    let notificationTimeout;
+    const showNotification = (message, success) => {
+        if (typeof window.showAdminToast === 'function') {
+            window.showAdminToast(message, success ? 'success' : 'error');
+            return;
+        }
+
+        window.clearTimeout(notificationTimeout);
+        notifications.textContent = message;
+        notifications.className = success ? 'alert-toast' : 'alert-toast alert-error';
+        notifications.setAttribute('role', success ? 'status' : 'alert');
+        notifications.hidden = false;
+        notificationTimeout = window.setTimeout(() => {
+            notifications.hidden = true;
+        }, 3000);
+    };
+
+    const openAppointmentForm = async (url) => {
+        try {
+            const response = await fetch(url, {
+                headers: {'X-Requested-With': 'XMLHttpRequest'},
+                credentials: 'same-origin'
+            });
+            if (!response.ok) throw new Error(`Appointment form could not be loaded (${response.status}).`);
+            actionContent.innerHTML = await response.text();
+            actionDialog.showModal();
+        } catch (error) {
+            console.error('Unable to load appointment form.', error);
+            showNotification(error.message || 'Unable to load the appointment form.', false);
+        }
+    };
+
+    addButton.addEventListener('click', () => openAppointmentForm(addButton.dataset.formUrl));
+    actionDialog.addEventListener('click', (event) => {
+        if (event.target.closest('[data-close-appointment-form]')) actionDialog.close();
+    });
+
+    const makeButton = (label, className, iconClass) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = className;
+        const icon = document.createElement('i');
+        icon.className = iconClass;
+        icon.setAttribute('aria-hidden', 'true');
+        button.append(icon, document.createTextNode(` ${label}`));
+        return button;
+    };
+    const setAppointmentDateTime = (cell, date, time) => {
+        const dateLine = document.createElement('span');
+        dateLine.textContent = date || '—';
+        const timeLine = document.createElement('span');
+        timeLine.textContent = time || '—';
+        cell.className = 'appointment-date-time';
+        cell.textContent = '';
+        cell.append(dateLine, timeLine);
+    };
+    const createAppointmentRow = (booking) => {
+        const row = document.createElement('tr');
+        row.className = 'appointment-row';
+        row.dataset.id = String(booking.id);
+        row.dataset.sort = booking.sortKey;
+        row.dataset.status = booking.status;
+        row.dataset.search = Object.values(booking.details).join(' ').toLowerCase();
+        const values = [booking.id, booking.customer, booking.email, booking.phone, booking.vehicle, booking.service, `₱${Number(booking.price).toLocaleString('en-US', {minimumFractionDigits: 2})}`];
+        values.forEach((value) => {
+            const cell = document.createElement('td');
+            cell.textContent = value || '—';
+            row.append(cell);
+        });
+        const dateTimeCell = document.createElement('td');
+        setAppointmentDateTime(dateTimeCell, booking.date, booking.time);
+        row.append(dateTimeCell);
+        const notesCell = document.createElement('td');
+        notesCell.textContent = booking.notes || '—';
+        row.append(notesCell);
+        const statusCell = document.createElement('td');
+        const badge = document.createElement('span');
+        badge.className = `badge ${booking.status === 'Completed' ? 'badge-success' : (booking.status === 'Cancelled' ? 'badge-danger' : 'badge-secondary')}`;
+        badge.textContent = booking.status;
+        statusCell.append(badge);
+        row.append(statusCell);
+
+        const actions = document.createElement('td');
+        actions.className = 'table-row-actions';
+        const viewButton = makeButton('View', 'btn-sm btn-secondary view-appointment', 'fas fa-eye');
+        viewButton.dataset.appointment = JSON.stringify(booking.details);
+        const editButton = makeAppointmentEditButton(booking);
+        const deleteForm = document.createElement('form');
+        deleteForm.method = 'post';
+        deleteForm.action = booking.deleteUrl;
+        deleteForm.dataset.deferredAction = 'delete';
+        deleteForm.dataset.confirmMessage = 'Delete this appointment? The change will be applied after the 3-second Undo window.';
+        const token = document.createElement('input');
+        token.type = 'hidden';
+        token.name = '_token';
+        token.value = booking.deleteToken;
+        deleteForm.append(token, makeButton('Delete', 'btn-sm btn-danger', 'fas fa-trash'));
+        deleteForm.querySelector('button').type = 'submit';
+        actions.append(viewButton);
+        if (editButton) actions.append(editButton);
+        actions.append(deleteForm);
+        row.append(actions);
+        return row;
+    };
+
+    const makeAppointmentEditButton = (booking) => {
+        if (booking.status === 'Completed' || booking.status === 'Cancellation Pending') return null;
+        const button = document.createElement('a');
+        button.href = booking.editUrl;
+        button.dataset.formUrl = booking.editUrl;
+        button.className = 'btn-sm btn-info edit-appointment';
+        button.append(document.createTextNode('Edit'));
+        return button;
+    };
+
+    const updateAppointmentRow = (booking, resultCounts) => {
+        const row = table.querySelector(`.appointment-row[data-id="${booking.id}"]`);
+        if (!row) {
+            const emptyRow = document.getElementById('noAppointmentsEmpty');
+            if (emptyRow) emptyRow.remove();
+            const followingRow = rows.find((candidate) => candidate.dataset.sort > booking.sortKey);
+            table.querySelector('tbody').insertBefore(createAppointmentRow(booking), followingRow || noMatches);
+        } else {
+            const cells = row.querySelectorAll('td');
+            const values = [booking.id, booking.customer, booking.email, booking.phone, booking.vehicle, booking.service, `₱${Number(booking.price).toLocaleString('en-US', {minimumFractionDigits: 2})}`];
+            values.forEach((value, index) => { cells[index].textContent = value || '—'; });
+            setAppointmentDateTime(cells[7], booking.date, booking.time);
+            cells[8].textContent = booking.notes || '—';
+            const badge = cells[9].querySelector('.badge');
+            badge.textContent = booking.status;
+            badge.className = `badge ${booking.status === 'Completed' ? 'badge-success' : (booking.status === 'Cancelled' ? 'badge-danger' : 'badge-secondary')}`;
+            row.dataset.status = booking.status;
+            row.dataset.sort = booking.sortKey;
+            row.dataset.search = Object.values(booking.details).join(' ').toLowerCase();
+            row.querySelector('.view-appointment').dataset.appointment = JSON.stringify(booking.details);
+            const actions = cells[10];
+            const previousEditButton = actions.querySelector('.edit-appointment');
+            const updatedEditButton = makeAppointmentEditButton(booking);
+            if (previousEditButton && !updatedEditButton) previousEditButton.remove();
+            else if (!previousEditButton && updatedEditButton) {
+                actions.insertBefore(updatedEditButton, actions.querySelector('form'));
+            }
+            const followingRow = rows.find((candidate) => candidate !== row && candidate.dataset.sort > booking.sortKey);
+            table.querySelector('tbody').insertBefore(row, followingRow || noMatches);
+        }
+        rows = [...table.querySelectorAll('.appointment-row')];
+        Object.entries(resultCounts || {}).forEach(([key, count]) => {
+            const card = document.querySelector(`[data-appointment-count="${key}"] h3`);
+            if (card) card.textContent = String(count);
+        });
+        filterRows();
+    };
+
+    actionDialog.addEventListener('submit', async (event) => {
+        const form = event.target.closest('#appointmentActionForm');
+        if (!form) return;
+        event.preventDefault();
+        if (form.dataset.submitting === 'true') return;
+        form.dataset.submitting = 'true';
+        const submitButton = event.submitter;
+        if (submitButton) submitButton.disabled = true;
+        try {
+            const response = await fetch(form.action, {
+                method: 'POST',
+                body: new FormData(form),
+                headers: {'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
+                credentials: 'same-origin'
+            });
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.message || `Appointment save failed (${response.status}).`);
+            updateAppointmentRow(result.booking, result.counts);
+            actionDialog.close();
+            showNotification(result.message || 'Appointment saved.', true);
+        } catch (error) {
+            console.error('Unable to save appointment.', error);
+            showNotification(error.message || 'Unable to save appointment.', false);
+        } finally {
+            form.dataset.submitting = 'false';
+            if (submitButton) submitButton.disabled = false;
+        }
+    });
+})();
+</script>
 {% endblock %}

@@ -19,6 +19,31 @@ class OrderStatusManager
 
     public function updateStatus(OrderItem|CustomerOrder $selectedOrder, string $nextStatus, string $cancellationReason = ''): void
     {
+        $this->applyStatus($selectedOrder, $nextStatus, $cancellationReason, false);
+    }
+
+    public function markCancellationPending(OrderItem|CustomerOrder $selectedOrder): void
+    {
+        $this->changePendingCancellationStatus($selectedOrder, 'Pending', 'Cancellation Pending');
+    }
+
+    public function restorePendingCancellation(OrderItem|CustomerOrder $selectedOrder): void
+    {
+        $this->changePendingCancellationStatus($selectedOrder, 'Cancellation Pending', 'Pending');
+    }
+
+    public function finalizePendingCancellation(OrderItem|CustomerOrder $selectedOrder): void
+    {
+        $this->applyStatus($selectedOrder, 'Cancelled', 'Cancelled by customer', true);
+    }
+
+    private function applyStatus(
+        OrderItem|CustomerOrder $selectedOrder,
+        string $nextStatus,
+        string $cancellationReason,
+        bool $finalizingPendingCancellation,
+    ): void
+    {
         if (!in_array($nextStatus, ['Pending', 'Processing', 'Shipped', 'Completed', 'Cancelled'], true)) {
             throw new \DomainException('Invalid order status.');
         }
@@ -39,6 +64,12 @@ class OrderStatusManager
 
             $items = $this->orders->findItemsInGroup($orderGroup ?? $selectedOrder);
             $currentStatus = $orderGroup?->getStatus() ?? ($selectedOrder instanceof OrderItem ? $selectedOrder->getStatus() : null) ?? 'Pending';
+            if ($currentStatus === 'Cancellation Pending' && !$finalizingPendingCancellation) {
+                throw new \DomainException('This order is awaiting cancellation confirmation.');
+            }
+            if ($finalizingPendingCancellation && $currentStatus !== 'Cancellation Pending') {
+                throw new \DomainException('This order is no longer awaiting cancellation.');
+            }
             if ($currentStatus === 'Completed') {
                 throw new \DomainException('Completed orders cannot be updated.');
             }
@@ -87,6 +118,54 @@ class OrderStatusManager
             if ($orderGroup instanceof CustomerOrder) {
                 $orderGroup->setStatus($nextStatus);
                 $orderGroup->setCancellationReason($nextStatus === 'Cancelled' ? $cancellationReason : null);
+            }
+
+            $this->entityManager->flush();
+            if ($ownsTransaction) {
+                $connection->commit();
+            }
+        } catch (\Throwable $exception) {
+            if ($ownsTransaction && $connection->isTransactionActive()) {
+                $connection->rollBack();
+                $this->entityManager->clear();
+            }
+
+            throw $exception;
+        }
+    }
+
+    private function changePendingCancellationStatus(
+        OrderItem|CustomerOrder $selectedOrder,
+        string $expectedStatus,
+        string $nextStatus,
+    ): void {
+        $connection = $this->entityManager->getConnection();
+        $ownsTransaction = !$connection->isTransactionActive();
+        if ($ownsTransaction) {
+            $connection->beginTransaction();
+        }
+
+        try {
+            $orderGroup = $selectedOrder instanceof CustomerOrder ? $selectedOrder : $selectedOrder->getCustomerOrder();
+            if ($orderGroup instanceof CustomerOrder) {
+                $this->entityManager->lock($orderGroup, LockMode::PESSIMISTIC_WRITE);
+            } else {
+                $this->entityManager->lock($selectedOrder, LockMode::PESSIMISTIC_WRITE);
+            }
+
+            $items = $this->orders->findItemsInGroup($orderGroup ?? $selectedOrder);
+            $currentStatus = $orderGroup?->getStatus() ?? ($selectedOrder instanceof OrderItem ? $selectedOrder->getStatus() : null) ?? 'Pending';
+            if ($currentStatus !== $expectedStatus) {
+                throw new \DomainException($expectedStatus === 'Pending'
+                    ? 'Only pending orders can be cancelled.'
+                    : 'This order is no longer awaiting cancellation.');
+            }
+
+            foreach ($items as $item) {
+                $item->setStatus($nextStatus);
+            }
+            if ($orderGroup instanceof CustomerOrder) {
+                $orderGroup->setStatus($nextStatus);
             }
 
             $this->entityManager->flush();
