@@ -1,11 +1,70 @@
 <div class="modal-header">
-    <h3 id="appointmentActionTitle">{{ title }}</h3>
+    <div>
+        <p class="admin-edit-eyebrow">Appointment management</p>
+        <h3 id="appointmentActionTitle">{{ title }}</h3>
+    </div>
     <button type="button" class="close-btn" data-close-appointment-form aria-label="Close">×</button>
 </div>
-{{ form_start(form, {action: action, attr: {id: 'appointmentActionForm'}}) }}
-    {{ form_widget(form) }}
+<p class="admin-edit-intro">Review the appointment details and keep its status and schedule up to date.</p>
+{{ form_start(form, {action: action, attr: {id: 'appointmentActionForm', class: 'admin-edit-form'}}) }}
+    <section class="admin-edit-section">
+        <h4 class="admin-edit-section-title">Appointment details</h4>
+        <div class="admin-edit-form-grid">
+            {% if form.customerId is defined %}
+                <div class="admin-edit-field">
+                    {{ form_label(form.customerId, 'Customer') }}
+                    {{ form_widget(form.customerId, {attr: {class: 'form-control'}}) }}
+                    {{ form_errors(form.customerId) }}
+                </div>
+                <div class="admin-edit-field">
+                    {{ form_label(form.serviceId, 'Service') }}
+                    {{ form_widget(form.serviceId, {attr: {class: 'form-control'}}) }}
+                    {{ form_errors(form.serviceId) }}
+                </div>
+            {% else %}
+                <div class="admin-edit-field">
+                    {{ form_label(form.service, 'Service') }}
+                    {{ form_widget(form.service, {attr: {class: 'form-control'}}) }}
+                    {{ form_errors(form.service) }}
+                </div>
+            {% endif %}
+            <div class="admin-edit-field">
+                {{ form_label(form.vehicleModel, 'Motorcycle model') }}
+                {{ form_widget(form.vehicleModel, {attr: {class: 'form-control'}}) }}
+                {{ form_errors(form.vehicleModel) }}
+            </div>
+            <div class="admin-edit-field">
+                {{ form_label(form.bookingDate, 'Appointment date') }}
+                {{ form_widget(form.bookingDate, {attr: {class: 'form-control'}}) }}
+                {{ form_errors(form.bookingDate) }}
+            </div>
+            <div class="admin-edit-field">
+                {{ form_label(form.bookingTime, 'Appointment time') }}
+                {{ form_widget(form.bookingTime, {attr: {class: 'form-control'}}) }}
+                {{ form_errors(form.bookingTime) }}
+            </div>
+            <div class="admin-edit-field">
+                {{ form_label(form.status, 'Status') }}
+                {{ form_widget(form.status, {attr: {class: 'form-control', required: true}}) }}
+                {{ form_errors(form.status) }}
+            </div>
+            <div class="admin-edit-field admin-edit-field-full">
+                {{ form_label(form.notes, 'Notes') }}
+                {{ form_widget(form.notes, {attr: {class: 'form-control', rows: 3}}) }}
+                {{ form_errors(form.notes) }}
+            </div>
+            {% if form.rejectionReason is defined %}
+                <div class="admin-edit-field admin-edit-field-full">
+                    {{ form_label(form.rejectionReason, 'Cancellation reason') }}
+                    {{ form_widget(form.rejectionReason, {attr: {class: 'form-control', rows: 3}}) }}
+                    {{ form_errors(form.rejectionReason) }}
+                </div>
+            {% endif %}
+        </div>
+    </section>
+    {{ form_rest(form) }}
     <div class="modal-footer">
-        <button type="submit" class="btn-primary">Save appointment</button>
         <button type="button" class="btn-secondary" data-close-appointment-form>Cancel</button>
+        <button type="submit" class="btn-primary">{{ title starts with 'Edit' ? 'Save changes' : 'Create appointment' }}</button>
     </div>
 {{ form_end(form) }}

@@ -18,7 +18,7 @@
             <label class="visually-hidden" for="appointmentStatus">Status</label>
             <select id="appointmentStatus" name="status">
                 <option value="">All statuses</option>
-                {% for option in ['Pending', 'Cancelled', 'Completed'] %}
+                {% for option in ['Pending', 'Completed', 'Cancelled'] %}
                     <option value="{{ option }}" {{ status == option ? 'selected' : '' }}>{{ option }}</option>
                 {% endfor %}
             </select>
@@ -113,8 +113,7 @@
             </dl>
             <div class="modal-footer"><button type="button" class="btn-secondary" data-close-appointment-details>Close</button></div>
         </dialog>
-        <p id="appointmentNotifications" class="alert-toast" role="status" aria-live="polite" hidden></p>
-        <dialog id="appointmentActionDialog" class="modal-content" aria-labelledby="appointmentActionTitle">
+        <dialog id="appointmentActionDialog" class="modal-content admin-edit-dialog" aria-labelledby="appointmentActionTitle">
             <div id="appointmentActionContent"></div>
         </dialog>
     </div>
@@ -172,22 +171,12 @@
     const actionDialog = document.getElementById('appointmentActionDialog');
     const actionContent = document.getElementById('appointmentActionContent');
     const addButton = document.getElementById('addAppointment');
-    const notifications = document.getElementById('appointmentNotifications');
-    let notificationTimeout;
     const showNotification = (message, success) => {
         if (typeof window.showAdminToast === 'function') {
             window.showAdminToast(message, success ? 'success' : 'error');
             return;
         }
-
-        window.clearTimeout(notificationTimeout);
-        notifications.textContent = message;
-        notifications.className = success ? 'alert-toast' : 'alert-toast alert-error';
-        notifications.setAttribute('role', success ? 'status' : 'alert');
-        notifications.hidden = false;
-        notificationTimeout = window.setTimeout(() => {
-            notifications.hidden = true;
-        }, 3000);
+        console.error(message);
     };
 
     const openAppointmentForm = async (url) => {

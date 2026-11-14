@@ -34,13 +34,7 @@ class ServiceBookingType extends AbstractType
             ->add('bookingDate', DateType::class, ['widget' => 'single_text', 'input' => 'datetime_immutable'])
             ->add('bookingTime', TimeType::class, ['widget' => 'single_text', 'input' => 'datetime_immutable'])
             ->add('status', ChoiceType::class, [
-                'choices' => [
-                    'Pending' => 'Pending',
-                    'Confirmed' => 'Confirmed',
-                    'Completed' => 'Completed',
-                    'Cancelled' => 'Cancelled',
-                    'Rejected' => 'Rejected',
-                ],
+                'choices' => $options['status_choices'],
             ])
             ->add('notes', TextareaType::class, ['required' => false, 'constraints' => [new Length(max: 2000)]])
             ->add('rejectionReason', TextareaType::class, [
@@ -55,7 +49,13 @@ class ServiceBookingType extends AbstractType
         $resolver->setDefaults([
             'data_class' => ServiceBooking::class,
             'services' => [],
+            'status_choices' => [
+                'Pending' => 'Pending',
+                'Completed' => 'Completed',
+                'Cancelled' => 'Cancelled',
+            ],
         ]);
         $resolver->setAllowedTypes('services', 'array');
+        $resolver->setAllowedTypes('status_choices', 'array');
     }
 }

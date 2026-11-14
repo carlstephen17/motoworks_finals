@@ -21,11 +21,12 @@ class AdminUserType extends AbstractType
     public function buildForm(FormBuilderInterface $builder, array $options): void
     {
         $builder
-            ->add('firstName', TextType::class, ['label' => 'First name', 'constraints' => [new NotBlank(), new Length(max: 50)]])
-            ->add('lastName', TextType::class, ['label' => 'Last name', 'constraints' => [new NotBlank(), new Length(max: 50)]])
-            ->add('username', TextType::class, ['constraints' => [new NotBlank(), new Regex('/^[A-Za-z0-9._-]{3,50}$/')]])
-            ->add('email', EmailType::class, ['constraints' => [new NotBlank(), new Email(), new Length(max: 100)]])
+            ->add('firstName', TextType::class, ['label' => 'First name', 'empty_data' => '', 'constraints' => [new NotBlank(), new Length(max: 50)]])
+            ->add('lastName', TextType::class, ['label' => 'Last name', 'empty_data' => '', 'constraints' => [new NotBlank(), new Length(max: 50)]])
+            ->add('username', TextType::class, ['empty_data' => '', 'constraints' => [new NotBlank(), new Regex('/^[A-Za-z0-9._-]{3,50}$/')]])
+            ->add('email', EmailType::class, ['empty_data' => '', 'constraints' => [new NotBlank(), new Email(), new Length(max: 100)]])
             ->add('phone', TelType::class, [
+                'empty_data' => '',
                 'attr' => [
                     'inputmode' => 'numeric',
                     'pattern' => '09[0-9]{9}',

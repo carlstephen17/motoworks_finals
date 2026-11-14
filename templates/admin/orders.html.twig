@@ -5,7 +5,7 @@
     {% include 'orders/_group_list.html.twig' with {
         heading: 'Customer Orders',
         headerInfo: 'Shared customer checkout orders',
-        createRoute: null,
+        createRoute: 'admin_order_new',
         statusRoute: 'admin_order_status',
         deleteRoute: 'admin_order_delete',
         statusTokenPrefix: 'admin_order_status'

@@ -19,7 +19,7 @@ class StaffControllerTest extends WebTestCase
     public function testStaffDashboardRetainsLegacyOverviewAndRestrictsAdminPages(): void
     {
         $client = static::createClient();
-        $staff = static::getContainer()->get(UserRepository::class)->find(6);
+        $staff = static::getContainer()->get(UserRepository::class)->findOneBy(['role' => 'staff']);
         self::assertNotNull($staff);
         $client->loginUser($staff);
 
@@ -28,10 +28,15 @@ class StaffControllerTest extends WebTestCase
         $this->assertResponseIsSuccessful();
         $this->assertSelectorExists('aside#staff-sidebar');
         $this->assertSelectorExists('a[aria-current="page"][href="/staff"]');
+        $this->assertSelectorExists('#staff-sidebar a[href="/"]');
+        $this->assertSelectorTextContains('#staff-sidebar a[href="/"]', 'Website');
         $this->assertSelectorExists('[data-sidebar-toggle]');
         $this->assertSelectorTextContains('body', 'Total Products');
         $this->assertSelectorTextContains('body', 'Total Orders');
         $this->assertSelectorTextContains('body', 'Total Service Appointments');
+        $this->assertSelectorNotExists('a[href="/staff/service-records"]');
+        $this->assertSelectorNotExists('[data-dashboard-count="serviceRecords"]');
+        self::assertStringNotContainsString('Total Service Records', (string) $client->getResponse()->getContent());
 
         $client->request('GET', '/admin/users');
         $this->assertResponseStatusCodeSame(403);
@@ -40,7 +45,7 @@ class StaffControllerTest extends WebTestCase
     public function testStaffWalkInFormsSupportRegisteredAndNewMotorcycles(): void
     {
         $client = static::createClient();
-        $staff = static::getContainer()->get(UserRepository::class)->find(6);
+        $staff = static::getContainer()->get(UserRepository::class)->findOneBy(['role' => 'staff']);
         self::assertNotNull($staff);
         $client->loginUser($staff);
 
@@ -72,7 +77,7 @@ class StaffControllerTest extends WebTestCase
     public function testStaffOrdersListGroupedRecordsAndSupportsMultipleLineItems(): void
     {
         $client = static::createClient();
-        $staff = static::getContainer()->get(UserRepository::class)->find(6);
+        $staff = static::getContainer()->get(UserRepository::class)->findOneBy(['role' => 'staff']);
         self::assertNotNull($staff);
         $client->loginUser($staff);
 
@@ -82,6 +87,17 @@ class StaffControllerTest extends WebTestCase
         $this->assertSelectorTextContains('tbody', 'H3420 Side Mirror');
         $this->assertSelectorExists('[data-confirm-payment]');
         $this->assertSelectorExists('form[action="/staff/orders"]');
+        $this->assertSelectorExists('.order-filters .order-create-button[href="/staff/orders/new"]');
+        $this->assertSelectorExists('td.table-row-actions button[data-open-order-details]');
+        $this->assertSelectorExists('td.table-row-actions button[data-edit-order-details]');
+        $this->assertSelectorNotExists('td.table-row-actions form');
+        $statusOptionSets = $client->getCrawler()->filter('.order-status-form select[data-order-status]')->each(
+            static fn ($select): array => $select->filter('option')->each(static fn ($option): ?string => $option->attr('value')),
+        );
+        self::assertNotEmpty($statusOptionSets);
+        foreach ($statusOptionSets as $options) {
+            self::assertSame(['Pending', 'Completed', 'Cancelled'], $options);
+        }
 
         $client->request('GET', '/staff/orders', ['search' => '3', 'status' => 'Pending']);
         $this->assertResponseIsSuccessful();
@@ -89,38 +105,80 @@ class StaffControllerTest extends WebTestCase
 
         $client->request('GET', '/staff/orders/new');
         $this->assertResponseIsSuccessful();
-        $this->assertSelectorExists('textarea[name="form[deliveryAddress]"]');
-        $this->assertSelectorExists('select[name="form[items][0][productId]"]');
-        $this->assertSelectorExists('input[name="form[items][0][quantity]"]');
+        $this->assertSelectorExists('textarea[name="order_create[deliveryAddress]"]');
+        $this->assertSelectorExists('select[name="order_create[items][0][productId]"]');
+        $this->assertSelectorExists('input[name="order_create[items][0][quantity]"]');
         $this->assertSelectorExists('#add-order-item');
     }
 
     public function testStaffAppointmentFiltersUseBookingDateSourceAndStatus(): void
     {
         $client = static::createClient();
-        $staff = static::getContainer()->get(UserRepository::class)->find(6);
+        $container = static::getContainer();
+        $entityManager = $container->get(EntityManagerInterface::class);
+        $staff = $container->get(UserRepository::class)->findOneBy(['role' => 'staff']);
         self::assertNotNull($staff);
         $client->loginUser($staff);
 
-        $client->request('GET', '/staff/appointments', [
-            'search' => 'Honda',
-            'status' => 'Pending',
-            'date' => '2026-11-17',
-            'source' => 'online',
-        ]);
+        $connection = $entityManager->getConnection();
+        $connection->beginTransaction();
+        try {
+            $customer = $container->get(UserRepository::class)->find(1);
+            $service = $entityManager->getRepository(Service::class)->findOneBy(['active' => true]);
+            self::assertNotNull($customer);
+            self::assertNotNull($service);
 
-        $this->assertResponseIsSuccessful();
-        $this->assertSelectorExists('#panel-action-confirmation-modal');
-        $this->assertSelectorTextContains('tbody', 'Honda Click');
-        $this->assertSelectorExists('select[name="status"]');
-        $this->assertSelectorExists('form[data-deferred-action="delete"]');
-        $this->assertSelectorExists('textarea[name="rejectionReason"]');
+            $booking = new ServiceBooking(
+                $customer,
+                $service,
+                'Honda Click',
+                new \DateTimeImmutable('2026-11-17'),
+                new \DateTimeImmutable('2026-11-17 10:00:00'),
+                null,
+                null,
+                null,
+            );
+            $booking->setSource('customer_online');
+            $entityManager->persist($booking);
+            $entityManager->flush();
+
+            $client->request('GET', '/staff/appointments', [
+                'search' => 'Honda',
+                'status' => 'Pending',
+                'date' => '2026-11-17',
+                'source' => 'online',
+            ]);
+
+            $this->assertResponseIsSuccessful();
+            $this->assertSelectorExists('#panel-action-confirmation-modal');
+            $this->assertSelectorTextContains('tbody', 'Honda Click');
+            $this->assertSelectorExists('button.view-appointment');
+            $this->assertSelectorExists('button.edit-appointment');
+            $this->assertSelectorExists('#staffAppointmentDetails');
+            $this->assertSelectorExists('#staffAppointmentEdit');
+            $this->assertSelectorExists('#appointmentFilters[data-auto-filter]');
+            $this->assertSelectorNotExists('#appointmentFilters button[type="submit"]');
+            $this->assertSelectorNotExists('#appointmentSource');
+            $this->assertSelectorNotExists('#appointmentFilters a.btn-secondary');
+            self::assertStringNotContainsString('Source', $client->getCrawler()->filter('#appointmentTable thead')->text());
+            $this->assertSelectorExists('#staffAppointmentDetails .order-details-modal-header');
+            $this->assertSelectorCount(3, '#staffAppointmentDetails .order-detail-section');
+            self::assertSame(
+                ['Pending', 'Completed', 'Cancelled'],
+                $client->getCrawler()->filter('#staffAppointmentEdit select[data-appointment-field="status"] option')->each(static fn ($option): ?string => $option->attr('value')),
+            );
+            $this->assertSelectorNotExists('.table-row-actions form');
+            $this->assertSelectorNotExists('.table-row-actions select');
+        } finally {
+            $connection->rollBack();
+            $entityManager->clear();
+        }
     }
 
     public function testStaffPromotionHistorySupportsSearchAndStatusFilters(): void
     {
         $client = static::createClient();
-        $staff = static::getContainer()->get(UserRepository::class)->find(6);
+        $staff = static::getContainer()->get(UserRepository::class)->findOneBy(['role' => 'staff']);
         self::assertNotNull($staff);
         $client->loginUser($staff);
 
@@ -130,6 +188,174 @@ class StaffControllerTest extends WebTestCase
         $this->assertSelectorExists('#claimSearch');
         $this->assertSelectorExists('#claimStatus');
         $this->assertSelectorTextContains('body', 'All claims:');
+        $this->assertSelectorExists('button.view-promo-claim');
+        $this->assertSelectorExists('button.edit-promo-claim');
+        $this->assertSelectorExists('#staffPromoClaimDetails');
+        $this->assertSelectorExists('#staffPromoClaimEdit');
+        $this->assertSelectorExists('#promoClaimFilters[data-auto-filter]');
+        $this->assertSelectorNotExists('#promoClaimFilters button[type="submit"]');
+        $this->assertSelectorNotExists('#promoClaimFilters a.btn-secondary');
+        $this->assertSelectorExists('#staffPromoClaimDetails .order-details-modal-header');
+        $this->assertSelectorCount(2, '#staffPromoClaimDetails .order-detail-section');
+        self::assertSame(
+            ['Pending', 'Completed', 'Cancelled'],
+            $client->getCrawler()->filter('#staffPromoClaimEdit select[data-promo-field="status"] option')->each(static fn ($option): ?string => $option->attr('value')),
+        );
+        $this->assertSelectorNotExists('.table-row-actions form');
+        $this->assertSelectorNotExists('.table-row-actions select');
+    }
+
+    public function testStaffEditModalsPersistAppointmentOrderAndPromotionChanges(): void
+    {
+        $client = static::createClient();
+        $container = static::getContainer();
+        $entityManager = $container->get(EntityManagerInterface::class);
+        $staff = $container->get(UserRepository::class)->findOneBy(['role' => 'staff']);
+        $customer = $container->get(UserRepository::class)->find(1);
+        $service = $entityManager->getRepository(Service::class)->findOneBy(['active' => true]);
+        $promo = $entityManager->getRepository(Promo::class)->findOneBy(['active' => true]);
+        self::assertNotNull($staff);
+        self::assertNotNull($customer);
+        self::assertNotNull($service);
+        self::assertNotNull($promo);
+        self::assertNotEmpty($promo->getItemOptions());
+
+        $client->loginUser($staff);
+        $connection = $entityManager->getConnection();
+        $connection->beginTransaction();
+        $appointment = null;
+        $claim = null;
+        $order = null;
+        try {
+            $appointment = new ServiceBooking(
+                $customer,
+                $service,
+                'Honda Click',
+                new \DateTimeImmutable('2026-11-18'),
+                new \DateTimeImmutable('2026-11-18 10:00'),
+                null,
+                null,
+                null,
+            );
+            $appointment->setSource('staff');
+            $appointment->setCreatedByStaff($staff);
+            $claim = new PromoClaim(
+                $customer,
+                $customer->getFirstName().' '.$customer->getLastName(),
+                $customer->getPhone() ?? '',
+                $promo->getSlug(),
+                $promo->getItemOptions()[0],
+                new \DateTimeImmutable('2026-11-18'),
+                new \DateTimeImmutable('2026-11-18 11:00'),
+            );
+            $claim->setPromo($promo);
+            $claim->setCreatedByStaff($staff);
+            $order = new CustomerOrder($customer, '123 Test Street', 'Cash on Delivery', 'TEST-STAFF-EDIT');
+            $order->setCreatedByStaff($staff);
+            $entityManager->persist($appointment);
+            $entityManager->persist($claim);
+            $entityManager->persist($order);
+            $entityManager->flush();
+            $connection->commit();
+
+            $appointmentId = $appointment->getId();
+            $client->request('GET', '/staff/appointments');
+            $appointmentData = json_decode(
+                (string) $client->getCrawler()->filter('tr[data-id="'.$appointmentId.'"] .edit-appointment')->attr('data-appointment'),
+                true,
+            );
+            $appointmentEditData = [
+                    'service' => (string) $service->getId(),
+                    'vehicleModel' => 'Honda Click Updated',
+                    'bookingDate' => '2026-11-19',
+                    'bookingTime' => '12:30',
+                    'status' => 'Confirmed',
+                    'notes' => 'Updated by staff',
+                    'rejectionReason' => '',
+                ];
+            $client->xmlHttpRequest('POST', '/staff/appointments/'.$appointmentId.'/edit', [
+                '_token' => $appointmentData['csrfToken'],
+                'appointment_edit' => $appointmentEditData,
+            ]);
+            $this->assertResponseStatusCodeSame(422);
+            $appointmentEditData['status'] = 'Completed';
+            $client->xmlHttpRequest('POST', '/staff/appointments/'.$appointmentId.'/edit', [
+                '_token' => $appointmentData['csrfToken'],
+                'appointment_edit' => $appointmentEditData,
+            ]);
+            $this->assertResponseIsSuccessful();
+            $appointmentResult = json_decode((string) $client->getResponse()->getContent(), true)['appointment'];
+            self::assertSame('Completed', $appointmentResult['status']);
+            self::assertSame('Honda Click Updated', $appointmentResult['edit']['vehicleModel']);
+            $entityManager->clear();
+            $appointment = $entityManager->find(ServiceBooking::class, $appointmentId);
+            self::assertSame('Honda Click Updated', $appointment?->getVehicleModel());
+
+            $claimId = $claim->getId();
+            $client->request('GET', '/staff/promo-history');
+            $claimData = json_decode(
+                (string) $client->getCrawler()->filter('tr[data-id="'.$claimId.'"] .edit-promo-claim')->attr('data-claim'),
+                true,
+            );
+            $claimEditData = [
+                    'bundleSlug' => $promo->getSlug(),
+                    'selectedOption' => $promo->getItemOptions()[0],
+                    'appointmentDate' => '2026-11-20',
+                    'appointmentTime' => '13:00',
+                    'status' => 'Used',
+                ];
+            $client->xmlHttpRequest('POST', '/staff/promo-claims/'.$claimId.'/edit', [
+                '_token' => $claimData['csrfToken'],
+                'promo_claim_edit' => $claimEditData,
+            ]);
+            $this->assertResponseStatusCodeSame(422);
+            $claimEditData['status'] = 'Completed';
+            $client->xmlHttpRequest('POST', '/staff/promo-claims/'.$claimId.'/edit', [
+                '_token' => $claimData['csrfToken'],
+                'promo_claim_edit' => $claimEditData,
+            ]);
+            $this->assertResponseIsSuccessful();
+            $claimResult = json_decode((string) $client->getResponse()->getContent(), true)['claim'];
+            self::assertSame('Completed', $claimResult['status']);
+            $entityManager->clear();
+            $claim = $entityManager->find(PromoClaim::class, $claimId);
+            self::assertSame('Completed', $claim?->getStatus());
+
+            $orderId = $order->getId();
+            $client->request('GET', '/staff/orders');
+            $orderToken = $client->getCrawler()->filter('form.order-status-form[data-order-id="'.$orderId.'"] input[name="_token"]')->attr('value');
+            $client->xmlHttpRequest('POST', '/staff/orders/'.$orderId.'/status', [
+                '_token' => $orderToken,
+                'status' => 'Completed',
+            ]);
+            $this->assertResponseIsSuccessful();
+            self::assertSame('Completed', json_decode((string) $client->getResponse()->getContent(), true)['status']);
+            $entityManager->clear();
+            $order = $entityManager->find(CustomerOrder::class, $orderId);
+            self::assertSame('Completed', $order?->getStatus());
+
+            $client->xmlHttpRequest('POST', '/staff/orders/'.$orderId.'/status', [
+                '_token' => $orderToken,
+                'status' => 'Processing',
+            ]);
+            $this->assertResponseStatusCodeSame(422);
+        } finally {
+            $entityManager->clear();
+            foreach ([
+                [ServiceBooking::class, $appointment?->getId()],
+                [PromoClaim::class, $claim?->getId()],
+                [CustomerOrder::class, $order?->getId()],
+            ] as [$class, $id]) {
+                if ($id !== null) {
+                    $entity = $entityManager->find($class, $id);
+                    if ($entity !== null) {
+                        $entityManager->remove($entity);
+                    }
+                }
+            }
+            $entityManager->flush();
+            $entityManager->clear();
+        }
     }
 
     public function testUnauthorizedAndCustomerAccessToStaffRoutesIsRestricted(): void
@@ -154,7 +380,7 @@ class StaffControllerTest extends WebTestCase
         $em = static::getContainer()->get(EntityManagerInterface::class);
         $userRepo = static::getContainer()->get(UserRepository::class);
 
-        $staff1 = $userRepo->find(6);
+        $staff1 = $userRepo->findOneBy(['role' => 'staff']);
         self::assertNotNull($staff1);
 
         $staff2 = $userRepo->findOneBy(['username' => 'staff_alt_test']);
@@ -193,6 +419,9 @@ class StaffControllerTest extends WebTestCase
             'Honda Beat',
             new \DateTimeImmutable(),
             new \DateTimeImmutable(),
+            null,
+            null,
+            null,
         );
         $booking->setSource('staff');
         $booking->setCreatedByStaff($staff1);
@@ -270,7 +499,7 @@ class StaffControllerTest extends WebTestCase
     public function testStaffPanelTablesUseAdminTableStyle(): void
     {
         $client = static::createClient();
-        $staff = static::getContainer()->get(UserRepository::class)->find(6);
+        $staff = static::getContainer()->get(UserRepository::class)->findOneBy(['role' => 'staff']);
         self::assertNotNull($staff);
         $client->loginUser($staff);
 

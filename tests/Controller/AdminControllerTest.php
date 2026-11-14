@@ -40,10 +40,6 @@ class AdminControllerTest extends WebTestCase
             '/admin/promo-history',
         ] as $path) {
             $client->request('GET', $path);
-            if ($path === '/admin/promo-history') {
-                $this->assertResponseRedirects('/admin/promos?history=1');
-                $client->followRedirect();
-            }
             $this->assertResponseIsSuccessful($path);
             $this->assertSelectorExists('main.admin-main > header.main-header');
         }
@@ -123,6 +119,8 @@ class AdminControllerTest extends WebTestCase
         $this->assertResponseIsSuccessful();
         $this->assertSelectorExists('aside.admin-sidebar');
         $this->assertSelectorExists('a[aria-current="page"][href="/admin"]');
+        $this->assertSelectorExists('.admin-sidebar a[href="/"]');
+        $this->assertSelectorTextContains('.admin-sidebar a[href="/"]', 'Website');
         $this->assertSelectorExists('link[href="/admin/css/admin_dashboard.css"]');
         $this->assertSelectorTextContains('.main-header h2', 'Dashboard Overview');
         $this->assertSelectorTextContains('.admin-user-info', 'Welcome back, Admin');
@@ -191,6 +189,79 @@ class AdminControllerTest extends WebTestCase
         $this->assertSelectorExists('select[name="service[active]"]');
         $this->assertSelectorTextContains('select[name="service[active]"]', 'Active');
         $this->assertSelectorTextContains('select[name="service[active]"]', 'Inactive');
+    }
+
+    public function testServiceEditUpdatesAsynchronouslyAndReturnsValidationErrors(): void
+    {
+        $client = static::createClient();
+        $client->disableReboot();
+        $container = $client->getContainer();
+        $entityManager = $container->get(EntityManagerInterface::class);
+        $admin = $container->get(UserRepository::class)->find(2);
+        self::assertNotNull($admin);
+        $client->loginUser($admin);
+        $connection = $entityManager->getConnection();
+        $connection->beginTransaction();
+        $service = (new Service())
+            ->setName('Service Edit Test')
+            ->setPrice('20.00')
+            ->setDescription('Original description')
+            ->setImage('uploads/original.webp');
+        $entityManager->persist($service);
+        $entityManager->flush();
+        $serviceId = $service->getId();
+
+        try {
+            $crawler = $client->request('GET', '/admin/services');
+            $this->assertResponseIsSuccessful();
+            $token = $crawler->filter('#serviceAdminForm input[name="service[_token]"]')->attr('value');
+            self::assertNotEmpty($token);
+            $this->assertSelectorExists('#serviceFormDialog.admin-edit-dialog');
+            $this->assertSelectorExists('#serviceAdminForm .admin-edit-form-grid');
+
+            $client->xmlHttpRequest('POST', '/admin/services/'.$serviceId.'/edit', ['service' => [
+                '_token' => $token,
+                'name' => 'Updated Service',
+                'price' => '49.95',
+                'description' => 'Updated description',
+                'active' => '0',
+                'featured' => '1',
+            ]]);
+            $this->assertResponseIsSuccessful();
+            $result = json_decode((string) $client->getResponse()->getContent(), true);
+            self::assertSame('Service updated.', $result['message']);
+            self::assertSame($serviceId, $result['service']['id']);
+            self::assertSame('49.95', $result['service']['price']);
+            self::assertFalse($result['service']['active']);
+            self::assertTrue($result['service']['featured']);
+            self::assertSame('/uploads/original.webp', $result['service']['imageUrl']);
+
+            $entityManager->clear();
+            $service = $container->get(\App\Repository\ServiceRepository::class)->find($serviceId);
+            self::assertNotNull($service);
+            self::assertSame('Updated Service', $service->getName());
+            self::assertSame('Updated description', $service->getDescription());
+            self::assertSame('49.95', $service->getPrice());
+
+            $client->xmlHttpRequest('POST', '/admin/services/'.$serviceId.'/edit', ['service' => [
+                '_token' => $token,
+                'name' => 'Invalid Update',
+                'price' => 'not-a-price',
+                'description' => 'This update should not persist.',
+                'active' => '1',
+            ]]);
+            $this->assertResponseStatusCodeSame(422);
+            $error = json_decode((string) $client->getResponse()->getContent(), true);
+            self::assertNotEmpty($error['message']);
+
+            $entityManager->clear();
+            $service = $container->get(\App\Repository\ServiceRepository::class)->find($serviceId);
+            self::assertNotNull($service);
+            self::assertSame('Updated Service', $service->getName());
+        } finally {
+            $connection->rollBack();
+            $entityManager->clear();
+        }
     }
 
     public function testServiceFormMapsLegacyActiveStatusWithoutDatabaseWrites(): void
@@ -556,16 +627,26 @@ class AdminControllerTest extends WebTestCase
             self::assertSame('4', $editLink->attr('data-stock'));
             self::assertSame('1', $editLink->attr('data-active'));
 
-            $crawler = $client->request('GET', '/admin/products/'.$productId.'/edit');
+            $editPage = $client->request('GET', '/admin/products/'.$productId.'/edit');
             $this->assertResponseIsSuccessful();
-            $form = $crawler->selectButton('Save')->form();
-            $form['product[name]'] = 'Updated temporary product';
-            $form['product[price]'] = '19.25';
-            $form['product[stock]'] = '9';
-            $form['product[active]']->untick();
-            $client->submit($form);
+            $form = $editPage->selectButton('Save')->form();
+            $token = $form['product[_token]']->getValue();
+            $client->xmlHttpRequest('POST', '/admin/products/'.$productId.'/edit', ['product' => [
+                '_token' => $token,
+                'name' => 'Updated temporary product',
+                'price' => '19.25',
+                'stock' => '9',
+            ]]);
 
-            $this->assertResponseRedirects('/admin/products');
+            $this->assertResponseIsSuccessful();
+            $result = json_decode((string) $client->getResponse()->getContent(), true);
+            self::assertTrue($result['success']);
+            self::assertSame('Product updated.', $result['message']);
+            self::assertSame($productId, $result['product']['id']);
+            self::assertSame('19.25', $result['product']['price']);
+            self::assertSame(9, $result['product']['stock']);
+            self::assertFalse($result['product']['active']);
+
             $entityManager->clear();
             $updatedProduct = $container->get(ProductRepository::class)->find($productId);
             self::assertNotNull($updatedProduct);
@@ -573,6 +654,22 @@ class AdminControllerTest extends WebTestCase
             self::assertSame('19.25', $updatedProduct->getPrice());
             self::assertSame(9, $updatedProduct->getStock());
             self::assertFalse($updatedProduct->isActive());
+
+            $client->xmlHttpRequest('POST', '/admin/products/'.$productId.'/edit', ['product' => [
+                '_token' => $token,
+                'name' => 'Invalid product update',
+                'price' => 'not-a-price',
+                'stock' => '10',
+                'active' => '1',
+            ]]);
+            $this->assertResponseStatusCodeSame(422);
+            $error = json_decode((string) $client->getResponse()->getContent(), true);
+            self::assertNotEmpty($error['message']);
+
+            $entityManager->clear();
+            $updatedProduct = $container->get(ProductRepository::class)->find($productId);
+            self::assertNotNull($updatedProduct);
+            self::assertSame('Updated temporary product', $updatedProduct->getName());
         } finally {
             $connection->rollBack();
             $entityManager->clear();
@@ -592,11 +689,11 @@ class AdminControllerTest extends WebTestCase
         $this->assertSelectorExists('#promoStatus');
         $this->assertSelectorExists('button.view-promo');
         $this->assertSelectorExists('#promoFormDialog form#promoAdminForm');
-        $this->assertSelectorExists('[data-open-promo-history]');
-        $this->assertSelectorExists('dialog#promoHistoryDialog');
+        $this->assertSelectorExists('a[href="/admin/promo-history"]');
+        $this->assertSelectorNotExists('dialog#promoHistoryDialog');
         $this->assertSelectorExists('#admin-toast-container[popover="manual"]');
         $this->assertSelectorExists('a[aria-current="page"][href="/admin/promos"]');
-        $this->assertSelectorNotExists('a[aria-current="page"][href="/admin/promos?history=1"]');
+        $this->assertSelectorNotExists('a[aria-current="page"][href="/admin/promo-history"]');
         $this->assertSelectorExists('#promoAdminForm select[name="promo[active]"] option[value="1"]');
         $this->assertSelectorExists('#promoAdminForm select[name="promo[active]"] option[value="0"]');
         $this->assertSelectorNotExists('form[action^="/admin/promos/"][action$="/status"]');
@@ -729,7 +826,7 @@ class AdminControllerTest extends WebTestCase
         $this->assertSame('admin', $users->find(2)?->getRole());
     }
 
-    public function testAdminAppointmentFormIncludesLegacyStatusChoices(): void
+    public function testAdminAppointmentFormsOnlyOfferSupportedStatuses(): void
     {
         $client = static::createClient();
         $admin = static::getContainer()->get(UserRepository::class)->find(2);
@@ -740,8 +837,10 @@ class AdminControllerTest extends WebTestCase
 
         $this->assertResponseIsSuccessful();
         $this->assertSelectorExists('select[name="form[status]"] option[value="Pending"]');
-        $this->assertSelectorExists('select[name="form[status]"] option[value="Cancelled"]');
         $this->assertSelectorExists('select[name="form[status]"] option[value="Completed"]');
+        $this->assertSelectorExists('select[name="form[status]"] option[value="Cancelled"]');
+        $this->assertSelectorNotExists('select[name="form[status]"] option[value="Confirmed"]');
+        $this->assertSelectorNotExists('select[name="form[status]"] option[value="Rejected"]');
 
         $booking = null;
         foreach (static::getContainer()->get(ServiceBookingRepository::class)->findForAdmin('', '') as $candidate) {
@@ -754,7 +853,16 @@ class AdminControllerTest extends WebTestCase
         $client->request('GET', '/admin/appointments/'.$booking->getId().'/edit');
         $this->assertResponseIsSuccessful();
         $this->assertSelectorExists('select[name="service_booking[status]"] option[value="Pending"]');
+        $this->assertSelectorExists('select[name="service_booking[status]"] option[value="Completed"]');
         $this->assertSelectorExists('select[name="service_booking[status]"] option[value="Cancelled"]');
+        $this->assertSelectorNotExists('select[name="service_booking[status]"] option[value="Confirmed"]');
+        $this->assertSelectorNotExists('select[name="service_booking[status]"] option[value="Rejected"]');
+        $expectedStatus = match ($booking->getStatus()) {
+            'Completed' => 'Completed',
+            'Cancelled', 'Rejected' => 'Cancelled',
+            default => 'Pending',
+        };
+        $this->assertSelectorExists('select[name="service_booking[status]"] option[value="'.$expectedStatus.'"][selected]');
     }
 
     public function testAdminAppointmentFiltersAndSummaryUseDoctrineQueries(): void
@@ -909,15 +1017,34 @@ class AdminControllerTest extends WebTestCase
                 }
             }
             self::assertNotNull($booking);
+            $booking->setStatus('Confirmed');
+            $entityManager->flush();
             $bookingId = $booking->getId();
-            $nextStatus = $booking->getStatus() === 'Cancelled' ? 'Pending' : 'Cancelled';
 
             $client->xmlHttpRequest('GET', '/admin/appointments/'.$bookingId.'/edit');
             $this->assertResponseIsSuccessful();
             $this->assertSelectorExists('#appointmentActionForm select[name="service_booking[status]"]');
+            $this->assertSelectorExists('#appointmentActionForm select[name="service_booking[status]"] option[value="Pending"][selected]');
             $token = $client->getCrawler()
                 ->filter('#appointmentActionForm input[name="service_booking[_token]"]')
                 ->attr('value');
+            $editData = [
+                '_token' => $token,
+                'service' => (string) $booking->getService()->getId(),
+                'vehicleModel' => $booking->getVehicleModel(),
+                'bookingDate' => $booking->getBookingDate()->format('Y-m-d'),
+                'bookingTime' => $booking->getBookingTime()->format('H:i'),
+                'status' => 'Confirmed',
+                'notes' => $booking->getNotes() ?? '',
+                'rejectionReason' => '',
+            ];
+            $client->xmlHttpRequest('POST', '/admin/appointments/'.$bookingId.'/edit', ['service_booking' => $editData]);
+            $this->assertResponseStatusCodeSame(422);
+            $entityManager->clear();
+            $booking = $container->get(ServiceBookingRepository::class)->find($bookingId);
+            self::assertNotNull($booking);
+            $nextStatus = $booking->getStatus() === 'Cancelled' ? 'Pending' : 'Cancelled';
+
             $client->xmlHttpRequest('POST', '/admin/appointments/'.$bookingId.'/edit', ['service_booking' => [
                 '_token' => $token,
                 'service' => (string) $booking->getService()->getId(),
@@ -932,7 +1059,7 @@ class AdminControllerTest extends WebTestCase
             $this->assertResponseIsSuccessful();
             $result = json_decode((string) $client->getResponse()->getContent(), true);
             self::assertSame('Appointment updated.', $result['message']);
-            self::assertSame($nextStatus === 'Rejected' ? 'Cancelled' : $nextStatus, $result['booking']['status']);
+            self::assertSame($nextStatus, $result['booking']['status']);
             self::assertSame($container->get(ServiceBookingRepository::class)->getAdminStatusCounts(), $result['counts']);
             $entityManager->clear();
             self::assertSame($nextStatus, $container->get(ServiceBookingRepository::class)->find($bookingId)?->getStatus());
@@ -962,13 +1089,15 @@ class AdminControllerTest extends WebTestCase
             $this->assertSelectorExists('details.admin-user-create form[action="/admin/users/new"]');
             $this->assertSelectorExists('dialog#userEditDialog form#userEditForm');
             $this->assertSelectorExists('dialog#userEditDialog select[name="admin_user[role]"]');
+            $this->assertSelectorExists('#userEditForm .admin-edit-form-grid input[name="admin_user[firstName]"]');
             $this->assertSelectorExists('a.user-edit[data-action^="/admin/users/"][data-user]');
 
             $token = $crawler->filter('#userEditForm input[name="admin_user[_token]"]')->attr('value');
-            $client->request('POST', '/admin/users/'.$user->getId().'/edit', [
+            $updatedFirstName = 'Updated '.$user->getFirstName();
+            $client->xmlHttpRequest('POST', '/admin/users/'.$user->getId().'/edit', [
                 'admin_user' => [
                     '_token' => $token,
-                    'firstName' => $user->getFirstName(),
+                    'firstName' => $updatedFirstName,
                     'lastName' => $user->getLastName(),
                     'username' => $user->getUsername(),
                     'email' => $user->getEmail(),
@@ -978,9 +1107,34 @@ class AdminControllerTest extends WebTestCase
                 ],
             ]);
 
-            $this->assertResponseRedirects('/admin/users');
+            $this->assertResponseIsSuccessful();
+            $result = json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR);
+            self::assertTrue($result['success']);
+            self::assertSame($user->getId(), $result['user']['id']);
+            self::assertSame($updatedFirstName, $result['user']['firstName']);
             $entityManager->clear();
-            self::assertSame('staff', $client->getContainer()->get(UserRepository::class)->find($user->getId())?->getRole());
+            $updatedUser = $client->getContainer()->get(UserRepository::class)->find($user->getId());
+            self::assertNotNull($updatedUser);
+            self::assertSame('staff', $updatedUser?->getRole());
+            self::assertSame($updatedFirstName, $updatedUser->getFirstName());
+
+            $client->xmlHttpRequest('POST', '/admin/users/'.$user->getId().'/edit', [
+                'admin_user' => [
+                    '_token' => $token,
+                    'firstName' => '',
+                    'lastName' => $updatedUser->getLastName(),
+                    'username' => $updatedUser->getUsername(),
+                    'email' => $updatedUser->getEmail(),
+                    'phone' => $updatedUser->getPhone(),
+                    'role' => 'staff',
+                    'plainPassword' => '',
+                ],
+            ]);
+            $this->assertResponseStatusCodeSame(422);
+            $error = json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR);
+            self::assertNotEmpty($error['message']);
+            $entityManager->clear();
+            self::assertSame($updatedFirstName, $client->getContainer()->get(UserRepository::class)->find($user->getId())?->getFirstName());
         } finally {
             $connection->rollBack();
             $entityManager->clear();
@@ -1001,6 +1155,10 @@ class AdminControllerTest extends WebTestCase
         $this->assertSelectorTextContains('tbody', 'H3420 Side Mirror');
         $this->assertSelectorTextContains('tbody', '₱1,500.00');
         $this->assertSelectorExists('button[data-open-order-details]');
+        $this->assertSelectorExists('button[data-order-create-url="/admin/orders/new"]');
+        $this->assertSelectorExists('dialog#orderCreateDialog.admin-edit-dialog');
+        $this->assertSelectorExists('dialog[id^="order-view-details-"].order-details-modal');
+        $this->assertSelectorExists('dialog[id^="order-edit-details-"].admin-order-edit-dialog');
         $this->assertSelectorNotExists('dialog[id^="order-view-details-"] form');
         $this->assertSelectorNotExists('dialog[id^="order-view-details-"] input, dialog[id^="order-view-details-"] select, dialog[id^="order-view-details-"] textarea');
         $this->assertSelectorExists('dialog[id^="order-edit-details-"] form.order-status-form');
@@ -1008,12 +1166,153 @@ class AdminControllerTest extends WebTestCase
         $this->assertSelectorNotExists('[data-confirm-payment]');
         self::assertStringNotContainsString('verify a pending payment', (string) $client->getResponse()->getContent());
         $this->assertSelectorExists('form[action^="/admin/orders/"][action$="/delete"][data-deferred-action="delete"]');
-        $this->assertSelectorExists('#orderStatus option[value="Processing"]');
+        $this->assertSelectorExists('#orderStatus option[value="Pending"]');
+        $this->assertSelectorExists('#orderStatus option[value="Completed"]');
+        $this->assertSelectorExists('#orderStatus option[value="Cancelled"]');
+        $this->assertSelectorNotExists('#orderStatus option[value="Processing"]');
+        $this->assertSelectorExists('dialog[id^="order-edit-details-"] select[name="status"] option[value="Pending"]');
+        $this->assertSelectorExists('dialog[id^="order-edit-details-"] select[name="status"] option[value="Completed"]');
+        $this->assertSelectorExists('dialog[id^="order-edit-details-"] select[name="status"] option[value="Cancelled"]');
+        $this->assertSelectorNotExists('dialog[id^="order-edit-details-"] select[name="status"] option[value="Processing"]');
         $this->assertSelectorNotExists('.order-filters button[type="submit"]');
         $this->assertSelectorExists('#orderStatus[data-auto-submit]');
     }
 
-    public function testAdminCanFilterOrdersByProcessingStatusAutomatically(): void
+    public function testAdminCreatesOrderFromCenteredModalAndPersistsIt(): void
+    {
+        $client = static::createClient();
+        $client->disableReboot();
+        $container = $client->getContainer();
+        $entityManager = $container->get(EntityManagerInterface::class);
+        $admin = $container->get(UserRepository::class)->find(2);
+        $customer = $container->get(UserRepository::class)->find(3);
+        self::assertNotNull($admin);
+        self::assertNotNull($customer);
+        $client->loginUser($admin);
+
+        $connection = $entityManager->getConnection();
+        $connection->beginTransaction();
+        try {
+            $product = (new Product())
+                ->setName('Admin modal order product')
+                ->setPrice('12.50')
+                ->setStock(8)
+                ->setActive(true);
+            $entityManager->persist($product);
+            $entityManager->flush();
+            $productId = $product->getId();
+
+            $client->xmlHttpRequest('GET', '/admin/orders/new');
+            $this->assertResponseIsSuccessful();
+            $this->assertSelectorExists('#orderCreateForm select[name="order_create[customerId]"]');
+            $this->assertSelectorExists('#orderCreateForm select[name="order_create[items][0][productId]"]');
+            $this->assertSelectorTextContains(
+                sprintf('#orderCreateForm select[name="order_create[items][0][productId]"] option[value="%d"]', $productId),
+                'Admin modal order product — ₱12.50',
+            );
+            $token = $client->getCrawler()->filter('#orderCreateForm input[name="order_create[_token]"]')->attr('value');
+
+            $client->xmlHttpRequest('POST', '/admin/orders/new', ['order_create' => [
+                '_token' => $token,
+                'customerId' => (string) $customer->getId(),
+                'deliveryAddress' => '42 Modal Test Avenue',
+                'items' => [
+                    0 => ['productId' => (string) $productId, 'quantity' => '9'],
+                ],
+            ]]);
+            $this->assertResponseStatusCodeSame(409);
+            self::assertSame(8, $container->get(ProductRepository::class)->find($productId)?->getStock());
+
+            $client->xmlHttpRequest('POST', '/admin/orders/new', ['order_create' => [
+                '_token' => $token,
+                'customerId' => (string) $customer->getId(),
+                'deliveryAddress' => '42 Modal Test Avenue',
+                'items' => [
+                    0 => ['productId' => (string) $productId, 'quantity' => '2'],
+                ],
+            ]]);
+
+            $this->assertResponseStatusCodeSame(201);
+            $result = json_decode((string) $client->getResponse()->getContent(), true);
+            self::assertTrue($result['success']);
+            self::assertSame('Order created.', $result['message']);
+            $createdOrder = $container->get(CustomerOrderRepository::class)->find($result['id']);
+            self::assertNotNull($createdOrder);
+            self::assertSame('42 Modal Test Avenue', $createdOrder->getDeliveryAddress());
+            self::assertSame(6, $container->get(\App\Repository\ProductRepository::class)->find($productId)?->getStock());
+            $createdOrderId = (int) $createdOrder->getId();
+            $itemsByGroup = $container->get(CustomerOrderRepository::class)->findItemsForGroups([$createdOrderId]);
+            self::assertCount(1, $itemsByGroup[$createdOrderId] ?? []);
+            self::assertSame('Admin modal order product', $itemsByGroup[$createdOrderId][0]['productName']);
+            self::assertSame(12.5, (float) $itemsByGroup[$createdOrderId][0]['unitPrice']);
+            self::assertSame(25.0, (float) $itemsByGroup[$createdOrderId][0]['totalAmount']);
+
+            $client->request('GET', '/admin/orders');
+            $this->assertResponseIsSuccessful();
+            $this->assertSelectorTextContains('.order-items', 'Admin modal order product × 2');
+            $this->assertSelectorTextContains('.order-items', '₱25.00');
+        } finally {
+            $connection->rollBack();
+            $entityManager->clear();
+        }
+    }
+
+    public function testAdminOrderStatusUpdatesAreAjaxAndRejectLegacyStatuses(): void
+    {
+        $client = static::createClient();
+        $client->disableReboot();
+        $container = $client->getContainer();
+        $entityManager = $container->get(EntityManagerInterface::class);
+        $admin = $container->get(UserRepository::class)->find(2);
+        $customer = $container->get(UserRepository::class)->find(3);
+        self::assertNotNull($admin);
+        self::assertNotNull($customer);
+        $client->loginUser($admin);
+
+        $connection = $entityManager->getConnection();
+        $connection->beginTransaction();
+        try {
+            $order = new CustomerOrder($customer, 'Test address', 'Cash on Delivery', '', 'MWO-ADMIN-STATUS-'.uniqid());
+            $order->setStatus('Pending');
+            $entityManager->persist($order);
+            $entityManager->flush();
+            $orderId = $order->getId();
+
+            $crawler = $client->request('GET', '/admin/orders', ['search' => (string) $orderId]);
+            $this->assertResponseIsSuccessful();
+            $token = $crawler
+                ->filter('form[action="/admin/orders/'.$orderId.'/status"] input[name="_token"]')
+                ->attr('value');
+
+            $client->xmlHttpRequest('POST', '/admin/orders/'.$orderId.'/status', [
+                '_token' => $token,
+                'status' => 'Completed',
+            ]);
+
+            $this->assertResponseIsSuccessful();
+            $result = json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR);
+            self::assertTrue($result['success']);
+            self::assertSame($orderId, $result['id']);
+            self::assertSame('Completed', $result['status']);
+            self::assertSame($container->get(CustomerOrderRepository::class)->getStatusCounts(), $result['counts']);
+            self::assertSame('Completed', $container->get(CustomerOrderRepository::class)->find($orderId)?->getStatus());
+
+            $client->xmlHttpRequest('POST', '/admin/orders/'.$orderId.'/status', [
+                '_token' => $token,
+                'status' => 'Processing',
+            ]);
+
+            $this->assertResponseStatusCodeSame(422);
+            $invalidResult = json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR);
+            self::assertFalse($invalidResult['success']);
+            self::assertSame('Completed', $container->get(CustomerOrderRepository::class)->find($orderId)?->getStatus());
+        } finally {
+            $connection->rollBack();
+            $entityManager->clear();
+        }
+    }
+
+    public function testAdminCanFilterLegacyProcessingOrdersAsPending(): void
     {
         $client = static::createClient();
         $client->disableReboot();
@@ -1034,14 +1333,16 @@ class AdminControllerTest extends WebTestCase
             $entityManager->flush();
 
             $client->request('GET', '/admin/orders', [
-                'status' => 'Processing',
+                'status' => 'Pending',
                 'search' => (string) $order->getId(),
             ]);
 
             $this->assertResponseIsSuccessful();
-            $this->assertSelectorExists('#orderStatus option[value="Processing"][selected]');
+            $this->assertSelectorExists('#orderStatus option[value="Pending"][selected]');
             $this->assertSelectorTextContains('tbody', '#'.$order->getId());
-            $this->assertSelectorTextContains('tbody', 'Processing');
+            $this->assertSelectorTextContains('tbody', 'Pending');
+            $this->assertSelectorExists('dialog#order-edit-details-'.$order->getId().' select[name="status"] option[value="Pending"][selected]');
+            $this->assertSelectorExists('dialog#order-edit-details-'.$order->getId().' select[name="status"][data-current-status="Processing"][data-initial-status="Pending"]');
         } finally {
             $connection->rollBack();
             $entityManager->clear();
@@ -1161,7 +1462,7 @@ class AdminControllerTest extends WebTestCase
         }
     }
 
-    public function testAdminPromoHistoryRouteOpensTheHistoryModal(): void
+    public function testAdminPromoHistoryHasItsOwnPage(): void
     {
         $client = static::createClient();
         $admin = static::getContainer()->get(UserRepository::class)->find(2);
@@ -1169,25 +1470,106 @@ class AdminControllerTest extends WebTestCase
         $client->loginUser($admin);
 
         $client->request('GET', '/admin/promo-history');
-
-        $this->assertResponseRedirects('/admin/promos?history=1');
-        $client->followRedirect();
         $this->assertResponseIsSuccessful();
-        $this->assertSelectorExists('dialog#promoHistoryDialog');
-        $this->assertSelectorExists('a[aria-current="page"][href="/admin/promos?history=1"]');
+        $this->assertSelectorExists('.main-header h2');
+        $this->assertSelectorTextContains('.main-header', 'Promotion History');
+        $this->assertSelectorNotExists('dialog#promoHistoryDialog');
+        $this->assertSelectorExists('a[aria-current="page"][href="/admin/promo-history"]');
         $this->assertSelectorNotExists('a[aria-current="page"][href="/admin/promos"]');
         $this->assertSelectorExists('#promoClaimSearch');
         $this->assertSelectorExists('#promoClaimStatus');
+        $this->assertSelectorExists('#promoClaimStatus option[value="Pending"]');
+        $this->assertSelectorExists('#promoClaimStatus option[value="Completed"]');
+        $this->assertSelectorExists('#promoClaimStatus option[value="Cancelled"]');
+        $this->assertSelectorNotExists('#promoClaimStatus option[value="Confirmed"]');
+        $this->assertSelectorNotExists('#promoClaimStatus option[value="Used"]');
         $this->assertSelectorExists('table#promoClaimTable.admin-table');
         $this->assertSelectorExists('button.view-promo-claim');
         $this->assertSelectorExists('dialog#promoClaimDetails');
+        $this->assertSelectorExists('button#addPromoClaim[data-form-url="/admin/promo-history/new"]');
+        $this->assertSelectorExists('dialog#promoClaimCreateDialog.admin-edit-dialog');
+        $this->assertSelectorExists('dialog#promoClaimDetails.modal-content');
         $this->assertSelectorExists('a.edit-promo-claim[data-action^="/admin/promo-history/"][data-action$="/edit"]');
         $this->assertSelectorExists('dialog#promoClaimEdit form#promoClaimEditForm');
         $this->assertSelectorExists('form[action^="/admin/promo-history/"][data-deferred-action="delete"]');
 
-        $client->request('GET', '/admin/promos?history=1');
+        $client->request('GET', '/admin/promos');
         $this->assertResponseIsSuccessful();
-        $this->assertSelectorExists('dialog#promoHistoryDialog');
+        $this->assertSelectorNotExists('#promoClaimTable');
+    }
+
+    public function testAdminCreatesPromoClaimFromCenteredModalAndPersistsIt(): void
+    {
+        $client = static::createClient();
+        $client->disableReboot();
+        $container = $client->getContainer();
+        $entityManager = $container->get(EntityManagerInterface::class);
+        $admin = $container->get(UserRepository::class)->find(2);
+        $customer = $container->get(UserRepository::class)->find(3);
+        self::assertNotNull($admin);
+        self::assertNotNull($customer);
+        $client->loginUser($admin);
+
+        $connection = $entityManager->getConnection();
+        $connection->beginTransaction();
+        try {
+            $promo = (new Promo())
+                ->setSlug('admin-modal-claim-'.bin2hex(random_bytes(4)))
+                ->setTitle('Admin Modal Claim Promo')
+                ->setBadge('Modal')
+                ->setDescription('Created from the admin claim modal.')
+                ->setItemLabel('Service')
+                ->setItemOptions('Oil change'."\n".'Brake check');
+            $otherPromo = (new Promo())
+                ->setSlug('admin-modal-claim-other-'.bin2hex(random_bytes(4)))
+                ->setTitle('Admin Modal Claim Other Promo')
+                ->setBadge('Modal')
+                ->setDescription('Another active promotion.')
+                ->setItemLabel('Service')
+                ->setItemOptions('Tire change');
+            $entityManager->persist($promo);
+            $entityManager->persist($otherPromo);
+            $entityManager->flush();
+
+            $client->xmlHttpRequest('GET', '/admin/promo-history/new');
+            $this->assertResponseIsSuccessful();
+            $this->assertSelectorExists('#promoClaimCreateForm select[name="form[customerId]"]');
+            $this->assertSelectorExists('#promoClaimCreateForm select[name="form[promoId]"]');
+            $this->assertSelectorExists('#promoClaimCreateForm select[name="form[selectedOption]"] option[value="Oil change"]');
+            $token = $client->getCrawler()->filter('#promoClaimCreateForm input[name="form[_token]"]')->attr('value');
+
+            $client->xmlHttpRequest('POST', '/admin/promo-history/new', ['form' => [
+                '_token' => $token,
+                'customerId' => (string) $customer->getId(),
+                'promoId' => (string) $promo->getId(),
+                'selectedOption' => 'Tire change',
+                'appointmentDate' => '2026-12-10',
+                'appointmentTime' => '09:30',
+            ]]);
+            $this->assertResponseStatusCodeSame(422);
+
+            $client->xmlHttpRequest('POST', '/admin/promo-history/new', ['form' => [
+                '_token' => $token,
+                'customerId' => (string) $customer->getId(),
+                'promoId' => (string) $promo->getId(),
+                'selectedOption' => 'Oil change',
+                'appointmentDate' => '2026-12-10',
+                'appointmentTime' => '09:30',
+            ]]);
+
+            $this->assertResponseStatusCodeSame(201);
+            $result = json_decode((string) $client->getResponse()->getContent(), true);
+            self::assertTrue($result['success']);
+            self::assertSame('Promotion claim created.', $result['message']);
+            $claim = $container->get(PromoClaimRepository::class)->find($result['id']);
+            self::assertNotNull($claim);
+            self::assertSame('Pending', $claim->getStatus());
+            self::assertSame('Oil change', $claim->getSelectedOption());
+            self::assertSame($promo->getId(), $claim->getPromo()?->getId());
+        } finally {
+            $connection->rollBack();
+            $entityManager->clear();
+        }
     }
 
     public function testAdminPromoClaimEditChangesOnlyPromotionAndStatus(): void
@@ -1221,6 +1603,7 @@ class AdminControllerTest extends WebTestCase
             $appointmentTime = new \DateTimeImmutable('2026-04-10 10:30:00');
             $claim = new PromoClaim(null, 'Legacy Guest', '09123456789', 'admin-history-original', 'Legacy option', $appointmentDate, $appointmentTime);
             $claim->setPromo($originalPromo);
+            $claim->setStatus('Confirmed');
             $entityManager->persist($originalPromo);
             $entityManager->persist($replacementPromo);
             $entityManager->persist($claim);
@@ -1228,10 +1611,17 @@ class AdminControllerTest extends WebTestCase
             $claimId = $claim->getId();
             $replacementPromoId = $replacementPromo->getId();
 
-            $crawler = $client->request('GET', '/admin/promos?history=1');
+            $crawler = $client->request('GET', '/admin/promo-history');
             $this->assertResponseIsSuccessful();
+            $this->assertSelectorExists('.promo-claim-row[data-id="'.$claimId.'"][data-status="Pending"]');
+            $this->assertSelectorExists('.promo-claim-row[data-id="'.$claimId.'"] .edit-promo-claim[data-status="Pending"]');
             $this->assertSelectorExists('select[name="admin_promo_claim_update[promo]"]');
             $this->assertSelectorExists('select[name="admin_promo_claim_update[status]"]');
+            $this->assertSelectorExists('select[name="admin_promo_claim_update[status]"] option[value="Pending"]');
+            $this->assertSelectorExists('select[name="admin_promo_claim_update[status]"] option[value="Completed"]');
+            $this->assertSelectorExists('select[name="admin_promo_claim_update[status]"] option[value="Cancelled"]');
+            $this->assertSelectorNotExists('select[name="admin_promo_claim_update[status]"] option[value="Confirmed"]');
+            $this->assertSelectorNotExists('select[name="admin_promo_claim_update[status]"] option[value="Used"]');
             $this->assertSelectorNotExists('[name="admin_promo_claim_update[selectedOption]"]');
             $this->assertSelectorNotExists('[name="admin_promo_claim_update[appointmentDate]"]');
             $this->assertSelectorNotExists('[name="admin_promo_claim_update[appointmentTime]"]');
@@ -1243,6 +1633,17 @@ class AdminControllerTest extends WebTestCase
                     'status' => 'Confirmed',
                 ],
             ]);
+            $this->assertResponseStatusCodeSame(422);
+            $entityManager->clear();
+            self::assertSame('Confirmed', $container->get(PromoClaimRepository::class)->find($claimId)?->getStatus());
+
+            $client->xmlHttpRequest('POST', '/admin/promo-history/'.$claimId.'/edit', [
+                'admin_promo_claim_update' => [
+                    '_token' => $token,
+                    'promo' => (string) $replacementPromoId,
+                    'status' => 'Pending',
+                ],
+            ]);
 
             $this->assertResponseIsSuccessful();
             $response = json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR);
@@ -1252,7 +1653,7 @@ class AdminControllerTest extends WebTestCase
             $updatedClaim = $container->get(PromoClaimRepository::class)->find($claimId);
             self::assertNotNull($updatedClaim);
             self::assertSame('admin-history-replacement', $updatedClaim->getBundleSlug());
-            self::assertSame('Confirmed', $updatedClaim->getStatus());
+            self::assertSame('Pending', $updatedClaim->getStatus());
             self::assertSame('Legacy option', $updatedClaim->getSelectedOption());
             self::assertSame($appointmentDate->format('Y-m-d'), $updatedClaim->getAppointmentDate()->format('Y-m-d'));
             self::assertSame($appointmentTime->format('H:i'), $updatedClaim->getAppointmentTime()->format('H:i'));
@@ -1340,7 +1741,7 @@ class AdminControllerTest extends WebTestCase
             $entityManager->flush();
             $claimId = $claim->getId();
 
-            $crawler = $client->request('GET', '/admin/promos?history=1');
+            $crawler = $client->request('GET', '/admin/promo-history');
             $this->assertResponseIsSuccessful();
             $token = $crawler
                 ->filter('form[action="/admin/promo-history/'.$claimId.'/delete"] input[name="_token"]')

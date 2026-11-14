@@ -9,8 +9,7 @@
             {% set staffNavigation = [
                 {route: 'staff_appointments', label: 'Appointments', path: path('staff_appointments'), icon: 'fa-calendar-check'},
                 {route: 'staff_orders', label: 'Orders', path: path('staff_orders'), icon: 'fa-box-open'},
-                {route: 'staff_promo_history', label: 'Promo History', path: path('staff_promo_history'), icon: 'fa-clock-rotate-left'},
-                {route: 'staff_service_records', label: 'Service Records', path: path('staff_service_records'), icon: 'fa-screwdriver-wrench'}
+                {route: 'staff_promo_history', label: 'Promo History', path: path('staff_promo_history'), icon: 'fa-clock-rotate-left'}
             ] %}
             <li class="{{ app.request.attributes.get('_route') == 'staff_dashboard' ? 'active' : '' }}">
                 <a href="{{ path('staff_dashboard') }}" {{ app.request.attributes.get('_route') == 'staff_dashboard' ? 'aria-current="page"' : '' }}>
@@ -26,9 +25,9 @@
                     </a>
                 </li>
             {% endfor %}
-            <li><a href="{{ path('app_home') }}"><i class="fas fa-globe" aria-hidden="true"></i> View site</a></li>
+            <li><a href="{{ path('app_home') }}"><i class="fas fa-globe" aria-hidden="true"></i> Website</a></li>
             <li class="sidebar-logout">
-                <form method="post" action="{{ path('app_logout') }}">
+                <form method="post" action="{{ path('app_logout') }}" data-turbo="false">
                     <input type="hidden" name="_csrf_token" value="{{ csrf_token('logout') }}">
                     <button type="submit"><i class="fas fa-sign-out-alt" aria-hidden="true"></i> Logout</button>
                 </form>

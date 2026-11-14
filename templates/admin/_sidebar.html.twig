@@ -10,15 +10,15 @@
                 {route: 'admin_orders', label: 'Orders', path: path('admin_orders'), icon: 'fa-cart-shopping'},
                 {route: 'admin_services', label: 'Services', path: path('admin_services'), icon: 'fa-concierge-bell'},
                 {route: 'admin_appointments', label: 'Appointments', path: path('admin_appointments'), icon: 'fa-calendar-check'},
-                {route: 'admin_promos', label: 'Promo', path: path('admin_promos'), icon: 'fa-tags', history: false},
-                {route: 'admin_promos', label: 'Promo History', path: path('admin_promos', {history: 1}), icon: 'fa-tags', history: true},
-                {route: 'admin_users', label: 'Users', path: path('admin_users'), icon: 'fa-users'}
+                {route: 'admin_promos', label: 'Promo', path: path('admin_promos'), icon: 'fa-tags'},
+                {route: 'admin_promo_history', label: 'Promo History', path: path('admin_promo_history'), icon: 'fa-tags'},
+                {route: 'admin_users', label: 'Users', path: path('admin_users'), icon: 'fa-users'},
+                {route: 'app_home', label: 'Website', path: path('app_home'), icon: 'fa-globe'}
             ] %}
             {% for item in adminNavigation %}
                 {% set activeRoute = app.request.attributes.get('_route') %}
                 {% if item.route == 'admin_promos' %}
-                    {% set isHistoryPage = activeRoute starts with 'admin_promo_history' or (activeRoute == 'admin_promos' and app.request.query.get('history') == '1') %}
-                    {% set active = (activeRoute == 'admin_promos' or activeRoute starts with 'admin_promo_') and item.history == isHistoryPage %}
+                    {% set active = activeRoute == item.route or activeRoute starts with 'admin_promo_' and not (activeRoute starts with 'admin_promo_history') %}
                 {% else %}
                     {% set active = activeRoute == item.route or activeRoute starts with item.route ~ '_' %}
                 {% endif %}
@@ -27,7 +27,7 @@
                 </li>
             {% endfor %}
             <li class="sidebar-logout">
-                <form method="post" action="{{ path('app_logout') }}">
+                <form method="post" action="{{ path('app_logout') }}" data-turbo="false">
                     <input type="hidden" name="_csrf_token" value="{{ csrf_token('logout') }}">
                     <button type="submit"><i class="fas fa-sign-out-alt" aria-hidden="true"></i> Logout</button>
                 </form>

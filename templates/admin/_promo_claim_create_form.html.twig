@@ -1,0 +1,50 @@
+<div class="modal-header">
+    <div>
+        <p class="admin-edit-eyebrow">Promotion history</p>
+        <h3 id="promoClaimCreateTitle">Create promotion claim</h3>
+    </div>
+    <button type="button" class="close-btn" data-close-promo-claim-create aria-label="Close">×</button>
+</div>
+<p class="admin-edit-intro">Create a claim for a customer using an active promotion and its available option.</p>
+{% if promoOptions is empty %}
+    <p class="admin-edit-validation-message" role="alert">There are no active promotions available for new claims.</p>
+{% endif %}
+<div data-promo-options="{{ promoOptions|json_encode|e('html_attr') }}"></div>
+{{ form_start(form, {action: action, attr: {id: 'promoClaimCreateForm', class: 'admin-edit-form'}}) }}
+    {{ form_errors(form) }}
+    <section class="admin-edit-section">
+        <h4 class="admin-edit-section-title">Claim details</h4>
+        <div class="admin-edit-form-grid">
+            <div class="admin-edit-field">
+                {{ form_label(form.customerId, 'Customer') }}
+                {{ form_widget(form.customerId, {attr: {class: 'form-control', required: true}}) }}
+                {{ form_errors(form.customerId) }}
+            </div>
+            <div class="admin-edit-field">
+                {{ form_label(form.promoId, 'Promotion') }}
+                {{ form_widget(form.promoId, {attr: {class: 'form-control', required: true, 'data-promo-select': true}}) }}
+                {{ form_errors(form.promoId) }}
+            </div>
+            <div class="admin-edit-field">
+                {{ form_label(form.selectedOption, 'Promotion option') }}
+                {{ form_widget(form.selectedOption, {attr: {class: 'form-control', required: true, 'data-promo-option': true}}) }}
+                {{ form_errors(form.selectedOption) }}
+            </div>
+            <div class="admin-edit-field">
+                {{ form_label(form.appointmentDate, 'Appointment date') }}
+                {{ form_widget(form.appointmentDate, {attr: {class: 'form-control', required: true}}) }}
+                {{ form_errors(form.appointmentDate) }}
+            </div>
+            <div class="admin-edit-field">
+                {{ form_label(form.appointmentTime, 'Appointment time') }}
+                {{ form_widget(form.appointmentTime, {attr: {class: 'form-control', required: true}}) }}
+                {{ form_errors(form.appointmentTime) }}
+            </div>
+        </div>
+    </section>
+    {{ form_rest(form) }}
+    <div class="modal-footer">
+        <button type="button" class="btn-secondary" data-close-promo-claim-create>Cancel</button>
+        <button type="submit" class="btn-primary" {{ promoOptions is empty ? 'disabled' : '' }}>Create claim</button>
+    </div>
+{{ form_end(form) }}

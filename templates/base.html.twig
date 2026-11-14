@@ -7,7 +7,7 @@
         <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 128 128%22><text y=%221.2em%22 font-size=%2296%22>⚫️</text><text y=%221.3em%22 x=%220.2em%22 font-size=%2276%22 fill=%22%23fff%22>sf</text></svg>">
         <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
         {% block stylesheets %}
-            <link rel="stylesheet" href="{{ asset('styles/index/style.css') }}">
+            <link rel="stylesheet" href="{{ asset('styles/index/style.css') }}?v=20261114-hide-scrollbar">
             <link rel="stylesheet" href="{{ asset('styles/index/layout.css') }}">
             <link rel="stylesheet" href="{{ asset('styles/index/components.css') }}">
             <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -23,7 +23,7 @@
                 <link rel="stylesheet" href="{{ asset('admin/css/admin_dashboard.css') }}">
                 <link rel="stylesheet" href="{{ asset('staff/css/staff_layout.css') }}">
                 <link rel="stylesheet" href="{{ asset('staff/css/staff_dashboard.css') }}">
-                <link rel="stylesheet" href="{{ asset('staff/css/staff_tables.css') }}">
+                <link rel="stylesheet" href="{{ asset('staff/css/staff_tables.css') }}?v=20261114-compact-modals-3">
                 <link rel="stylesheet" href="{{ asset('staff/css/staff_forms.css') }}">
                 <link rel="stylesheet" href="{{ asset('staff/css/staff_appointments.css') }}">
                 <link rel="stylesheet" href="{{ asset('staff/css/staff_orders.css') }}">
@@ -143,6 +143,21 @@
                 return typeof returnPath === 'string' && returnPath.startsWith('/') && !returnPath.startsWith('//')
                     ? returnPath
                     : responseUrl;
+            }
+
+            function navigateAfterAuthentication(responseUrl) {
+                const targetUrl = new URL(getAuthenticatedRedirect(responseUrl), window.location.href);
+                const currentUrl = new URL(window.location.href);
+                if (
+                    targetUrl.origin === currentUrl.origin
+                    && targetUrl.pathname === currentUrl.pathname
+                    && targetUrl.search === currentUrl.search
+                ) {
+                    window.location.reload();
+                    return;
+                }
+
+                window.location.assign(targetUrl.href);
             }
 
             function showTimedModalAlert(modalId, message, type = 'success') {
@@ -412,47 +427,49 @@
                 }
 
                 try {
-                    const response = await fetch(form.action, {
-                        method: 'POST',
-                        body: new FormData(form),
-                        headers: {'X-Requested-With': 'XMLHttpRequest'},
-                    });
-                    const html = await response.text();
-                    const resultPage = new DOMParser().parseFromString(html, 'text/html');
-                    const finalPath = new URL(response.url).pathname;
-                    const alertText = resultPage.querySelector('[role="alert"]')?.textContent.trim();
-                    const statusText = resultPage.querySelector('[role="status"]')?.textContent.trim();
-                    const validationMessages = Array.from(resultPage.querySelectorAll('form ul li, form .form-error-message'))
-                        .map((message) => message.textContent.trim())
-                        .filter(Boolean);
-                    const errorMessage = alertText || validationMessages.join(' ');
-
-                    if (modalId === 'login-modal') {
-                        if (!response.ok || finalPath === new URL(form.action).pathname) {
-                            showModalAlert(modalId, errorMessage || 'Invalid username or password.', 'error');
-                        } else {
-                            const successMessage = resultPage.getElementById('auth-success-notification')?.textContent.trim()
-                                || 'Login successful! Welcome back.';
-                            sessionStorage.setItem(window.pendingAuthSuccessKey, successMessage);
-                            window.location.assign(getAuthenticatedRedirect(response.url));
-                            return;
-                        }
-                    } else if (modalId === 'register-modal') {
-                        if (!response.ok || finalPath === new URL(form.action).pathname) {
-                            showModalAlert(modalId, errorMessage || 'Check the registration details and try again.', 'error');
-                        } else {
-                            window.location.assign(getAuthenticatedRedirect(response.url));
-                            return;
-                        }
-                    } else if (modalId === 'forgot-modal') {
-                        if (!response.ok || errorMessage) {
-                            showModalAlert(modalId, errorMessage || 'Unable to request a password reset.', 'error');
-                        } else {
-                            showModalAlert(modalId, statusText || alertText || 'If that email exists, reset instructions have been sent.', 'success');
-                        }
+                    let response;
+                    try {
+                        response = await fetch(form.action, {
+                            method: 'POST',
+                            body: new FormData(form),
+                            headers: {'X-Requested-With': 'XMLHttpRequest'},
+                        });
+                    } catch (error) {
+                        console.error('Authentication form request failed.', error);
+                        showModalAlert(modalId, 'Unable to contact the server. Please try again.', 'error');
+                        return;
                     }
-                } catch (error) {
-                    showModalAlert(modalId, 'Unable to contact the server. Please try again.', 'error');
+
+                    try {
+                        const html = await response.text();
+                        const resultPage = new DOMParser().parseFromString(html, 'text/html');
+                        const finalPath = new URL(response.url).pathname;
+                        const alertText = resultPage.querySelector('[role="alert"]')?.textContent.trim();
+                        const statusText = resultPage.querySelector('[role="status"]')?.textContent.trim();
+                        const validationMessages = Array.from(resultPage.querySelectorAll('form ul li, form .form-error-message'))
+                            .map((message) => message.textContent.trim())
+                            .filter(Boolean);
+                        const errorMessage = alertText || validationMessages.join(' ');
+
+                        if (modalId === 'register-modal') {
+                            if (!response.ok || finalPath === new URL(form.action).pathname) {
+                                showModalAlert(modalId, errorMessage || 'Check the registration details and try again.', 'error');
+                            } else {
+                                sessionStorage.setItem(window.pendingAuthSuccessKey, 'Account created successfully. Welcome to Bencalo MotoWorks.');
+                                navigateAfterAuthentication(response.url);
+                                return;
+                            }
+                        } else if (modalId === 'forgot-modal') {
+                            if (!response.ok || errorMessage) {
+                                showModalAlert(modalId, errorMessage || 'Unable to request a password reset.', 'error');
+                            } else {
+                                showModalAlert(modalId, statusText || alertText || 'If that email exists, reset instructions have been sent.', 'success');
+                            }
+                        }
+                    } catch (error) {
+                        console.error('Unable to process the authentication server response.', error);
+                        showModalAlert(modalId, 'The server responded, but the request could not be completed. Please refresh and try again.', 'error');
+                    }
                 } finally {
                     form.dataset.submitting = 'false';
                     if (submitButton) {
@@ -519,9 +536,19 @@
                     }
                 }
 
-                if (window.location.pathname === '/login') openModal('login-modal');
-                const loginError = document.getElementById('login-page-auth-error');
-                if (loginError) showModalAlert('login-modal', loginError.textContent.trim(), 'error');
+                const requestedAuthModal = new URLSearchParams(window.location.search).get('auth');
+                if (requestedAuthModal === 'login') openModal('login-modal');
+                if (requestedAuthModal === 'register') openModal('register-modal');
+                const loginError = document.getElementById('login-modal-alert');
+                if (loginError && loginError.textContent.trim()) {
+                    openModal('login-modal');
+                    showModalAlert('login-modal', loginError.textContent.trim(), 'error');
+                }
+                if (requestedAuthModal === 'login' || requestedAuthModal === 'register') {
+                    const cleanUrl = new URL(window.location.href);
+                    cleanUrl.searchParams.delete('auth');
+                    window.history.replaceState({}, document.title, cleanUrl.pathname + cleanUrl.search + cleanUrl.hash);
+                }
 
                 const navToggle = document.getElementById('nav-toggle-btn');
                 const mainNav = document.getElementById('main-nav');
@@ -609,7 +636,22 @@
                 const loginForm = document.getElementById('ajax-login-form');
                 const registerForm = document.getElementById('ajax-register-form');
                 const forgotForm = document.getElementById('ajax-forgot-form');
-                if (loginForm) loginForm.addEventListener('submit', (event) => submitPageModalForm(event, loginForm, 'login-modal'));
+                if (loginForm) {
+                    loginForm.addEventListener('submit', (event) => {
+                        if (loginForm.dataset.submitting === 'true') {
+                            event.preventDefault();
+                            return;
+                        }
+
+                        loginForm.dataset.submitting = 'true';
+                        sessionStorage.removeItem(window.pendingAuthSuccessKey);
+                        const submitButton = loginForm.querySelector('button[type="submit"]');
+                        if (submitButton) {
+                            submitButton.disabled = true;
+                            submitButton.textContent = 'Please wait...';
+                        }
+                    });
+                }
                 if (registerForm) registerForm.addEventListener('submit', (event) => submitPageModalForm(event, registerForm, 'register-modal'));
                 if (forgotForm) forgotForm.addEventListener('submit', (event) => submitPageModalForm(event, forgotForm, 'forgot-modal'));
 

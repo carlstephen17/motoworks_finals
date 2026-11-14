@@ -30,6 +30,12 @@ html {
   scroll-behavior: smooth;
   height: 100%;
   overflow-x: hidden;
+  scrollbar-width: none;
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+  display: none;
 }
 
 body {
@@ -38,6 +44,7 @@ body {
   min-height: 100%;
   padding-top: 80px;
   overflow-x: hidden;
+  scrollbar-width: none;
   background: var(--color-bg);
   color: var(--color-text);
   font-family: var(--font-body);

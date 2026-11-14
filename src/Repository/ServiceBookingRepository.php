@@ -71,7 +71,8 @@ class ServiceBookingRepository extends ServiceEntityRepository
         }
 
         if ($status === 'Pending') {
-            $query->andWhere('booking.status IN (:statuses)')->setParameter('statuses', ['Pending', 'Cancellation Pending', 'Confirmed']);
+            $query->andWhere('(booking.status NOT IN (:terminalStatuses) OR booking.status IS NULL)')
+                ->setParameter('terminalStatuses', ['Completed', 'Cancelled', 'Rejected']);
         } elseif ($status === 'Cancelled') {
             $query->andWhere('booking.status IN (:statuses)')->setParameter('statuses', ['Cancelled', 'Rejected']);
         } elseif ($status === 'Completed') {
@@ -133,7 +134,8 @@ class ServiceBookingRepository extends ServiceEntityRepository
         }
 
         if ($status === 'Pending') {
-            $query->andWhere('booking.status IN (:statuses)')->setParameter('statuses', ['Pending', 'Cancellation Pending', 'Confirmed']);
+            $query->andWhere('(booking.status NOT IN (:terminalStatuses) OR booking.status IS NULL)')
+                ->setParameter('terminalStatuses', ['Completed', 'Cancelled', 'Rejected']);
         } elseif ($status === 'Cancelled') {
             $query->andWhere('booking.status IN (:statuses)')->setParameter('statuses', ['Cancelled', 'Rejected']);
         } elseif ($status === 'Completed') {
@@ -172,12 +174,12 @@ class ServiceBookingRepository extends ServiceEntityRepository
             $count = (int) $row['statusCount'];
             $counts['total'] += $count;
 
-            if (in_array($row['status'], ['Pending', 'Cancellation Pending', 'Confirmed'], true)) {
-                $counts['pending'] += $count;
+            if ($row['status'] === 'Completed') {
+                $counts['completed'] += $count;
             } elseif (in_array($row['status'], ['Cancelled', 'Rejected'], true)) {
                 $counts['cancelled'] += $count;
-            } elseif ($row['status'] === 'Completed') {
-                $counts['completed'] += $count;
+            } else {
+                $counts['pending'] += $count;
             }
         }
 

@@ -1,13 +1,16 @@
 {% if registrationForm is defined and forgotPasswordForm is defined %}
-    <div id="login-modal" class="auth-modal" style="display: {{ app.request.pathinfo == '/login' ? 'flex' : 'none' }};">
+    {% set loginErrorMessages = app.flashes('auth_error') %}
+    {% set loginErrorMessage = loginErrorMessages|first|default('') %}
+    {% set lastLoginUsernames = app.flashes('auth_username') %}
+    <div id="login-modal" class="auth-modal" style="display: {{ app.request.query.get('auth') == 'login' ? 'flex' : 'none' }};">
         <div class="auth-modal-content">
             <button type="button" class="auth-modal-close" onclick="closeModal('login-modal')">&times;</button>
             <h2 class="modal-heading-lg">Log In</h2>
-            <div id="login-modal-alert" class="modal-alert"></div>
+            <div id="login-modal-alert" class="modal-alert {{ loginErrorMessage ? 'error' : '' }}" role="alert">{{ loginErrorMessage }}</div>
             <form id="ajax-login-form" class="auth-form" action="{{ path('app_login') }}" method="post" data-turbo="false">
                 <input type="hidden" name="_csrf_token" value="{{ csrf_token('authenticate') }}">
                 <input type="hidden" name="_target_path" id="login-target-path" value="">
-                <input type="text" name="username" placeholder="Username or Email" value="{{ last_username|default('') }}" required autocomplete="username" class="auth-input auth-input-padded">
+                <input type="text" name="username" placeholder="Username or Email" value="{{ lastLoginUsernames|first|default(last_username|default('')) }}" required autocomplete="username" class="auth-input auth-input-padded">
                 <div class="password-container mb-sm">
                     <input type="password" id="login-password" name="password" placeholder="Password" required autocomplete="current-password" class="auth-input auth-input-padded-r">
                     <button type="button" class="toggle-password" onclick="togglePasswordVisibility('login-password', this)">
@@ -30,7 +33,7 @@
         </div>
     </div>
 
-    <div id="register-modal" class="auth-modal" style="display: none;">
+    <div id="register-modal" class="auth-modal" style="display: {{ app.request.query.get('auth') == 'register' ? 'flex' : 'none' }};">
         <div class="auth-modal-content">
             <button type="button" class="auth-modal-close" onclick="closeModal('register-modal')">&times;</button>
             <h2 class="modal-heading-lg">Create Account</h2>

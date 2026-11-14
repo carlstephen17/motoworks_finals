@@ -56,7 +56,7 @@
     <article class="dashboard-activity-panel">
         <header class="dashboard-activity-heading">
             <h3>Recent Promos</h3>
-            <a href="{{ path('admin_promos', {history: 1}) }}">View all</a>
+            <a href="{{ path('admin_promo_history') }}">View all</a>
         </header>
         {% if recentPromoClaims is defined and recentPromoClaims is not empty %}
             <ul class="dashboard-activity-list">
@@ -64,7 +64,7 @@
                     {% set activityStatus = claim.status|default('Pending') %}
                     <li>
                         <div class="dashboard-activity-item-heading">
-                            <a href="{{ path('admin_promos', {history: 1}) }}">Promo #{{ claim.id }}</a>
+                            <a href="{{ path('admin_promo_history') }}">Promo #{{ claim.id }}</a>
                             <span class="dashboard-activity-status dashboard-activity-status--{{ activityStatus|lower|replace({' ': '-'}) }}">{{ activityStatus }}</span>
                         </div>
                         <span class="dashboard-activity-description">{{ claim.fullName }} · {{ claim.promo ? claim.promo.title : claim.bundleSlug }}</span>

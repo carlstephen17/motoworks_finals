@@ -19,14 +19,14 @@
             {% endfor %}
         </section>
 
-        <form id="appointmentFilters" class="table-filters" method="get" action="{{ path('staff_appointments') }}">
+        <form id="appointmentFilters" class="table-filters" method="get" action="{{ path('staff_appointments') }}" data-auto-filter>
             <label class="visually-hidden" for="appointmentSearch">Search</label>
             <input id="appointmentSearch" type="search" name="search" value="{{ filters.search }}" placeholder="Search customer, vehicle, service, or ID..." autocomplete="off">
 
             <label class="visually-hidden" for="appointmentStatus">Status</label>
             <select id="appointmentStatus" name="status">
                 <option value="">All statuses</option>
-                {% for option in ['Pending', 'Cancelled', 'Completed'] %}
+                {% for option in ['Pending', 'Completed', 'Cancelled'] %}
                     <option value="{{ option }}" {{ filters.status == option ? 'selected' : '' }}>{{ option }}</option>
                 {% endfor %}
             </select>
@@ -34,16 +34,6 @@
             <label class="visually-hidden" for="appointmentDate">Date</label>
             <input id="appointmentDate" type="date" name="date" value="{{ filters.date }}">
 
-            <label class="visually-hidden" for="appointmentSource">Booking source</label>
-            <select id="appointmentSource" name="source">
-                <option value="">All sources</option>
-                <option value="online" {{ filters.source == 'online' ? 'selected' : '' }}>Customer online</option>
-                <option value="staff" {{ filters.source == 'staff' ? 'selected' : '' }}>Staff</option>
-                <option value="admin" {{ filters.source == 'admin' ? 'selected' : '' }}>Admin</option>
-            </select>
-
-            <button type="submit" class="btn-primary"><i class="fas fa-filter" aria-hidden="true"></i> Filter</button>
-            <a href="{{ path('staff_appointments') }}" class="btn-secondary">Clear</a>
             <a class="btn-primary" href="{{ path('staff_appointment_new') }}"><i class="fas fa-plus" aria-hidden="true"></i> Create appointment</a>
         </form>
 
@@ -56,15 +46,13 @@
                         <th>Vehicle</th>
                         <th>Service</th>
                         <th>Date &amp; Time</th>
-                        <th>Source</th>
                         <th>Status</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                 {% for booking in bookings %}
-                    {% set displayStatus = booking.status in ['Confirmed', 'Cancellation Pending'] ? 'Pending' : (booking.status == 'Rejected' ? 'Cancelled' : booking.status) %}
-                    {% set bookingSource = booking.source == 'staff' ? 'Staff-Created' ~ (booking.createdByStaff ? ' (' ~ booking.createdByStaff.firstName ~ ' ' ~ booking.createdByStaff.lastName ~ ')' : '') : (booking.source == 'admin' ? 'Admin-Created' : 'Customer Online') %}
+                    {% set displayStatus = booking.status == 'Completed' ? 'Completed' : (booking.status in ['Cancelled', 'Rejected'] ? 'Cancelled' : 'Pending') %}
                     {% set vehicle = booking.vehicleModel %}
                     {% if booking.motorcycle and booking.motorcycle.plateNumber %}
                         {% set vehicle = vehicle ~ ' (' ~ booking.motorcycle.plateNumber ~ ')' %}
@@ -83,7 +71,17 @@
                         status: displayStatus,
                         notes: booking.notes|default('—'),
                         cancellationReason: booking.rejectionReason|default('—'),
-                        source: bookingSource
+                        createdAt: booking.createdAt ? booking.createdAt|date('M j, Y g:i A') : '—',
+                        csrfToken: csrf_token('staff_appointment_edit_' ~ booking.id),
+                        edit: {
+                            service: booking.service.id,
+                            vehicleModel: booking.vehicleModel|default(''),
+                            bookingDate: booking.bookingDate|date('Y-m-d'),
+                            bookingTime: booking.bookingTime|date('H:i'),
+                            status: displayStatus,
+                            notes: booking.notes|default(''),
+                            rejectionReason: booking.rejectionReason|default('')
+                        }
                     } %}
                     <tr class="appointment-row" data-id="{{ booking.id }}">
                         <td><strong>#{{ booking.id }}</strong></td>
@@ -92,80 +90,132 @@
                             <small class="text-muted">{{ booking.user.email }}</small><br>
                             <small class="text-muted">{{ booking.user.phone|default('N/A') }}</small>
                         </td>
-                        <td>{{ vehicle }}</td>
-                        <td>
+                        <td data-appointment-vehicle>{{ vehicle }}</td>
+                        <td data-appointment-service>
                             {{ booking.service.name }}<br>
                             <small class="text-muted">₱{{ booking.service.price|number_format(2) }}</small>
                         </td>
-                        <td class="appointment-date-time">
-                            <span>{{ booking.bookingDate|date('M j, Y') }}</span>
-                            <span>{{ booking.bookingTime|date('g:i A') }}</span>
+                        <td class="appointment-date-time" data-appointment-schedule>
+                            <span data-appointment-date>{{ booking.bookingDate|date('M j, Y') }}</span>
+                            <span data-appointment-time>{{ booking.bookingTime|date('g:i A') }}</span>
                         </td>
                         <td>
-                            <small>{{ bookingSource }}</small>
-                        </td>
-                        <td>
-                            <span class="badge {{ displayStatus == 'Completed' ? 'badge-success' : (displayStatus == 'Cancelled' ? 'badge-danger' : 'badge-secondary') }}">{{ displayStatus }}</span>
+                            <span class="badge {{ displayStatus == 'Completed' ? 'badge-success' : (displayStatus == 'Cancelled' ? 'badge-danger' : 'badge-warning') }}" data-appointment-status>{{ displayStatus }}</span>
                         </td>
                         <td class="table-row-actions">
                             <button type="button" class="btn-sm btn-secondary view-appointment" data-appointment="{{ appointmentDetails|json_encode|e('html_attr') }}">
                                 <i class="fas fa-eye" aria-hidden="true"></i> View
                             </button>
                             {% if canModify and booking.status not in ['Completed', 'Cancellation Pending'] %}
-                                <a class="btn-sm btn-info edit-appointment" href="{{ path('staff_appointment_edit', {id: booking.id}) }}">
+                                <button type="button" class="btn-sm btn-info edit-appointment" data-edit-appointment data-appointment="{{ appointmentDetails|json_encode|e('html_attr') }}" data-edit-url="{{ path('staff_appointment_edit', {id: booking.id}) }}">
                                     <i class="fas fa-edit" aria-hidden="true"></i> Edit
-                                </a>
-                            {% endif %}
-                            {% if canModify and booking.status != 'Completed' %}
-                                <form method="post" action="{{ path('staff_appointment_update', {id: booking.id}) }}" data-deferred-cancel-status="Cancelled" data-confirm-message="Cancel this appointment? The change will be applied after the 3-second Undo window." style="display:inline-flex; align-items:center; gap:4px; margin:0;">
-                                    <input type="hidden" name="_token" value="{{ csrf_token('staff_appointment_update_' ~ booking.id) }}">
-                                    <select name="status" class="form-control" style="padding:4px 6px; font-size:0.8rem; height:auto; width:auto;" data-initial-status="{{ booking.status }}">
-                                        {% for option in ['Pending', 'Confirmed', 'Completed', 'Cancelled', 'Rejected'] %}
-                                            <option value="{{ option }}" {{ booking.status == option ? 'selected' : '' }}>{{ option }}</option>
-                                        {% endfor %}
-                                    </select>
-                                    <textarea name="rejectionReason" style="display:none;" maxlength="1000">{{ booking.rejectionReason }}</textarea>
-                                    <button type="submit" class="btn-sm btn-primary">Update</button>
-                                </form>
-                            {% endif %}
-                            {% if canModify and booking.status != 'Cancellation Pending' %}
-                                <form method="post" action="{{ path('staff_appointment_delete', {id: booking.id}) }}" data-deferred-action="delete" data-confirm-message="Delete this appointment? The change will be applied after the 3-second Undo window.">
-                                    <input type="hidden" name="_token" value="{{ csrf_token('staff_appointment_delete_' ~ booking.id) }}">
-                                    <button type="submit" class="btn-sm btn-danger"><i class="fas fa-trash" aria-hidden="true"></i> Delete</button>
-                                </form>
+                                </button>
                             {% endif %}
                         </td>
                     </tr>
                 {% else %}
-                    <tr><td colspan="8">No appointments found for these filters.</td></tr>
+                    <tr><td colspan="7">No appointments found for these filters.</td></tr>
                 {% endfor %}
                 </tbody>
             </table>
         </div>
 
-        <dialog id="staffAppointmentDetails" class="modal-content" aria-labelledby="staffAppointmentDetailsTitle">
-            <div class="modal-header">
+        <dialog id="staffAppointmentDetails" class="order-details-modal staff-order-dialog" aria-labelledby="staffAppointmentDetailsTitle">
+            <div class="order-details-modal-header">
                 <h3 id="staffAppointmentDetailsTitle">Appointment Details</h3>
-                <button type="button" class="close-btn" data-close-appointment-details aria-label="Close">×</button>
+                <button class="btn-sm btn-danger" type="button" data-close-appointment-details aria-label="Close"><i class="fas fa-times" aria-hidden="true"></i></button>
             </div>
-            <dl>
-                <dt>Appointment ID</dt><dd data-detail="id"></dd>
-                <dt>Customer</dt><dd data-detail="customer"></dd>
-                <dt>Email</dt><dd data-detail="email"></dd>
-                <dt>Phone</dt><dd data-detail="phone"></dd>
-                <dt>Vehicle</dt><dd data-detail="vehicle"></dd>
-                <dt>Service</dt><dd data-detail="service"></dd>
-                <dt>Price</dt><dd data-detail="price"></dd>
-                <dt>Date</dt><dd data-detail="date"></dd>
-                <dt>Time</dt><dd data-detail="time"></dd>
-                <dt>Source</dt><dd data-detail="source"></dd>
-                <dt>Status</dt><dd data-detail="status"></dd>
-                <dt>Notes</dt><dd data-detail="notes"></dd>
-                <dt>Cancellation reason</dt><dd data-detail="cancellationReason"></dd>
-            </dl>
-            <div class="modal-footer">
-                <button type="button" class="btn-secondary" data-close-appointment-details>Close</button>
+            <div class="order-details-body">
+                <section class="order-detail-section">
+                    <h4>Appointment and customer</h4>
+                    <dl class="order-detail-grid">
+                        <div><dt>Appointment ID</dt><dd data-detail="id"></dd></div>
+                        <div><dt>Created</dt><dd data-detail="createdAt"></dd></div>
+                        <div><dt>Customer</dt><dd data-detail="customer"></dd></div>
+                        <div><dt>Email</dt><dd data-detail="email"></dd></div>
+                        <div><dt>Phone</dt><dd data-detail="phone"></dd></div>
+                    </dl>
+                </section>
+                <section class="order-detail-section">
+                    <h4>Service and schedule</h4>
+                    <dl class="order-detail-grid">
+                        <div><dt>Vehicle</dt><dd data-detail="vehicle"></dd></div>
+                        <div><dt>Service</dt><dd data-detail="service"></dd></div>
+                        <div><dt>Price</dt><dd data-detail="price"></dd></div>
+                        <div><dt>Date</dt><dd data-detail="date"></dd></div>
+                        <div><dt>Time</dt><dd data-detail="time"></dd></div>
+                        <div><dt>Status</dt><dd><span class="badge" data-detail="status"></span></dd></div>
+                    </dl>
+                </section>
+                <section class="order-detail-section">
+                    <h4>Additional details</h4>
+                    <dl class="order-detail-grid">
+                        <div class="order-detail-full"><dt>Notes</dt><dd data-detail="notes"></dd></div>
+                        <div class="order-detail-full"><dt>Cancellation reason</dt><dd data-detail="cancellationReason"></dd></div>
+                    </dl>
+                </section>
             </div>
+        </dialog>
+
+        <dialog id="staffAppointmentEdit" class="staff-edit-dialog" aria-labelledby="staffAppointmentEditTitle">
+            <form method="post" class="staff-edit-form" data-appointment-edit-form>
+                <div class="staff-edit-header">
+                    <div>
+                        <p class="staff-edit-eyebrow">Appointment management</p>
+                        <h3 id="staffAppointmentEditTitle">Edit Appointment</h3>
+                    </div>
+                    <button type="button" class="close-btn" data-close-appointment-edit aria-label="Close">×</button>
+                </div>
+                <input type="hidden" name="_token" value="{{ csrf_token('staff_appointment_edit_0') }}" data-appointment-csrf>
+                <div class="staff-edit-body">
+                    <section class="staff-edit-section">
+                        <h4>Service and vehicle</h4>
+                        <div class="staff-edit-grid">
+                            <label>Service
+                                <select class="form-control" name="appointment_edit[service]" required data-appointment-field="service">
+                                    {% for service in services %}
+                                        <option value="{{ service.id }}">{{ service.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </label>
+                            <label>Motorcycle model
+                                <input class="form-control" type="text" name="appointment_edit[vehicleModel]" maxlength="255" required data-appointment-field="vehicleModel">
+                            </label>
+                        </div>
+                    </section>
+                    <section class="staff-edit-section">
+                        <h4>Schedule and status</h4>
+                        <div class="staff-edit-grid">
+                            <label>Appointment date
+                                <input class="form-control" type="date" name="appointment_edit[bookingDate]" required data-appointment-field="bookingDate">
+                            </label>
+                            <label>Appointment time
+                                <input class="form-control" type="time" name="appointment_edit[bookingTime]" required data-appointment-field="bookingTime">
+                            </label>
+                            <label>Status
+                                <select class="form-control" name="appointment_edit[status]" required data-appointment-field="status">
+                                    {% for option in ['Pending', 'Completed', 'Cancelled'] %}
+                                        <option value="{{ option }}">{{ option }}</option>
+                                    {% endfor %}
+                                </select>
+                            </label>
+                            <label class="staff-edit-full">Cancellation reason
+                                <textarea class="form-control" name="appointment_edit[rejectionReason]" maxlength="1000" rows="2" data-appointment-field="rejectionReason"></textarea>
+                            </label>
+                        </div>
+                    </section>
+                    <section class="staff-edit-section">
+                        <h4>Additional notes</h4>
+                        <label>Appointment notes
+                            <textarea class="form-control" name="appointment_edit[notes]" maxlength="2000" rows="3" data-appointment-field="notes"></textarea>
+                        </label>
+                    </section>
+                </div>
+                <div class="staff-edit-footer">
+                    <button type="button" class="btn-secondary" data-close-appointment-edit>Cancel</button>
+                    <button type="submit" class="btn-primary"><i class="fas fa-save" aria-hidden="true"></i> Save changes</button>
+                </div>
+            </form>
         </dialog>
     </div>
 </main>
@@ -181,7 +231,10 @@
                 const data = JSON.parse(viewBtn.dataset.appointment);
                 Object.keys(data).forEach((key) => {
                     const el = dialog.querySelector(`[data-detail="${key}"]`);
-                    if (el) el.textContent = data[key] || '—';
+                    if (el) {
+                        el.textContent = data[key] || '—';
+                        if (key === 'status') el.className = `badge ${data[key] === 'Completed' ? 'badge-success' : (data[key] === 'Cancelled' ? 'badge-danger' : 'badge-warning')}`;
+                    }
                 });
                 if (typeof dialog.showModal === 'function') {
                     dialog.showModal();
@@ -190,6 +243,7 @@
                 }
             } catch (err) {
                 console.error(err);
+                if (typeof window.showAdminToast === 'function') window.showAdminToast('Unable to load appointment details.', 'error');
             }
         }
         if (event.target.closest('[data-close-appointment-details]')) {

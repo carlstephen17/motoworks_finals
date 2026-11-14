@@ -174,6 +174,15 @@
     margin-bottom: 5px;
 }
 
+.order-item > span {
+    min-width: 0;
+}
+
+.order-item > strong {
+    margin-left: auto;
+    white-space: nowrap;
+}
+
 .order-item img {
     flex: 0 0 36px;
     object-fit: cover;
@@ -218,6 +227,40 @@
 .order-details-body ul {
     padding-left: 20px;
     margin: 8px 0;
+}
+
+.promo-history-toolbar,
+.admin-edit-section-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.promo-history-toolbar {
+    margin-bottom: 18px;
+}
+
+.admin-edit-section-heading {
+    margin-bottom: 12px;
+}
+
+.admin-edit-section-heading .admin-edit-section-title {
+    margin-bottom: 0;
+}
+
+.order-create-item {
+    padding: 14px;
+    border: 1px solid #e8edf4;
+    border-radius: 10px;
+}
+
+.order-create-item + .order-create-item {
+    margin-top: 12px;
+}
+
+.order-create-item .admin-edit-form-grid {
+    margin-bottom: 12px;
 }
 
 .order-update-form {
@@ -345,7 +388,13 @@
 
 .order-filters {
     display: grid;
-    grid-template-columns: minmax(220px, 2fr) repeat(4, minmax(130px, 1fr));
+    grid-template-columns: minmax(220px, 2fr) repeat(4, minmax(130px, 1fr)) auto;
+}
+
+.order-filters > .order-create-button {
+    justify-self: end;
+    min-height: 40px;
+    white-space: nowrap;
 }
 
 .order-filters .form-group {
@@ -451,8 +500,7 @@
 #promoClaimDetails,
 #promoClaimEdit,
 #appointmentDetails,
-#appointmentActionDialog,
-#promoHistoryDialog {
+#appointmentActionDialog {
     position: fixed;
     inset: 0;
     margin: auto;
@@ -478,53 +526,13 @@
     max-width: none;
 }
 
-#promoHistoryDialog {
-    width: min(1100px, calc(100vw - 32px));
-    max-width: none;
-    overflow: hidden;
-}
-
-#promoHistoryDialog[open] {
-    display: flex;
-    flex-direction: column;
-}
-
-.promo-history-modal .modal-header {
-    flex: 0 0 auto;
-    align-items: flex-start;
-    padding-bottom: 16px;
-    border-bottom: 1px solid #e2e8f0;
-}
-
-.promo-history-modal .modal-header h2 {
-    margin: 0;
-    color: #0f172a;
-    font-size: 1.35rem;
-}
-
-.promo-history-eyebrow {
-    margin: 0 0 4px;
-    color: #64748b;
-    font-size: 0.75rem;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-}
-
-.promo-history-modal-body {
-    min-height: 0;
-    overflow: auto;
-    padding: 18px 2px 2px;
-}
-
 #userEditDialog::backdrop,
 #promoClaimDetails::backdrop,
 #appointmentDetails::backdrop,
 #promoDetails::backdrop,
 #promoFormDialog::backdrop,
 #promoClaimEdit::backdrop,
-#appointmentActionDialog::backdrop,
-#promoHistoryDialog::backdrop {
+#appointmentActionDialog::backdrop {
     background: rgba(15, 23, 42, 0.55);
 }
 
@@ -533,16 +541,6 @@
 }
 
 @media (max-width: 600px) {
-    #promoHistoryDialog {
-        width: calc(100vw - 20px);
-        max-height: calc(100vh - 20px);
-        padding: 16px;
-    }
-
-    .promo-history-modal-body {
-        padding-top: 12px;
-    }
-
     .appointment-filter-toolbar,
     .order-filters,
     .table-filters {
@@ -563,6 +561,10 @@
 
     .order-filters {
         grid-template-columns: 1fr;
+    }
+
+    .order-filters > .order-create-button {
+        justify-self: stretch;
     }
 }
 
@@ -793,6 +795,15 @@ dialog.modal-content {
     overflow-y: auto;
 }
 
+.admin-view-dialog {
+    position: fixed;
+    inset: 0;
+    width: min(480px, calc(100vw - 32px));
+    max-width: 90vw;
+    max-height: 90vh;
+    margin: auto;
+}
+
 dialog.modal-content::backdrop {
     background: rgba(15, 23, 42, 0.6);
     backdrop-filter: blur(3px);
@@ -951,5 +962,254 @@ dialog.modal-content::backdrop {
 
     #promoClaimDetails dd {
         margin-bottom: 8px;
+    }
+}
+
+.admin-edit-dialog {
+    position: fixed;
+    inset: 0;
+    width: min(760px, calc(100vw - 32px));
+    max-width: none;
+    max-height: calc(100vh - 32px);
+    margin: auto;
+    padding: 28px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    border: 1px solid #dbe3ee;
+    border-radius: 16px;
+    color: #172338;
+}
+
+.admin-edit-dialog .modal-header {
+    align-items: flex-start;
+    margin-bottom: 10px;
+    padding-bottom: 16px;
+    border-color: #e8edf4;
+}
+
+.admin-edit-dialog .modal-header h3 {
+    margin: 4px 0 0;
+    color: #172338;
+    font-size: 1.3rem;
+}
+
+.admin-edit-eyebrow {
+    margin: 0;
+    color: #2563eb;
+    font-size: 0.68rem;
+    font-weight: 750;
+    letter-spacing: 1.1px;
+    text-transform: uppercase;
+}
+
+.admin-edit-intro {
+    margin: 0 0 20px;
+    color: #64748b;
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+
+.admin-edit-validation-message {
+    margin: 0 0 16px;
+    padding: 10px 12px;
+    border: 1px solid #fecaca;
+    border-radius: 8px;
+    background: #fef2f2;
+    color: #b91c1c;
+    font-size: 0.9rem;
+}
+
+.admin-edit-form {
+    display: grid;
+    gap: 20px;
+    margin: 0;
+}
+
+.admin-edit-section {
+    min-width: 0;
+}
+
+.admin-edit-section-title {
+    margin: 0 0 13px;
+    padding-bottom: 9px;
+    border-bottom: 1px solid #e8edf4;
+    color: #25364e;
+    font-size: 0.92rem;
+    font-weight: 700;
+}
+
+.admin-edit-form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+}
+
+.admin-edit-field {
+    min-width: 0;
+}
+
+.admin-edit-field-full {
+    grid-column: 1 / -1;
+}
+
+.admin-edit-field > label {
+    display: block;
+    margin-bottom: 7px;
+    color: #344256;
+    font-size: 0.84rem;
+    font-weight: 650;
+}
+
+.admin-edit-field .form-control {
+    width: 100%;
+    min-height: 44px;
+    padding: 10px 12px;
+    border: 1px solid #cbd5e1;
+    border-radius: 7px;
+    background: #f8fafc;
+    color: #172338;
+    font: inherit;
+}
+
+.admin-edit-field textarea.form-control {
+    min-height: 90px;
+    resize: vertical;
+}
+
+.admin-edit-field .admin-edit-file {
+    padding: 8px;
+    background: #fff;
+}
+
+.admin-edit-help {
+    display: block;
+    margin-top: 6px;
+    color: #748197;
+    font-size: 0.76rem;
+    line-height: 1.4;
+}
+
+.admin-edit-field ul {
+    margin: 5px 0 0;
+    padding-left: 18px;
+    color: #b42318;
+    font-size: 0.8rem;
+}
+
+.admin-edit-toggle {
+    display: flex;
+    align-items: flex-start;
+    gap: 11px;
+    padding: 14px;
+    border: 1px solid #e1e8f1;
+    border-radius: 9px;
+    background: #f8fafc;
+}
+
+.admin-edit-toggle > div {
+    min-width: 0;
+}
+
+.admin-edit-toggle label {
+    display: block;
+    margin: 0;
+    color: #344256;
+    font-size: 0.84rem;
+    font-weight: 650;
+}
+
+.admin-edit-checkbox {
+    width: 17px;
+    height: 17px;
+    flex: 0 0 17px;
+    margin-top: 2px;
+    accent-color: #2563eb;
+}
+
+.admin-edit-dialog .modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 0;
+    padding-top: 18px;
+    border-color: #e8edf4;
+}
+
+.admin-service-thumb {
+    display: block;
+    width: 40px;
+    height: 40px;
+    border-radius: 6px;
+    object-fit: cover;
+}
+
+.admin-order-edit-dialog .order-details-modal-header {
+    align-items: center;
+}
+
+.admin-order-edit-dialog .order-details-modal-header h3 {
+    color: #172338;
+    font-size: 1.2rem;
+}
+
+.admin-order-edit-dialog .admin-edit-intro {
+    margin-bottom: 18px;
+}
+
+.admin-order-status-form {
+    padding: 16px;
+    border: 1px solid #e1e8f1;
+    border-radius: 10px;
+    background: #f8fafc;
+}
+
+.admin-order-status-form .admin-order-status-label,
+.admin-order-status-form .admin-order-cancellation-reason {
+    display: block;
+    color: #344256;
+    font-size: 0.84rem;
+    font-weight: 650;
+}
+
+.admin-order-status-form .form-control {
+    width: 100%;
+    min-height: 42px;
+    margin-top: 7px;
+    padding: 9px 11px;
+    border: 1px solid #cbd5e1;
+    border-radius: 7px;
+    background: #fff;
+    font: inherit;
+}
+
+.admin-order-status-form textarea.form-control {
+    min-height: 84px;
+}
+
+@media (max-width: 560px) {
+    .admin-edit-dialog {
+        width: calc(100vw - 20px);
+        max-height: calc(100vh - 20px);
+        padding: 20px;
+        border-radius: 13px;
+    }
+
+    .admin-edit-form-grid {
+        grid-template-columns: 1fr;
+        gap: 14px;
+    }
+
+    .admin-edit-field-full {
+        grid-column: auto;
+    }
+
+    .admin-edit-dialog .modal-footer {
+        flex-wrap: wrap;
+    }
+
+    .promo-history-toolbar,
+    .admin-edit-section-heading {
+        align-items: stretch;
+        flex-direction: column;
     }
 }

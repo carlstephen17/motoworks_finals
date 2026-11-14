@@ -48,13 +48,8 @@
                 </div>
             {% else %}
                 <a class="btn btn-primary" href="{{ path('service_index') }}">Book Appointment</a>
-                {% if app.request.attributes.get('_route') in ['app_home', 'shop_index'] %}
-                    <button type="button" onclick="openModal('login-modal')" class="btn-login-header" style="background:none; border:none; cursor:pointer;">Log In</button>
-                    <button type="button" onclick="openModal('register-modal')" class="btn-signup-header" style="cursor:pointer;">Sign Up</button>
-                {% else %}
-                    <a class="btn-login-header" href="{{ path('app_login') }}">Log In</a>
-                    <a class="btn-signup-header" href="{{ path('app_register') }}">Sign Up</a>
-                {% endif %}
+                <button type="button" onclick="openModal('login-modal')" class="btn-login-header" aria-haspopup="dialog" aria-controls="login-modal" style="background:none; border:none; cursor:pointer;">Log In</button>
+                <button type="button" onclick="openModal('register-modal')" class="btn-signup-header" aria-haspopup="dialog" aria-controls="register-modal" style="cursor:pointer;">Sign Up</button>
             {% endif %}
         </div>
         <button

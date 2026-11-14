@@ -74,13 +74,13 @@
                             aria-label="Add to cart"
                             {{ stockLevel <= 0 ? 'disabled style="opacity: 0.5; cursor: not-allowed;"' : '' }}
                         >
-                            <i class="fa-solid fa-cart-plus"></i>
+                            <i class="fa-solid fa-cart-plus" aria-hidden="true"></i>
                         </button>
 
                         <!-- BUY NOW -->
                         <button
                             type="button"
-                            class="btn {{ stockLevel > 0 ? 'btn-primary' : 'btn-secondary' }} btn-block js-buy-now"
+                            class="btn {{ stockLevel > 0 ? 'btn-primary' : 'btn-secondary' }} btn-block btn-buy-now js-buy-now"
                             data-product-id="{{ product.id }}"
                             data-product-name="{{ product.name|e('html_attr') }}"
                             data-product-price="{{ product.price }}"

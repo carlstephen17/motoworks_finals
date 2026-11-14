@@ -24,8 +24,6 @@ class AdminPromoClaimUpdateType extends AbstractType
             ->add('status', ChoiceType::class, [
                 'choices' => [
                     'Pending' => 'Pending',
-                    'Confirmed' => 'Confirmed',
-                    'Used' => 'Used',
                     'Completed' => 'Completed',
                     'Cancelled' => 'Cancelled',
                 ],

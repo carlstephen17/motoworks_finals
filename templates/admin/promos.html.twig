@@ -10,7 +10,6 @@
     <div class="admin-content-body">
     {% for message in app.flashes('success') %}<p role="status" data-auto-dismiss>{{ message }}</p>{% endfor %}
     {% for message in app.flashes('error') %}<p role="alert" data-auto-dismiss>{{ message }}</p>{% endfor %}
-    <p id="promoNotifications" class="alert-toast" role="status" aria-live="polite" hidden></p>
     <section class="table-filters" aria-label="Filter promotions">
         <label for="promoSearch">Search promos</label>
         <input id="promoSearch" type="search">
@@ -20,9 +19,9 @@
             <option value="1">Active</option>
             <option value="0">Inactive</option>
         </select>
-        <button type="button" class="btn-sm btn-secondary" data-open-promo-history>
+        <a class="btn-sm btn-secondary" href="{{ path('admin_promo_history') }}">
             <i class="fas fa-clock-rotate-left" aria-hidden="true"></i> Promo History
-        </button>
+        </a>
     </section>
     <div class="table-responsive">
     <table class="admin-table" id="promoTable">
@@ -83,20 +82,99 @@
         <dl id="promoDetailsList"></dl>
         <div class="modal-footer"><button type="button" id="closePromoDetails" class="btn-secondary">Close</button></div>
     </dialog>
-    <dialog id="promoFormDialog" class="modal-content" aria-labelledby="promoFormTitle">
+    <dialog id="promoFormDialog" class="modal-content admin-edit-dialog" aria-labelledby="promoFormTitle">
         <div class="modal-header">
-            <h3 id="promoFormTitle">Create promotion</h3>
+            <div>
+                <p class="admin-edit-eyebrow">Promotion catalogue</p>
+                <h3 id="promoFormTitle">Create promotion</h3>
+            </div>
             <button type="button" class="close-btn" data-close-promo-form aria-label="Close">×</button>
         </div>
-        {{ form_start(promoForm, {action: path('admin_promo_new'), attr: {id: 'promoAdminForm'}}) }}
-            {{ form_widget(promoForm) }}
+        <p class="admin-edit-intro">Update the offer, customer-facing details, and display assets for this promotion.</p>
+        {{ form_start(promoForm, {action: path('admin_promo_new'), attr: {id: 'promoAdminForm', class: 'admin-edit-form'}}) }}
+            <section class="admin-edit-section">
+                <h4 class="admin-edit-section-title">Promotion details</h4>
+                <div class="admin-edit-form-grid">
+                    <div class="admin-edit-field">
+                        {{ form_label(promoForm.title, 'Promotion name') }}
+                        {{ form_widget(promoForm.title, {attr: {class: 'form-control', autocomplete: 'off'}}) }}
+                        {{ form_errors(promoForm.title) }}
+                    </div>
+                    <div class="admin-edit-field">
+                        {{ form_label(promoForm.slug, 'URL slug') }}
+                        {{ form_widget(promoForm.slug, {attr: {class: 'form-control', autocomplete: 'off'}}) }}
+                        {{ form_errors(promoForm.slug) }}
+                    </div>
+                    <div class="admin-edit-field">
+                        {{ form_label(promoForm.badge, 'Offer badge') }}
+                        {{ form_widget(promoForm.badge, {attr: {class: 'form-control'}}) }}
+                        {{ form_errors(promoForm.badge) }}
+                    </div>
+                    <div class="admin-edit-field">
+                        {{ form_label(promoForm.active, 'Availability') }}
+                        {{ form_widget(promoForm.active, {attr: {class: 'form-control'}}) }}
+                        {{ form_errors(promoForm.active) }}
+                    </div>
+                    <div class="admin-edit-field admin-edit-field-full">
+                        {{ form_label(promoForm.description, 'Description') }}
+                        {{ form_widget(promoForm.description, {attr: {class: 'form-control', rows: 4}}) }}
+                        {{ form_errors(promoForm.description) }}
+                    </div>
+                </div>
+            </section>
+            <section class="admin-edit-section">
+                <h4 class="admin-edit-section-title">Customer offer</h4>
+                <div class="admin-edit-form-grid">
+                    <div class="admin-edit-field">
+                        {{ form_label(promoForm.itemLabel, 'Offer label') }}
+                        {{ form_widget(promoForm.itemLabel, {attr: {class: 'form-control'}}) }}
+                        {{ form_errors(promoForm.itemLabel) }}
+                    </div>
+                    <div class="admin-edit-field admin-edit-field-full">
+                        {{ form_label(promoForm.itemOptions, 'Offer options') }}
+                        {{ form_widget(promoForm.itemOptions, {attr: {class: 'form-control', rows: 3}}) }}
+                        <small class="admin-edit-help">Enter one option per line.</small>
+                        {{ form_errors(promoForm.itemOptions) }}
+                    </div>
+                    <div class="admin-edit-field admin-edit-field-full">
+                        {{ form_label(promoForm.perks, 'Perks') }}
+                        {{ form_widget(promoForm.perks, {attr: {class: 'form-control', rows: 3}}) }}
+                        {{ form_errors(promoForm.perks) }}
+                    </div>
+                </div>
+            </section>
+            <section class="admin-edit-section">
+                <h4 class="admin-edit-section-title">Display assets</h4>
+                <div class="admin-edit-form-grid">
+                    <div class="admin-edit-field">
+                        {{ form_label(promoForm.productImage, 'Product image path') }}
+                        {{ form_widget(promoForm.productImage, {attr: {class: 'form-control'}}) }}
+                        {{ form_errors(promoForm.productImage) }}
+                    </div>
+                    <div class="admin-edit-field">
+                        {{ form_label(promoForm.serviceImage, 'Service image path') }}
+                        {{ form_widget(promoForm.serviceImage, {attr: {class: 'form-control'}}) }}
+                        {{ form_errors(promoForm.serviceImage) }}
+                    </div>
+                    <div class="admin-edit-field">
+                        {{ form_label(promoForm.productIcon, 'Product icon') }}
+                        {{ form_widget(promoForm.productIcon, {attr: {class: 'form-control'}}) }}
+                        {{ form_errors(promoForm.productIcon) }}
+                    </div>
+                    <div class="admin-edit-field">
+                        {{ form_label(promoForm.serviceIcon, 'Service icon') }}
+                        {{ form_widget(promoForm.serviceIcon, {attr: {class: 'form-control'}}) }}
+                        {{ form_errors(promoForm.serviceIcon) }}
+                    </div>
+                </div>
+            </section>
+            {{ form_rest(promoForm) }}
             <div class="modal-footer">
                 <button type="submit" class="btn-primary">Save promotion</button>
                 <button type="button" class="btn-secondary" data-close-promo-form>Cancel</button>
             </div>
         {{ form_end(promoForm) }}
     </dialog>
-    {% include 'admin/_promo_history_modal.html.twig' %}
 </div>
 </main>
 <script>
@@ -132,6 +210,7 @@
     document.getElementById('closePromoDetails').addEventListener('click', () => promoDetails.close());
 
     const formTitle = document.getElementById('promoFormTitle');
+    const formSubmitButton = promoForm.querySelector('button[type="submit"]');
     const assignFormValue = (field, value) => {
         const control = promoForm.elements.namedItem(`promo[${field}]`);
         if (!control) return;
@@ -216,6 +295,7 @@
         promoForm.reset();
         promoForm.action = createLink.dataset.createUrl;
         formTitle.textContent = 'Create promotion';
+        formSubmitButton.textContent = 'Create promotion';
         formDialog.showModal();
     });
     table.addEventListener('click', (event) => {
@@ -242,29 +322,19 @@
         Object.entries(promo).forEach(([field, value]) => assignFormValue(field, value));
         promoForm.action = link.dataset.action;
         formTitle.textContent = 'Edit promotion';
+        formSubmitButton.textContent = 'Save changes';
         formDialog.showModal();
     });
     formDialog.querySelectorAll('[data-close-promo-form]').forEach((button) => {
         button.addEventListener('click', () => formDialog.close());
     });
 
-    const notification = document.getElementById('promoNotifications');
-    let notificationTimeout;
     const showNotification = (message, success) => {
         if (typeof window.showAdminToast === 'function') {
             window.showAdminToast(message, success ? 'success' : 'error');
             return;
         }
-
-        if (notificationTimeout) window.clearTimeout(notificationTimeout);
-        notification.textContent = message;
-        notification.className = success ? 'alert-toast' : 'alert-toast alert-error';
-        notification.setAttribute('role', success ? 'status' : 'alert');
-        notification.hidden = false;
-        notificationTimeout = window.setTimeout(() => {
-            notification.hidden = true;
-            notificationTimeout = null;
-        }, 3000);
+        console.error(message);
     };
 
     promoForm.addEventListener('submit', async (event) => {

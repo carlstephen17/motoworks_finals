@@ -4,16 +4,14 @@ namespace App\Controller;
 
 use App\Entity\CustomerOrder;
 use App\Entity\Motorcycle;
-use App\Entity\OrderItem;
 use App\Entity\Promo;
 use App\Entity\PromoClaim;
-use App\Entity\Product;
 use App\Entity\Service;
 use App\Entity\ServiceBooking;
 use App\Entity\ServiceRecord;
 use App\Entity\User;
 use App\Form\PromoClaimUpdateType;
-use App\Form\StaffOrderItemType;
+use App\Form\OrderCreateType;
 use App\Form\ServiceBookingType;
 use App\Form\ServiceRecordUpdateType;
 use App\Repository\CustomerOrderRepository;
@@ -25,24 +23,25 @@ use App\Repository\ServiceBookingRepository;
 use App\Repository\ServiceRecordRepository;
 use App\Repository\ServiceRepository;
 use App\Repository\UserRepository;
+use App\Service\OrderCreationManager;
 use App\Service\OrderStatusManager;
 use App\Service\PaymentStatusManager;
-use Doctrine\DBAL\LockMode;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\Form\Extension\Core\Type\ChoiceType;
-use Symfony\Component\Form\Extension\Core\Type\CollectionType;
 use Symfony\Component\Form\Extension\Core\Type\DateType;
 use Symfony\Component\Form\Extension\Core\Type\TextareaType;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
 use Symfony\Component\Form\Extension\Core\Type\TimeType;
+use Symfony\Component\Form\FormFactoryInterface;
 use Symfony\Component\Form\FormBuilderInterface;
+use Symfony\Component\Form\FormInterface;
+use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 use Symfony\Component\Validator\Constraints\Length;
-use Symfony\Component\Validator\Constraints\Count;
 use Symfony\Component\Validator\Constraints\NotBlank;
 use Symfony\Component\Validator\Constraints\Regex;
 
@@ -56,13 +55,11 @@ class StaffController extends AbstractController
         ServiceBookingRepository $bookings,
         CustomerOrderRepository $orders,
         PromoClaimRepository $claims,
-        ServiceRecordRepository $records,
     ): Response {
         $productCount = $products->count([]);
         $appointmentCount = $bookings->count([]);
         $orderCount = $orders->count([]);
         $claimCount = $claims->count([]);
-        $recordCount = $records->count([]);
 
         return $this->render('staff/dashboard.html.twig', [
             'counts' => [
@@ -70,18 +67,16 @@ class StaffController extends AbstractController
                 'appointments' => $appointmentCount,
                 'orders' => $orderCount,
                 'promoClaims' => $claimCount,
-                'serviceRecords' => $recordCount,
-                'totalRecords' => $productCount + $appointmentCount + $orderCount + $claimCount + $recordCount,
+                'totalRecords' => $productCount + $appointmentCount + $orderCount + $claimCount,
             ],
             'recentAppointments' => $bookings->findRecentForAdmin(),
             'recentOrders' => $orders->findRecentForAdmin(),
             'recentPromoClaims' => $claims->findRecentForAdmin(),
-            'recentServiceRecords' => $records->findBy([], ['id' => 'DESC'], 5),
         ]);
     }
 
     #[Route('/appointments', name: 'staff_appointments', methods: ['GET'])]
-    public function appointments(Request $request, ServiceBookingRepository $bookings): Response
+    public function appointments(Request $request, ServiceBookingRepository $bookings, ServiceRepository $services): Response
     {
         $search = $request->query->get('search');
         $search = is_string($search) ? trim($search) : '';
@@ -94,6 +89,7 @@ class StaffController extends AbstractController
         return $this->render('staff/appointments.html.twig', [
             'bookings' => $bookings->findForStaff($search, $status, $date, $source),
             'counts' => $bookings->getAdminStatusCounts(),
+            'services' => $services->findBy([], ['name' => 'ASC']),
             'filters' => [
                 'search' => $search,
                 'status' => $status,
@@ -182,8 +178,10 @@ class StaffController extends AbstractController
             return $this->redirectToRoute('staff_appointments');
         }
         $status = (string) $request->request->get('status');
-        if (!in_array($status, ['Pending', 'Confirmed', 'Completed', 'Cancelled', 'Rejected'], true)) {
-            throw $this->createNotFoundException('Invalid appointment status.');
+        if (!in_array($status, ['Pending', 'Completed', 'Cancelled'], true)) {
+            return $request->isXmlHttpRequest()
+                ? new JsonResponse(['success' => false, 'message' => 'Choose Pending, Completed, or Cancelled.'], Response::HTTP_UNPROCESSABLE_ENTITY)
+                : throw $this->createNotFoundException('Invalid appointment status.');
         }
         $rejectionReason = trim((string) $request->request->get('rejectionReason', ''));
         if (mb_strlen($rejectionReason) > 1000) {
@@ -192,16 +190,33 @@ class StaffController extends AbstractController
             return $this->redirectToRoute('staff_appointments');
         }
         $booking->setStatus($status);
-        $booking->setRejectionReason(in_array($status, ['Cancelled', 'Rejected'], true) ? ($rejectionReason ?: null) : null);
+        $booking->setRejectionReason($status === 'Cancelled' ? ($rejectionReason ?: null) : null);
         $entityManager->flush();
-        $this->addFlash('success', 'Appointment updated.');
+        if (!$request->isXmlHttpRequest()) {
+            $this->addFlash('success', 'Appointment updated.');
+        }
+
+        if ($request->isXmlHttpRequest()) {
+            return new JsonResponse([
+                'success' => true,
+                'message' => 'Appointment updated.',
+                'appointment' => $this->appointmentPayload($booking),
+                'counts' => $bookings->getAdminStatusCounts(),
+            ]);
+        }
 
         return $this->redirectToRoute('staff_appointments');
     }
 
     #[Route('/appointments/{id}/edit', name: 'staff_appointment_edit', requirements: ['id' => '\d+'], methods: ['GET', 'POST'])]
-    public function appointmentEdit(int $id, Request $request, ServiceBookingRepository $bookings, ServiceRepository $services, EntityManagerInterface $entityManager): Response
-    {
+    public function appointmentEdit(
+        int $id,
+        Request $request,
+        ServiceBookingRepository $bookings,
+        ServiceRepository $services,
+        FormFactoryInterface $formFactory,
+        EntityManagerInterface $entityManager,
+    ): Response {
         $this->requireStaff();
         $booking = $bookings->find($id) ?? throw $this->createNotFoundException('Appointment not found.');
         $this->assertAppointmentOwnership($booking);
@@ -216,8 +231,40 @@ class StaffController extends AbstractController
             return $this->redirectToRoute('staff_appointments');
         }
 
+        $serviceList = $services->findBy([], ['name' => 'ASC']);
+        if ($request->isMethod('POST') && $request->isXmlHttpRequest()) {
+            if (!$this->isCsrfTokenValid('staff_appointment_edit_'.$id, (string) $request->request->get('_token'))) {
+                return new JsonResponse(['success' => false, 'message' => 'Your session token is invalid. Refresh the page and try again.'], Response::HTTP_FORBIDDEN);
+            }
+
+            $form = $formFactory->createNamed('appointment_edit', ServiceBookingType::class, $booking, [
+                'services' => $serviceList,
+                'status_choices' => ['Pending' => 'Pending', 'Completed' => 'Completed', 'Cancelled' => 'Cancelled'],
+                'csrf_protection' => false,
+            ]);
+            $submitted = $request->request->all();
+            $form->submit(is_array($submitted['appointment_edit'] ?? null) ? $submitted['appointment_edit'] : []);
+            if (!$form->isValid()) {
+                return new JsonResponse(['success' => false, 'message' => $this->firstFormError($form)], Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
+            if ($booking->getStatus() !== 'Cancelled') {
+                $booking->setRejectionReason(null);
+            } else {
+                $booking->setRejectionReason(trim((string) $booking->getRejectionReason()) ?: null);
+            }
+            $entityManager->flush();
+
+            return new JsonResponse([
+                'success' => true,
+                'message' => 'Appointment updated.',
+                'appointment' => $this->appointmentPayload($booking),
+                'counts' => $bookings->getAdminStatusCounts(),
+            ]);
+        }
+
         $form = $this->createForm(ServiceBookingType::class, $booking, [
-            'services' => $services->findBy([], ['name' => 'ASC']),
+            'services' => $serviceList,
+            'status_choices' => ['Pending' => 'Pending', 'Completed' => 'Completed', 'Cancelled' => 'Cancelled'],
         ])->handleRequest($request);
         if ($form->isSubmitted() && $form->isValid()) {
             if ($booking->getStatus() !== 'Cancelled') {
@@ -296,12 +343,15 @@ class StaffController extends AbstractController
         Request $request,
         UserRepository $users,
         ProductRepository $products,
-        EntityManagerInterface $entityManager,
+        OrderCreationManager $orderCreationManager,
     ): Response {
-        $this->requireStaff();
+        $staff = $this->requireStaff();
         $customers = $users->findBy(['role' => 'customer'], ['firstName' => 'ASC']);
         $availableProducts = $products->findActiveProducts();
-        $form = $this->orderForm($customers, $availableProducts);
+        $form = $this->createForm(OrderCreateType::class, null, [
+            'customers' => $customers,
+            'products' => $availableProducts,
+        ]);
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
@@ -324,55 +374,13 @@ class StaffController extends AbstractController
             ) {
                 $this->addFlash('error', 'Choose a customer, delivery address, and between 1 and 20 valid order items.');
             } else {
-                $connection = $entityManager->getConnection();
-                $connection->beginTransaction();
                 try {
-                    ksort($requestedItems, SORT_NUMERIC);
-                    $lockedProducts = [];
-                    foreach ($requestedItems as $productId => $quantity) {
-                        $product = $entityManager->find(Product::class, $productId, LockMode::PESSIMISTIC_WRITE);
-                        if (!$product instanceof Product || !$product->isActive()) {
-                            throw new \DomainException('One or more selected products are unavailable.');
-                        }
-                        if ($quantity > $product->getStock()) {
-                            throw new \DomainException($product->getName().' has only '.$product->getStock().' in stock.');
-                        }
-                        $lockedProducts[$productId] = $product;
-                    }
-                    $paymentMethod = 'Cash on Delivery';
-                    $orderGroup = new CustomerOrder($customer, $deliveryAddress, $paymentMethod, 'PENDING');
-                    $orderGroup->setCreatedByStaff($this->requireStaff());
-                    $entityManager->persist($orderGroup);
-                    $entityManager->flush();
-                    $reference = 'MWO-'.(new \DateTimeImmutable())->format('Ymd').'-'.$orderGroup->getId();
-                    $orderGroup->setPaymentReference($reference);
-                    foreach ($requestedItems as $productId => $quantity) {
-                        $product = $lockedProducts[$productId];
-                        $unitPrice = $product->getPrice();
-                        $product->setStock($product->getStock() - $quantity);
-                        $entityManager->persist(new OrderItem(
-                            $customer,
-                            $product,
-                            $quantity,
-                            number_format((float) $unitPrice * $quantity, 2, '.', ''),
-                            $paymentMethod,
-                            $reference,
-                            $orderGroup,
-                            $unitPrice,
-                        ));
-                    }
-                    $entityManager->flush();
-                    $connection->commit();
+                    $orderCreationManager->create($staff, $customer, $deliveryAddress, $requestedItems);
                     $this->addFlash('success', 'Order created.');
 
                     return $this->redirectToRoute('staff_orders');
                 } catch (\DomainException $exception) {
-                    $connection->rollBack();
-                    $entityManager->clear();
                     $this->addFlash('error', $exception->getMessage());
-                } catch (\Throwable $exception) {
-                    $connection->rollBack();
-                    throw $exception;
                 }
             }
         }
@@ -388,14 +396,32 @@ class StaffController extends AbstractController
         $this->assertOrderOwnership($order);
         $this->assertCsrf($request, 'staff_order_status_'.$id);
         $status = (string) $request->request->get('status');
-        if (!in_array($status, ['Pending', 'Processing', 'Shipped', 'Completed', 'Cancelled'], true)) {
-            throw $this->createNotFoundException('Invalid order status.');
+        if (!in_array($status, ['Pending', 'Completed', 'Cancelled'], true)) {
+            return $request->isXmlHttpRequest()
+                ? new JsonResponse(['success' => false, 'message' => 'Choose Pending, Completed, or Cancelled.'], Response::HTTP_UNPROCESSABLE_ENTITY)
+                : throw $this->createNotFoundException('Invalid order status.');
         }
         try {
             $orderStatusManager->updateStatus($order, $status, (string) $request->request->get('cancellationReason', ''));
-            $this->addFlash('success', 'Order status updated.');
+            if (!$request->isXmlHttpRequest()) {
+                $this->addFlash('success', 'Order status updated.');
+            }
         } catch (\DomainException $exception) {
+            if ($request->isXmlHttpRequest()) {
+                return new JsonResponse(['success' => false, 'message' => $exception->getMessage()], Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
             $this->addFlash('error', $exception->getMessage());
+        }
+
+        if ($request->isXmlHttpRequest()) {
+            return new JsonResponse([
+                'success' => true,
+                'id' => (string) $id,
+                'status' => $status,
+                'cancellationReason' => $order->getCancellationReason(),
+                'message' => 'Order status updated.',
+                'counts' => $orders->getStatusCounts(),
+            ]);
         }
 
         return $this->redirectToRoute('staff_orders');
@@ -441,16 +467,17 @@ class StaffController extends AbstractController
     }
 
     #[Route('/promo-history', name: 'staff_promo_history', methods: ['GET'])]
-    public function promoHistory(Request $request, PromoClaimRepository $claims): Response
+    public function promoHistory(Request $request, PromoClaimRepository $claims, PromoRepository $promos): Response
     {
         $search = $request->query->get('search');
         $search = is_string($search) ? trim($search) : '';
         $status = $request->query->get('status');
-        $status = is_string($status) && in_array($status, ['Pending', 'Confirmed', 'Completed', 'Cancelled'], true) ? $status : '';
+        $status = is_string($status) && in_array($status, ['Pending', 'Cancelled', 'Completed'], true) ? $status : '';
 
         return $this->render('staff/promo_history.html.twig', [
             'claims' => $claims->findForStaff($search, $status),
             'counts' => $claims->getStaffStatusCounts(),
+            'promos' => $promos->findBy([], ['title' => 'ASC']),
             'search' => $search,
             'status' => $status,
         ]);
@@ -514,18 +541,38 @@ class StaffController extends AbstractController
             return $this->redirectToRoute('staff_promo_history');
         }
         $status = (string) $request->request->get('status');
-        if (!in_array($status, ['Pending', 'Confirmed', 'Used', 'Completed', 'Cancelled'], true)) {
-            throw $this->createNotFoundException('Invalid claim status.');
+        if (!in_array($status, ['Pending', 'Completed', 'Cancelled'], true)) {
+            return $request->isXmlHttpRequest()
+                ? new JsonResponse(['success' => false, 'message' => 'Choose Pending, Completed, or Cancelled.'], Response::HTTP_UNPROCESSABLE_ENTITY)
+                : throw $this->createNotFoundException('Invalid claim status.');
         }
         $claim->setStatus($status);
         $entityManager->flush();
-        $this->addFlash('success', 'Promotion claim updated.');
+        if (!$request->isXmlHttpRequest()) {
+            $this->addFlash('success', 'Promotion claim updated.');
+        }
+
+        if ($request->isXmlHttpRequest()) {
+            return new JsonResponse([
+                'success' => true,
+                'message' => 'Promotion claim updated.',
+                'claim' => $this->promoClaimPayload($claim),
+                'counts' => $claims->getStaffStatusCounts(),
+            ]);
+        }
 
         return $this->redirectToRoute('staff_promo_history');
     }
 
     #[Route('/promo-claims/{id}/edit', name: 'staff_promo_claim_edit', requirements: ['id' => '\d+'], methods: ['GET', 'POST'])]
-    public function promoClaimEdit(int $id, Request $request, PromoClaimRepository $claims, PromoRepository $promos, EntityManagerInterface $entityManager): Response
+    public function promoClaimEdit(
+        int $id,
+        Request $request,
+        PromoClaimRepository $claims,
+        PromoRepository $promos,
+        FormFactoryInterface $formFactory,
+        EntityManagerInterface $entityManager,
+    ): Response
     {
         $this->requireStaff();
         $claim = $claims->find($id) ?? throw $this->createNotFoundException('Promotion claim not found.');
@@ -544,6 +591,37 @@ class StaffController extends AbstractController
         $oldSlug = $claim->getBundleSlug();
         $oldOption = $claim->getSelectedOption();
         $promoList = $promos->findBy([], ['title' => 'ASC']);
+        if ($request->isMethod('POST') && $request->isXmlHttpRequest()) {
+            if (!$this->isCsrfTokenValid('staff_promo_claim_edit_'.$id, (string) $request->request->get('_token'))) {
+                return new JsonResponse(['success' => false, 'message' => 'Your session token is invalid. Refresh the page and try again.'], Response::HTTP_FORBIDDEN);
+            }
+
+            $form = $formFactory->createNamed('promo_claim_edit', PromoClaimUpdateType::class, $claim, [
+                'promos' => $promoList,
+                'csrf_protection' => false,
+            ]);
+            $submitted = $request->request->all();
+            $form->submit(is_array($submitted['promo_claim_edit'] ?? null) ? $submitted['promo_claim_edit'] : []);
+            if (!$form->isValid()) {
+                return new JsonResponse(['success' => false, 'message' => $this->firstFormError($form)], Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
+
+            $promo = $promos->findOneBy(['slug' => $claim->getBundleSlug()]);
+            $unchangedHistoricalOption = $oldSlug === $claim->getBundleSlug() && $oldOption === $claim->getSelectedOption();
+            if (!$promo || (!in_array($claim->getSelectedOption(), $promo->getItemOptions(), true) && !$unchangedHistoricalOption)) {
+                return new JsonResponse(['success' => false, 'message' => 'The selected promotion option is unavailable.'], Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
+            $claim->setPromo($promo);
+            $entityManager->flush();
+
+            return new JsonResponse([
+                'success' => true,
+                'message' => 'Promotion claim updated.',
+                'claim' => $this->promoClaimPayload($claim),
+                'counts' => $claims->getStaffStatusCounts(),
+            ]);
+        }
+
         $form = $this->createForm(PromoClaimUpdateType::class, $claim, ['promos' => $promoList])->handleRequest($request);
         if ($form->isSubmitted() && $form->isValid()) {
             $promo = $promos->findOneBy(['slug' => $claim->getBundleSlug()]);
@@ -759,6 +837,98 @@ class StaffController extends AbstractController
         }
     }
 
+    private function firstFormError(FormInterface $form): string
+    {
+        foreach ($form->getErrors(true) as $error) {
+            return $error->getMessage();
+        }
+
+        return 'Please check the submitted information and try again.';
+    }
+
+    private function appointmentPayload(ServiceBooking $booking): array
+    {
+        $motorcycle = $booking->getMotorcycle();
+        $creator = $booking->getCreatedByStaff();
+        $source = match ($booking->getSource()) {
+            'staff' => 'Staff-Created'.($creator ? ' ('.$creator->getFirstName().' '.$creator->getLastName().')' : ''),
+            'admin' => 'Admin-Created',
+            default => 'Customer Online',
+        };
+        $vehicle = $booking->getVehicleModel() ?? '—';
+        if ($motorcycle?->getPlateNumber()) {
+            $vehicle .= ' ('.$motorcycle->getPlateNumber().')';
+        }
+        $service = $booking->getService();
+        $user = $booking->getUser();
+        $status = $this->panelStatus($booking->getStatus());
+
+        return [
+            'id' => '#'.$booking->getId(),
+            'customer' => $user->getFirstName().' '.$user->getLastName(),
+            'email' => $user->getEmail(),
+            'phone' => $user->getPhone() ?: 'N/A',
+            'vehicle' => $vehicle,
+            'service' => $service->getName(),
+            'price' => '₱'.number_format((float) $service->getPrice(), 2, '.', ','),
+            'date' => $booking->getBookingDate()->format('M j, Y'),
+            'time' => $booking->getBookingTime()->format('g:i A'),
+            'status' => $status,
+            'notes' => $booking->getNotes() ?: '—',
+            'cancellationReason' => $booking->getRejectionReason() ?: '—',
+            'source' => $source,
+            'createdAt' => $booking->getCreatedAt()?->format('M j, Y g:i A') ?? '—',
+            'edit' => [
+                'service' => (string) $service->getId(),
+                'vehicleModel' => $booking->getVehicleModel() ?? '',
+                'bookingDate' => $booking->getBookingDate()->format('Y-m-d'),
+                'bookingTime' => $booking->getBookingTime()->format('H:i'),
+                'status' => $status,
+                'notes' => $booking->getNotes() ?? '',
+                'rejectionReason' => $booking->getRejectionReason() ?? '',
+            ],
+        ];
+    }
+
+    private function promoClaimPayload(PromoClaim $claim): array
+    {
+        $promo = $claim->getPromo();
+        $creator = $claim->getCreatedByStaff();
+        $status = $this->panelStatus($claim->getStatus());
+
+        return [
+            'id' => 'PC-'.$claim->getId(),
+            'fullName' => $claim->getFullName(),
+            'phone' => $claim->getPhone() ?: 'N/A',
+            'account' => $claim->getUser()?->getUsername() ?? 'Guest claim',
+            'email' => $claim->getUser()?->getEmail() ?? '—',
+            'promotion' => $promo?->getTitle() ?? $claim->getBundleSlug(),
+            'bundle' => $claim->getBundleSlug(),
+            'selectedOption' => $claim->getSelectedOption(),
+            'appointmentDate' => $claim->getAppointmentDate()->format('M j, Y'),
+            'appointmentTime' => $claim->getAppointmentTime()->format('g:i A'),
+            'status' => $status,
+            'creator' => $creator ? $creator->getFirstName().' '.$creator->getLastName() : 'Customer Online',
+            'createdAt' => $claim->getCreatedAt()->format('M j, Y g:i A'),
+            'edit' => [
+                'bundleSlug' => $claim->getBundleSlug(),
+                'selectedOption' => $claim->getSelectedOption(),
+                'appointmentDate' => $claim->getAppointmentDate()->format('Y-m-d'),
+                'appointmentTime' => $claim->getAppointmentTime()->format('H:i'),
+                'status' => $status,
+            ],
+        ];
+    }
+
+    private function panelStatus(?string $status): string
+    {
+        return match ($status) {
+            'Completed' => 'Completed',
+            'Cancelled', 'Rejected' => 'Cancelled',
+            default => 'Pending',
+        };
+    }
+
     private function bookingForm(array $customers, array $services, array $motorcycles): \Symfony\Component\Form\FormInterface
     {
         $customerChoices = [];
@@ -779,30 +949,6 @@ class StaffController extends AbstractController
             ->add('bookingDate', DateType::class, ['widget' => 'single_text', 'input' => 'datetime_immutable'])
             ->add('bookingTime', TimeType::class, ['widget' => 'single_text', 'input' => 'datetime_immutable'])
             ->add('notes', TextareaType::class, ['required' => false, 'constraints' => [new Length(max: 2000)]])
-            ->getForm();
-    }
-
-    private function orderForm(array $customers, array $products): \Symfony\Component\Form\FormInterface
-    {
-        $customerChoices = [];
-        foreach ($customers as $customer) {
-            $customerChoices[$customer->getFirstName().' '.$customer->getLastName()] = $customer->getId();
-        }
-
-        return $this->createFormBuilder()
-            ->add('customerId', ChoiceType::class, ['choices' => $customerChoices, 'placeholder' => 'Choose customer'])
-            ->add('deliveryAddress', TextareaType::class, [
-                'constraints' => [new NotBlank(), new Length(max: 2000)],
-            ])
-            ->add('items', CollectionType::class, [
-                'entry_type' => StaffOrderItemType::class,
-                'entry_options' => ['products' => $products],
-                'allow_add' => true,
-                'allow_delete' => true,
-                'prototype' => true,
-                'data' => [['quantity' => 1]],
-                'constraints' => [new Count(min: 1, max: 20)],
-            ])
             ->getForm();
     }
 

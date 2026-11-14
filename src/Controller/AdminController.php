@@ -2,7 +2,6 @@
 
 namespace App\Controller;
 
-use App\Entity\OrderItem;
 use App\Entity\Product;
 use App\Entity\Promo;
 use App\Entity\PromoClaim;
@@ -11,6 +10,7 @@ use App\Entity\ServiceBooking;
 use App\Entity\User;
 use App\Form\AdminPromoClaimUpdateType;
 use App\Form\AdminUserType;
+use App\Form\OrderCreateType;
 use App\Form\ProductType;
 use App\Form\PromoType;
 use App\Form\ServiceBookingType;
@@ -27,6 +27,7 @@ use App\Repository\UserRepository;
 use App\Service\ImageUploader;
 use App\Service\AdminUserDeletionGuard;
 use App\Service\OrderDeletionManager;
+use App\Service\OrderCreationManager;
 use App\Service\OrderStatusManager;
 use App\Service\PaymentStatusManager;
 use Doctrine\ORM\EntityManagerInterface;
@@ -45,6 +46,8 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Csrf\CsrfTokenManagerInterface;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
+use Symfony\Component\Validator\Constraints\Length;
+use Symfony\Component\Validator\Constraints\NotBlank;
 
 #[Route('/admin')]
 #[IsGranted('ROLE_ADMIN')]
@@ -120,7 +123,15 @@ class AdminController extends AbstractController
     #[Route('/products/{id}/edit', name: 'admin_product_edit', requirements: ['id' => '\d+'], methods: ['GET', 'POST'])]
     public function productEdit(int $id, Request $request, ProductRepository $products, EntityManagerInterface $entityManager, ImageUploader $imageUploader): Response
     {
-        $product = $products->find($id) ?? throw $this->createNotFoundException('Product not found.');
+        $product = $products->find($id);
+        if (!$product) {
+            if ($request->isXmlHttpRequest()) {
+                return $this->json(['success' => false, 'message' => 'Product not found.'], Response::HTTP_NOT_FOUND);
+            }
+
+            throw $this->createNotFoundException('Product not found.');
+        }
+
         $form = $this->createForm(ProductType::class, $product)->handleRequest($request);
         if ($form->isSubmitted() && $form->isValid()) {
             $oldImage = $product->getImage();
@@ -132,9 +143,38 @@ class AdminController extends AbstractController
             if ($image instanceof UploadedFile) {
                 $imageUploader->remove($oldImage, 'uploads');
             }
+            if ($request->isXmlHttpRequest()) {
+                $imagePath = $product->getImage();
+
+                return $this->json([
+                    'success' => true,
+                    'message' => 'Product updated.',
+                    'product' => [
+                        'id' => $product->getId(),
+                        'name' => $product->getName(),
+                        'price' => $product->getPrice(),
+                        'stock' => $product->getStock(),
+                        'active' => $product->isActive() ?? false,
+                        'imageUrl' => $imagePath ? $request->getBasePath().'/'.ltrim($imagePath, '/') : null,
+                    ],
+                ]);
+            }
+
             $this->addFlash('success', 'Product updated.');
 
             return $this->redirectToRoute('admin_products');
+        }
+
+        if ($request->isXmlHttpRequest()) {
+            $errors = [];
+            foreach ($form->getErrors(true, true) as $error) {
+                $errors[] = $error->getMessage();
+            }
+
+            return $this->json([
+                'success' => false,
+                'message' => $errors === [] ? 'Please check the product details.' : implode(' ', $errors),
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
         return $this->render('admin/form.html.twig', ['title' => 'Edit product', 'form' => $form]);
@@ -223,7 +263,15 @@ class AdminController extends AbstractController
     #[Route('/services/{id}/edit', name: 'admin_service_edit', requirements: ['id' => '\d+'], methods: ['GET', 'POST'])]
     public function serviceEdit(int $id, Request $request, ServiceRepository $services, EntityManagerInterface $entityManager, ImageUploader $imageUploader): Response
     {
-        $service = $services->find($id) ?? throw $this->createNotFoundException('Service not found.');
+        $service = $services->find($id);
+        if (!$service) {
+            if ($request->isXmlHttpRequest()) {
+                return $this->json(['message' => 'Service not found.'], Response::HTTP_NOT_FOUND);
+            }
+
+            throw $this->createNotFoundException('Service not found.');
+        }
+
         $form = $this->createForm(ServiceType::class, $service)->handleRequest($request);
         if ($form->isSubmitted() && $form->isValid()) {
             $oldImage = $service->getImage();
@@ -235,9 +283,37 @@ class AdminController extends AbstractController
             if ($image instanceof UploadedFile) {
                 $imageUploader->remove($oldImage, 'uploads');
             }
+            if ($request->isXmlHttpRequest()) {
+                $imagePath = $service->getImage();
+
+                return $this->json([
+                    'message' => 'Service updated.',
+                    'service' => [
+                        'id' => $service->getId(),
+                        'name' => $service->getName(),
+                        'description' => $service->getDescription(),
+                        'price' => $service->getPrice(),
+                        'active' => $service->isActive() ?? false,
+                        'featured' => $service->isFeatured() ?? false,
+                        'imageUrl' => $imagePath ? $request->getBasePath().'/'.ltrim($imagePath, '/') : null,
+                    ],
+                ]);
+            }
+
             $this->addFlash('success', 'Service updated.');
 
             return $this->redirectToRoute('admin_services');
+        }
+
+        if ($request->isXmlHttpRequest()) {
+            $errors = [];
+            foreach ($form->getErrors(true, true) as $error) {
+                $errors[] = $error->getMessage();
+            }
+
+            return $this->json([
+                'message' => $errors === [] ? 'Please check the service details.' : implode(' ', $errors),
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
         return $this->render('admin/form.html.twig', ['title' => 'Edit service', 'form' => $form]);
@@ -277,27 +353,11 @@ class AdminController extends AbstractController
     }
 
     #[Route('/promos', name: 'admin_promos', methods: ['GET'])]
-    public function promos(PromoRepository $promos, PromoClaimRepository $claims): Response
+    public function promos(PromoRepository $promos): Response
     {
-        $claimList = $claims->findBy([], ['id' => 'DESC']);
-        $promoList = $promos->findBy([], ['title' => 'ASC']);
-        $formClaim = $claimList[0] ?? new PromoClaim(
-            null,
-            '',
-            '',
-            '',
-            '',
-            new \DateTimeImmutable(),
-            new \DateTimeImmutable(),
-        );
-
         return $this->render('admin/promos.html.twig', [
             'promos' => $promos->findBy([], ['id' => 'DESC']),
             'promoForm' => $this->createForm(PromoType::class, new Promo())->createView(),
-            'claims' => $claimList,
-            'claimUpdateForm' => $this->createForm(AdminPromoClaimUpdateType::class, $formClaim, [
-                'promos' => $promoList,
-            ])->createView(),
         ]);
     }
 
@@ -337,7 +397,7 @@ class AdminController extends AbstractController
 
         if ($request->isXmlHttpRequest()) {
             $errors = [];
-            foreach ($form->getErrors(true, false) as $error) {
+            foreach ($form->getErrors(true, true) as $error) {
                 $errors[] = $error->getMessage();
             }
 
@@ -383,7 +443,7 @@ class AdminController extends AbstractController
 
         if ($request->isXmlHttpRequest()) {
             $errors = [];
-            foreach ($form->getErrors(true, false) as $error) {
+            foreach ($form->getErrors(true, true) as $error) {
                 $errors[] = $error->getMessage();
             }
 
@@ -459,12 +519,23 @@ class AdminController extends AbstractController
     #[Route('/users/{id}/edit', name: 'admin_user_edit', requirements: ['id' => '\d+'], methods: ['GET', 'POST'])]
     public function userEdit(int $id, Request $request, UserRepository $users, EntityManagerInterface $entityManager, UserPasswordHasherInterface $hasher): Response
     {
-        $user = $users->find($id) ?? throw $this->createNotFoundException('User not found.');
+        $user = $users->find($id);
+        if (!$user) {
+            if ($request->isXmlHttpRequest()) {
+                return $this->json(['message' => 'User not found.'], Response::HTTP_NOT_FOUND);
+            }
+
+            throw $this->createNotFoundException('User not found.');
+        }
+
         $originalRole = $user->getRole();
         $form = $this->createForm(AdminUserType::class, $user)->handleRequest($request);
         if ($form->isSubmitted() && $form->isValid()) {
             if ($user === $this->getUser() && $user->getRole() !== 'admin') {
                 $user->setRole($originalRole);
+                if ($request->isXmlHttpRequest()) {
+                    return $this->json(['message' => 'You cannot remove your own administrator role.'], Response::HTTP_CONFLICT);
+                }
                 $this->addFlash('error', 'You cannot remove your own administrator role.');
 
                 return $this->redirectToRoute('admin_users');
@@ -475,6 +546,9 @@ class AdminController extends AbstractController
                 ($usernameOwner !== null && $usernameOwner->getId() !== $user->getId())
                 || ($emailOwner !== null && $emailOwner->getId() !== $user->getId())
             ) {
+                if ($request->isXmlHttpRequest()) {
+                    return $this->json(['message' => 'Username or email is already in use.'], Response::HTTP_CONFLICT);
+                }
                 $this->addFlash('error', 'Username or email is already in use.');
 
                 return $this->render('admin/form.html.twig', ['title' => 'Edit user', 'form' => $form]);
@@ -483,9 +557,37 @@ class AdminController extends AbstractController
                 $user->setPassword($hasher->hashPassword($user, (string) $form->get('plainPassword')->getData()));
             }
             $entityManager->flush();
+            if ($request->isXmlHttpRequest()) {
+                return $this->json([
+                    'success' => true,
+                    'message' => 'User updated.',
+                    'user' => [
+                        'id' => $user->getId(),
+                        'firstName' => $user->getFirstName(),
+                        'lastName' => $user->getLastName(),
+                        'username' => $user->getUsername(),
+                        'email' => $user->getEmail(),
+                        'phone' => $user->getPhone(),
+                        'role' => $user->getRole(),
+                        'createdAt' => $user->getCreatedAt()->format('Y-m-d H:i'),
+                    ],
+                ]);
+            }
+
             $this->addFlash('success', 'User updated.');
 
             return $this->redirectToRoute('admin_users');
+        }
+
+        if ($request->isXmlHttpRequest()) {
+            $errors = [];
+            foreach ($form->getErrors(true, true) as $error) {
+                $errors[] = $error->getMessage();
+            }
+
+            return $this->json([
+                'message' => $errors === [] ? 'Please check the user details.' : implode(' ', $errors),
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
         return $this->render('admin/form.html.twig', ['title' => 'Edit user', 'form' => $form]);
@@ -532,7 +634,7 @@ class AdminController extends AbstractController
         $search = $request->query->get('search');
         $search = is_string($search) ? trim($search) : '';
         $status = $request->query->get('status');
-        $status = is_string($status) && in_array($status, ['Pending', 'Processing', 'Cancelled', 'Completed'], true) ? $status : '';
+        $status = is_string($status) && in_array($status, ['Pending', 'Completed', 'Cancelled'], true) ? $status : '';
         $paymentStatus = $request->query->get('payment_status');
         $paymentStatus = is_string($paymentStatus) && in_array($paymentStatus, ['Due on delivery', 'Pending', 'Paid'], true) ? $paymentStatus : '';
         $dateFrom = $this->parseDateFilter($request->query->get('date_from'));
@@ -544,6 +646,12 @@ class AdminController extends AbstractController
         $totalPages = max(1, (int) ceil($totalOrders / $perPage));
         $page = min($page, $totalPages);
         $groups = $orders->findForStaff($search, $status, $paymentStatus, $dateFrom, $dateTo?->modify('+1 day'), $perPage, ($page - 1) * $perPage);
+        foreach ($groups as &$group) {
+            if ($group['currentStatus'] === 'Processing') {
+                $group['displayStatus'] = 'Pending';
+            }
+        }
+        unset($group);
         $groupIds = array_map(static fn (array $order): int => (int) $order['orderGroupId'], $groups);
 
         return $this->render('admin/orders.html.twig', [
@@ -563,21 +671,143 @@ class AdminController extends AbstractController
         ]);
     }
 
+    #[Route('/orders/new', name: 'admin_order_new', methods: ['GET', 'POST'])]
+    public function orderNew(
+        Request $request,
+        UserRepository $users,
+        ProductRepository $products,
+        CustomerOrderRepository $orders,
+        OrderCreationManager $orderCreationManager,
+    ): Response {
+        $admin = $this->getUser();
+        if (!$admin instanceof User) {
+            throw $this->createAccessDeniedException();
+        }
+
+        $customers = $users->findBy(['role' => 'customer'], ['firstName' => 'ASC']);
+        $availableProducts = $products->findActiveProducts();
+        $form = $this->createForm(OrderCreateType::class, null, [
+            'customers' => $customers,
+            'products' => $availableProducts,
+        ]);
+        $form->handleRequest($request);
+
+        if ($request->isXmlHttpRequest() && !$request->isMethod('POST')) {
+            return $this->render('admin/_order_create_form.html.twig', [
+                'form' => $form->createView(),
+                'action' => $this->generateUrl('admin_order_new'),
+                'hasCustomers' => $customers !== [],
+                'hasProducts' => $availableProducts !== [],
+            ]);
+        }
+
+        if ($form->isSubmitted() && $form->isValid()) {
+            $data = $form->getData();
+            $customer = $users->find((int) $data['customerId']);
+            $deliveryAddress = trim((string) $data['deliveryAddress']);
+            $requestedItems = [];
+            foreach ($data['items'] as $item) {
+                $productId = (int) $item['productId'];
+                $requestedItems[$productId] = ($requestedItems[$productId] ?? 0) + (int) $item['quantity'];
+            }
+
+            if (
+                !$customer
+                || $deliveryAddress === ''
+                || mb_strlen($deliveryAddress) > 2000
+                || count($data['items']) < 1
+                || count($data['items']) > 20
+                || array_filter($requestedItems, static fn (int $quantity): bool => $quantity < 1 || $quantity > 999)
+            ) {
+                $message = 'Choose a customer, delivery address, and between 1 and 20 valid order items.';
+                if ($request->isXmlHttpRequest()) {
+                    return $this->json(['message' => $message], Response::HTTP_UNPROCESSABLE_ENTITY);
+                }
+                $this->addFlash('error', $message);
+            } else {
+                try {
+                    $order = $orderCreationManager->create($admin, $customer, $deliveryAddress, $requestedItems);
+
+                    if ($request->isXmlHttpRequest()) {
+                        return $this->json([
+                            'success' => true,
+                            'id' => $order->getId(),
+                            'message' => 'Order created.',
+                            'counts' => $orders->getStatusCounts(),
+                        ], Response::HTTP_CREATED);
+                    }
+                    $this->addFlash('success', 'Order created.');
+
+                    return $this->redirectToRoute('admin_orders');
+                } catch (\DomainException $exception) {
+                    $message = $exception->getMessage();
+                    if ($request->isXmlHttpRequest()) {
+                        return $this->json(['message' => $message], Response::HTTP_CONFLICT);
+                    }
+                    $this->addFlash('error', $message);
+                }
+            }
+        }
+
+        if ($request->isXmlHttpRequest()) {
+            $errors = [];
+            foreach ($form->getErrors(true, true) as $error) {
+                $errors[] = $error->getMessage();
+            }
+
+            return $this->json([
+                'message' => $errors === [] ? 'Please check the order details.' : implode(' ', $errors),
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        return $this->render('admin/form.html.twig', ['title' => 'Create order', 'form' => $form]);
+    }
+
     #[Route('/orders/{id}/status', name: 'admin_order_status', requirements: ['id' => '\d+'], methods: ['POST'])]
     public function orderStatus(int $id, Request $request, CustomerOrderRepository $orders, OrderStatusManager $orderStatusManager): Response
     {
-        $order = $orders->find($id) ?? throw $this->createNotFoundException('Order not found.');
-        $this->assertCsrf($request, 'admin_order_status_'.$id);
+        $order = $orders->find($id);
+        if (!$order) {
+            if ($request->isXmlHttpRequest()) {
+                return $this->json(['success' => false, 'message' => 'Order not found.'], Response::HTTP_NOT_FOUND);
+            }
+            throw $this->createNotFoundException('Order not found.');
+        }
+        if (!$this->isCsrfTokenValid('admin_order_status_'.$id, (string) $request->request->get('_token'))) {
+            if ($request->isXmlHttpRequest()) {
+                return $this->json(['success' => false, 'message' => 'Invalid security token.'], Response::HTTP_FORBIDDEN);
+            }
+            throw $this->createAccessDeniedException('Invalid security token.');
+        }
         $status = (string) $request->request->get('status');
-        if (!in_array($status, ['Pending', 'Processing', 'Shipped', 'Completed', 'Cancelled'], true)) {
+        if (!in_array($status, ['Pending', 'Completed', 'Cancelled'], true)) {
+            if ($request->isXmlHttpRequest()) {
+                return $this->json(['success' => false, 'message' => 'Invalid order status.'], Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
             throw $this->createNotFoundException('Invalid order status.');
         }
         try {
             $orderStatusManager->updateStatus($order, $status, (string) $request->request->get('cancellationReason', ''));
-            $this->addFlash('success', 'Order status updated.');
         } catch (\DomainException $exception) {
+            if ($request->isXmlHttpRequest()) {
+                return $this->json(['success' => false, 'message' => $exception->getMessage()], Response::HTTP_CONFLICT);
+            }
             $this->addFlash('error', $exception->getMessage());
+
+            return $this->redirectToRoute('admin_orders');
         }
+
+        if ($request->isXmlHttpRequest()) {
+            return $this->json([
+                'success' => true,
+                'id' => $id,
+                'status' => $order->getStatus(),
+                'counts' => $orders->getStatusCounts(),
+                'message' => 'Order status updated.',
+            ]);
+        }
+
+        $this->addFlash('success', 'Order status updated.');
 
         return $this->redirectToRoute('admin_orders');
     }
@@ -683,7 +913,7 @@ class AdminController extends AbstractController
             ->add('vehicleModel', TextType::class, ['label' => 'Motorcycle model'])
             ->add('bookingDate', DateType::class, ['widget' => 'single_text', 'input' => 'datetime_immutable'])
             ->add('bookingTime', TimeType::class, ['widget' => 'single_text', 'input' => 'datetime_immutable'])
-            ->add('status', ChoiceType::class, ['choices' => ['Pending' => 'Pending', 'Cancelled' => 'Cancelled', 'Completed' => 'Completed']])
+            ->add('status', ChoiceType::class, ['choices' => ['Pending' => 'Pending', 'Completed' => 'Completed', 'Cancelled' => 'Cancelled']])
             ->add('notes', TextareaType::class, ['required' => false])
             ->getForm()
             ->handleRequest($request);
@@ -754,7 +984,7 @@ class AdminController extends AbstractController
             return $this->redirectToRoute('admin_appointments');
         }
         $status = (string) $request->request->get('status');
-        if (!in_array($status, ['Pending', 'Confirmed', 'Completed', 'Cancelled', 'Rejected'], true)) {
+        if (!in_array($status, ['Pending', 'Completed', 'Cancelled'], true)) {
             throw $this->createNotFoundException('Invalid appointment status.');
         }
         $booking->setStatus($status);
@@ -788,7 +1018,16 @@ class AdminController extends AbstractController
 
         $form = $this->createForm(ServiceBookingType::class, $booking, [
             'services' => $services->findBy([], ['name' => 'ASC']),
-        ])->handleRequest($request);
+            'status_choices' => [
+                'Pending' => 'Pending',
+                'Completed' => 'Completed',
+                'Cancelled' => 'Cancelled',
+            ],
+        ]);
+        if (!$request->isMethod('POST')) {
+            $form->get('status')->setData($this->appointmentDisplayStatus($booking->getStatus()));
+        }
+        $form->handleRequest($request);
         if ($request->isXmlHttpRequest() && !$request->isMethod('POST')) {
             return $this->render('admin/_appointment_form.html.twig', [
                 'title' => 'Edit Appointment #'.$booking->getId(),
@@ -817,7 +1056,7 @@ class AdminController extends AbstractController
 
         if ($request->isXmlHttpRequest()) {
             $errors = [];
-            foreach ($form->getErrors(true, false) as $error) {
+            foreach ($form->getErrors(true, true) as $error) {
                 $errors[] = $error->getMessage();
             }
 
@@ -864,9 +1103,153 @@ class AdminController extends AbstractController
     }
 
     #[Route('/promo-history', name: 'admin_promo_history', methods: ['GET'])]
-    public function promoHistory(): Response
+    public function promoHistory(PromoRepository $promos, PromoClaimRepository $claims): Response
     {
-        return $this->redirectToRoute('admin_promos', ['history' => 1]);
+        $claimList = $claims->findBy([], ['id' => 'DESC']);
+        $formClaim = $claimList[0] ?? new PromoClaim(
+            null,
+            '',
+            '',
+            '',
+            '',
+            new \DateTimeImmutable(),
+            new \DateTimeImmutable(),
+        );
+
+        return $this->render('admin/promo_history.html.twig', [
+            'claims' => $claimList,
+            'claimUpdateForm' => $this->createForm(AdminPromoClaimUpdateType::class, $formClaim, [
+                'promos' => $promos->findBy([], ['title' => 'ASC']),
+            ])->createView(),
+        ]);
+    }
+
+    #[Route('/promo-history/new', name: 'admin_promo_history_new', methods: ['GET', 'POST'])]
+    public function promoHistoryNew(
+        Request $request,
+        UserRepository $users,
+        PromoRepository $promos,
+        EntityManagerInterface $entityManager,
+    ): Response {
+        $admin = $this->getUser();
+        if (!$admin instanceof User) {
+            throw $this->createAccessDeniedException();
+        }
+
+        $customerChoices = [];
+        foreach ($users->findBy(['role' => 'customer'], ['firstName' => 'ASC']) as $customer) {
+            $customerChoices[$customer->getFirstName().' '.$customer->getLastName()] = $customer->getId();
+        }
+        $activePromos = $promos->findActivePromos();
+        $promoChoices = [];
+        $optionChoices = [];
+        $promoOptions = [];
+        foreach ($activePromos as $promo) {
+            $promoChoices[$promo->getTitle()] = $promo->getId();
+            $promoOptions[(string) $promo->getId()] = $promo->getItemOptions();
+            foreach ($promo->getItemOptions() as $option) {
+                $optionChoices[$option] = $option;
+            }
+        }
+
+        $form = $this->createFormBuilder()
+            ->add('customerId', ChoiceType::class, [
+                'choices' => $customerChoices,
+                'placeholder' => 'Choose customer',
+                'constraints' => [new NotBlank()],
+            ])
+            ->add('promoId', ChoiceType::class, [
+                'choices' => $promoChoices,
+                'placeholder' => 'Choose promotion',
+                'constraints' => [new NotBlank()],
+            ])
+            ->add('selectedOption', ChoiceType::class, [
+                'choices' => $optionChoices,
+                'placeholder' => 'Choose promotion option',
+                'constraints' => [new NotBlank(), new Length(max: 255)],
+            ])
+            ->add('appointmentDate', DateType::class, [
+                'widget' => 'single_text',
+                'input' => 'datetime_immutable',
+            ])
+            ->add('appointmentTime', TimeType::class, [
+                'widget' => 'single_text',
+                'input' => 'datetime_immutable',
+            ])
+            ->getForm();
+        $form->handleRequest($request);
+
+        if ($request->isXmlHttpRequest() && !$request->isMethod('POST')) {
+            return $this->render('admin/_promo_claim_create_form.html.twig', [
+                'form' => $form->createView(),
+                'action' => $this->generateUrl('admin_promo_history_new'),
+                'promoOptions' => $promoOptions,
+            ]);
+        }
+
+        if ($form->isSubmitted() && $form->isValid()) {
+            $data = $form->getData();
+            $customer = $users->find((int) $data['customerId']);
+            $promo = $promos->find((int) $data['promoId']);
+            $appointmentDate = $data['appointmentDate'];
+            $appointmentTime = $data['appointmentTime'];
+            $selectedOption = trim((string) $data['selectedOption']);
+
+            if (
+                !$customer
+                || $customer->getRole() !== 'customer'
+                || !$promo
+                || !$promo->isActive()
+                || !$appointmentDate instanceof \DateTimeImmutable
+                || !$appointmentTime instanceof \DateTimeImmutable
+                || !in_array($selectedOption, $promo->getItemOptions(), true)
+            ) {
+                $message = 'Choose a customer, an active promotion, and one of its valid options.';
+                if ($request->isXmlHttpRequest()) {
+                    return $this->json(['message' => $message], Response::HTTP_UNPROCESSABLE_ENTITY);
+                }
+                $this->addFlash('error', $message);
+            } else {
+                $claim = new PromoClaim(
+                    $customer,
+                    trim($customer->getFirstName().' '.$customer->getLastName()),
+                    $customer->getPhone() ?? '',
+                    $promo->getSlug(),
+                    $selectedOption,
+                    $appointmentDate,
+                    $appointmentTime,
+                );
+                $claim->setPromo($promo);
+                $claim->setStatus('Pending');
+                $claim->setCreatedByStaff($admin);
+                $entityManager->persist($claim);
+                $entityManager->flush();
+
+                if ($request->isXmlHttpRequest()) {
+                    return $this->json([
+                        'success' => true,
+                        'id' => $claim->getId(),
+                        'message' => 'Promotion claim created.',
+                    ], Response::HTTP_CREATED);
+                }
+                $this->addFlash('success', 'Promotion claim created.');
+
+                return $this->redirectToRoute('admin_promo_history');
+            }
+        }
+
+        if ($request->isXmlHttpRequest()) {
+            $errors = [];
+            foreach ($form->getErrors(true, true) as $error) {
+                $errors[] = $error->getMessage();
+            }
+
+            return $this->json([
+                'message' => $errors === [] ? 'Please check the promotion claim details.' : implode(' ', $errors),
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        return $this->render('admin/form.html.twig', ['title' => 'Create promotion claim', 'form' => $form]);
     }
 
     #[Route('/promo-history/{id}/status', name: 'admin_promo_history_status', requirements: ['id' => '\d+'], methods: ['POST'])]
@@ -877,22 +1260,22 @@ class AdminController extends AbstractController
         if ($claim->getStatus() === 'Cancellation Pending') {
             $this->addFlash('error', 'This promotion claim is awaiting the customer cancellation Undo period.');
 
-            return $this->redirectToRoute('admin_promos', ['history' => 1]);
+            return $this->redirectToRoute('admin_promo_history');
         }
-        if ($claim->getStatus() === 'Completed') {
+        if ($this->promoClaimDisplayStatus($claim->getStatus()) === 'Completed') {
             $this->addFlash('error', 'Completed promotion claims cannot be edited.');
 
-            return $this->redirectToRoute('admin_promos', ['history' => 1]);
+            return $this->redirectToRoute('admin_promo_history');
         }
         $status = (string) $request->request->get('status');
-        if (!in_array($status, ['Pending', 'Confirmed', 'Used', 'Completed', 'Cancelled'], true)) {
+        if (!in_array($status, ['Pending', 'Completed', 'Cancelled'], true)) {
             throw $this->createNotFoundException('Invalid claim status.');
         }
         $claim->setStatus($status);
         $entityManager->flush();
         $this->addFlash('success', 'Promotion claim status updated.');
 
-        return $this->redirectToRoute('admin_promos', ['history' => 1]);
+        return $this->redirectToRoute('admin_promo_history');
     }
 
     #[Route('/promo-history/{id}/edit', name: 'admin_promo_history_edit', requirements: ['id' => '\d+'], methods: ['GET', 'POST'])]
@@ -905,20 +1288,24 @@ class AdminController extends AbstractController
             }
             $this->addFlash('error', 'This promotion claim is awaiting the customer cancellation Undo period.');
 
-            return $this->redirectToRoute('admin_promos', ['history' => 1]);
+            return $this->redirectToRoute('admin_promo_history');
         }
-        if ($claim->getStatus() === 'Completed') {
+        if ($this->promoClaimDisplayStatus($claim->getStatus()) === 'Completed') {
             if ($request->isXmlHttpRequest()) {
                 return $this->json(['message' => 'Completed promotion claims cannot be edited.'], Response::HTTP_CONFLICT);
             }
             $this->addFlash('error', 'Completed promotion claims cannot be edited.');
 
-            return $this->redirectToRoute('admin_promos', ['history' => 1]);
+            return $this->redirectToRoute('admin_promo_history');
         }
 
         $form = $this->createForm(AdminPromoClaimUpdateType::class, $claim, [
             'promos' => $promos->findBy([], ['title' => 'ASC']),
-        ])->handleRequest($request);
+        ]);
+        if (!$request->isMethod('POST')) {
+            $form->get('status')->setData($this->promoClaimDisplayStatus($claim->getStatus()));
+        }
+        $form->handleRequest($request);
         if ($form->isSubmitted() && $form->isValid()) {
             $entityManager->flush();
             if ($request->isXmlHttpRequest()) {
@@ -953,12 +1340,12 @@ class AdminController extends AbstractController
             }
             $this->addFlash('success', 'Promotion claim updated.');
 
-            return $this->redirectToRoute('admin_promos', ['history' => 1]);
+            return $this->redirectToRoute('admin_promo_history');
         }
 
         if ($request->isXmlHttpRequest()) {
             $errors = [];
-            foreach ($form->getErrors(true, false) as $error) {
+            foreach ($form->getErrors(true, true) as $error) {
                 $errors[] = $error->getMessage();
             }
 
@@ -986,7 +1373,7 @@ class AdminController extends AbstractController
             }
             $this->addFlash('error', 'This promotion claim is awaiting the customer cancellation Undo period.');
 
-            return $this->redirectToRoute('admin_promos', ['history' => 1]);
+            return $this->redirectToRoute('admin_promo_history');
         }
         $entityManager->remove($claim);
         $entityManager->flush();
@@ -995,7 +1382,7 @@ class AdminController extends AbstractController
         }
         $this->addFlash('success', 'Promotion claim deleted.');
 
-        return $this->redirectToRoute('admin_promos', ['history' => 1]);
+        return $this->redirectToRoute('admin_promo_history');
     }
 
     private function assertCsrf(Request $request, string $tokenId): void
@@ -1054,6 +1441,25 @@ class AdminController extends AbstractController
             'totalRecords' => $productCount + $serviceCount + $promoCount + $appointmentCount + $orderCount + $promoClaimCount,
             'paymentRecords' => $orderCount + $appointmentCount + $promoClaimCount,
         ];
+    }
+
+    private function appointmentDisplayStatus(string $status): string
+    {
+        return match ($status) {
+            'Completed' => 'Completed',
+            'Cancelled', 'Rejected' => 'Cancelled',
+            default => 'Pending',
+        };
+    }
+
+    private function promoClaimDisplayStatus(string $status): string
+    {
+        return match ($status) {
+            'Used', 'Completed' => 'Completed',
+            'Cancelled' => 'Cancelled',
+            'Cancellation Pending' => 'Cancellation Pending',
+            default => 'Pending',
+        };
     }
 
     /**
@@ -1121,11 +1527,7 @@ class AdminController extends AbstractController
         if ($booking->getMotorcycle()?->getPlateNumber()) {
             $vehicle .= ' ('.$booking->getMotorcycle()->getPlateNumber().')';
         }
-        $displayStatus = match ($booking->getStatus()) {
-            'Confirmed', 'Cancellation Pending' => 'Pending',
-            'Rejected' => 'Cancelled',
-            default => $booking->getStatus(),
-        };
+        $displayStatus = $this->appointmentDisplayStatus($booking->getStatus());
 
         return [
             'id' => $booking->getId(),

@@ -1,0 +1,50 @@
+<div class="modal-header">
+    <div>
+        <p class="admin-edit-eyebrow">Order management</p>
+        <h3 id="orderCreateTitle">Create Order</h3>
+    </div>
+    <button type="button" class="close-btn" data-close-order-create aria-label="Close">×</button>
+</div>
+<p class="admin-edit-intro">Choose a customer and products. Stock is checked and deducted when the order is created.</p>
+{% if not hasCustomers or not hasProducts %}
+    <p class="admin-edit-validation-message" role="alert">
+        {% if not hasCustomers %}Add a customer before creating an order.{% endif %}
+        {% if not hasProducts %}Add an active product before creating an order.{% endif %}
+    </p>
+{% endif %}
+{{ form_start(form, {action: action, attr: {id: 'orderCreateForm', class: 'admin-edit-form'}}) }}
+    {{ form_errors(form) }}
+    <section class="admin-edit-section">
+        <h4 class="admin-edit-section-title">Customer and delivery</h4>
+        <div class="admin-edit-form-grid">
+            <div class="admin-edit-field">
+                {{ form_label(form.customerId, 'Customer') }}
+                {{ form_widget(form.customerId, {attr: {class: 'form-control', required: true}}) }}
+                {{ form_errors(form.customerId) }}
+            </div>
+            <div class="admin-edit-field admin-edit-field-full">
+                {{ form_label(form.deliveryAddress, 'Delivery address') }}
+                {{ form_widget(form.deliveryAddress, {attr: {class: 'form-control', rows: 3, required: true}}) }}
+                {{ form_errors(form.deliveryAddress) }}
+            </div>
+        </div>
+    </section>
+    <section class="admin-edit-section">
+        <div class="admin-edit-section-heading">
+            <h4 class="admin-edit-section-title">Order items</h4>
+            <button type="button" class="btn-sm btn-secondary" id="addOrderItem"><i class="fas fa-plus" aria-hidden="true"></i> Add item</button>
+        </div>
+        <div id="orderCreateItems" data-prototype="{{ include('admin/_order_create_item.html.twig', {item: form.items.vars.prototype})|e('html_attr') }}">
+            {% for item in form.items %}
+                {{ include('admin/_order_create_item.html.twig', {item: item}) }}
+            {% endfor %}
+        </div>
+        {% do form.items.setRendered %}
+        {{ form_errors(form.items) }}
+    </section>
+    {{ form_rest(form) }}
+    <div class="modal-footer">
+        <button type="button" class="btn-secondary" data-close-order-create>Cancel</button>
+        <button type="submit" class="btn-primary" {{ not hasCustomers or not hasProducts ? 'disabled' : '' }}>Create order</button>
+    </div>
+{{ form_end(form) }}

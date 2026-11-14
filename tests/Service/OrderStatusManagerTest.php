@@ -57,6 +57,17 @@ class OrderStatusManagerTest extends TestCase
         $manager->updateStatus($items[0], 'Cancelled');
     }
 
+    public function testStatusOutsideTheSupportedWorkflowIsRejected(): void
+    {
+        [, $items, $products] = $this->createGroupedOrder();
+        $manager = $this->createManager($items, $products);
+
+        $this->expectException(\DomainException::class);
+        $this->expectExceptionMessage('Invalid order status.');
+
+        $manager->updateStatus($items[0], 'In Progress');
+    }
+
     public function testCustomerOrderGroupCanBeUpdatedWithoutLineItems(): void
     {
         $orderGroup = new CustomerOrder(new User(), 'Bayawan City', 'Cash on Delivery', 'MWO-EMPTY-GROUP');

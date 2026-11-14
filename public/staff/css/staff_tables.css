@@ -127,9 +127,11 @@
 
 .staff-record-dialog {
     position: fixed;
-    inset: 0;
-    margin: auto;
+    inset: 50% auto auto 50%;
+    margin: 0;
+    transform: translate(-50%, -50%);
     width: min(760px, calc(100vw - 32px));
+    height: auto;
     max-height: 90vh;
     max-height: 90dvh;
     padding: 0;
@@ -139,7 +141,9 @@
     box-shadow: 0 20px 60px rgba(15, 23, 42, 0.3);
 }
 
-.staff-record-dialog::backdrop {
+.staff-record-dialog::backdrop,
+.staff-edit-dialog::backdrop,
+.staff-order-dialog::backdrop {
     background: rgba(15, 23, 42, 0.58);
 }
 
@@ -160,9 +164,256 @@
     padding: 20px;
 }
 
+.staff-record-dialog > .modal-header {
+    margin: 0;
+    padding: 18px 22px;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.staff-record-dialog > .modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin: 0;
+    padding: 16px 22px 20px;
+    border-top: 1px solid #e2e8f0;
+}
+
+.staff-edit-dialog,
+.staff-order-dialog {
+    position: fixed;
+    inset: 50% auto auto 50%;
+    margin: 0;
+    transform: translate(-50%, -50%);
+    width: min(760px, calc(100vw - 32px));
+    height: auto;
+    max-width: none;
+    max-height: 90vh;
+    max-height: 90dvh;
+    padding: 0;
+    overflow: auto;
+    border: 0;
+    border-radius: 12px;
+    background: #fff;
+    box-shadow: 0 20px 60px rgba(15, 23, 42, 0.3);
+}
+
+.staff-order-dialog {
+    width: min(760px, calc(100vw - 32px));
+}
+
+.staff-edit-form {
+    margin: 0;
+}
+
+.staff-edit-header,
+.staff-edit-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 18px 22px;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.staff-edit-header h3 {
+    margin: 0;
+    color: #172338;
+    font-size: 1.15rem;
+}
+
+.staff-edit-eyebrow {
+    margin: 0 0 4px;
+    color: #64748b;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.staff-edit-body {
+    display: block;
+    padding: 6px 22px 10px;
+}
+
+.staff-edit-dialog .staff-edit-section + .staff-edit-section {
+    margin-top: 8px;
+}
+
+.staff-edit-section {
+    display: grid;
+    gap: 8px;
+}
+
+.staff-edit-section h4 {
+    margin: 0;
+    color: #334155;
+    font-size: 0.92rem;
+}
+
+.staff-edit-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px 16px;
+}
+
+.staff-edit-grid label,
+.staff-edit-section > label {
+    display: grid;
+    gap: 6px;
+    color: #475569;
+    font-size: 0.84rem;
+    font-weight: 600;
+}
+
+.staff-edit-full {
+    grid-column: 1 / -1;
+}
+
+.staff-edit-footer {
+    justify-content: flex-end;
+    border-top: 1px solid #e2e8f0;
+    border-bottom: 0;
+}
+
+.staff-record-dialog dl {
+    display: grid;
+    grid-template-columns: minmax(120px, 0.7fr) minmax(0, 1.5fr);
+    gap: 12px 18px;
+    padding: 20px 22px;
+    margin: 0;
+}
+
+.staff-record-dialog dt {
+    color: #64748b;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.staff-record-dialog dd {
+    min-width: 0;
+    margin: 0;
+    color: #1e293b;
+    overflow-wrap: anywhere;
+}
+
+.order-detail-section {
+    padding: 12px;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+}
+
+.order-detail-section + .order-detail-section {
+    margin-top: 8px;
+}
+
+.order-detail-section h4 {
+    margin: 0 0 8px;
+    color: #334155;
+    font-size: 0.9rem;
+}
+
+.order-detail-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px 14px;
+    margin: 0;
+}
+
+.staff-order-dialog .order-details-body {
+    padding: 10px 16px 16px;
+}
+
+.staff-order-dialog .admin-edit-intro {
+    margin-bottom: 8px;
+}
+
+.staff-order-dialog .order-status-form {
+    gap: 8px;
+    margin-top: 0;
+}
+
+.staff-order-dialog .order-payment-form {
+    margin-top: 8px;
+}
+
+.staff-page .table-row-actions {
+    gap: 8px;
+}
+
+.order-detail-grid > div {
+    min-width: 0;
+}
+
+.order-detail-grid dt {
+    margin-bottom: 3px;
+    color: #64748b;
+    font-size: 0.74rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.order-detail-grid dd {
+    margin: 0;
+    color: #1e293b;
+    overflow-wrap: anywhere;
+}
+
+.order-detail-full {
+    grid-column: 1 / -1;
+}
+
 @media (max-width: 700px) {
-    .staff-record-dialog {
+    .staff-record-dialog,
+    .staff-edit-dialog,
+    .staff-order-dialog {
         width: calc(100vw - 20px);
+    }
+
+    .staff-edit-header,
+    .staff-edit-footer {
+        padding-right: 16px;
+        padding-left: 16px;
+    }
+
+    .staff-edit-body {
+        padding: 6px 12px 10px;
+    }
+
+    .staff-edit-grid,
+    .order-detail-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .staff-edit-full,
+    .order-detail-full {
+        grid-column: auto;
+    }
+
+    .staff-record-dialog dl {
+        grid-template-columns: 1fr;
+        gap: 4px;
+        padding: 16px;
+    }
+
+    .staff-record-dialog > .modal-header {
+        padding: 16px;
+    }
+
+    .staff-record-dialog > .modal-footer {
+        padding: 14px 16px 16px;
+    }
+
+    .staff-record-dialog dd {
+        margin-bottom: 10px;
+    }
+
+    .staff-order-dialog .order-details-body {
+        padding: 8px 12px 12px;
+    }
+
+    .order-detail-section {
+        padding: 10px;
     }
 
     .admin-table th,

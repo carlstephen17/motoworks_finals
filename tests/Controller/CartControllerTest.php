@@ -14,6 +14,15 @@ use Symfony\Component\BrowserKit\Cookie;
 
 class CartControllerTest extends WebTestCase
 {
+    public function testShopCartActionsUseBalancedButtons(): void
+    {
+        $client = static::createClient();
+        $client->request('GET', '/shop');
+
+        $this->assertResponseIsSuccessful();
+        $this->assertSelectorExists('.product-card-actions .btn-cart-add + .btn-buy-now');
+    }
+
     public function testCartAcceptsLegacySessionQuantityShape(): void
     {
         $client = static::createClient();

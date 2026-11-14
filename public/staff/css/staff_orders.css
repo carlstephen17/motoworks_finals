@@ -61,6 +61,13 @@
     margin-bottom: 0;
 }
 
+.order-create-button {
+    align-self: end;
+    justify-self: end;
+    min-height: 40px;
+    white-space: nowrap;
+}
+
 .order-filter-actions,
 .order-pagination,
 .order-pagination > div {
@@ -195,6 +202,10 @@
     .order-filters {
         grid-template-columns: 1fr;
         padding: 16px;
+    }
+
+    .order-create-button {
+        justify-self: stretch;
     }
 
     .order-filter-actions,

@@ -156,7 +156,7 @@ class StorefrontControllerTest extends WebTestCase
             $customer->setPassword($container->get(UserPasswordHasherInterface::class)->hashPassword($customer, 'TemporaryTestPassword!'));
             $entityManager->flush();
 
-            $loginPage = $client->request('GET', '/login');
+            $loginPage = $client->request('GET', '/');
             $csrfToken = $loginPage->filter('form.auth-form input[name="_csrf_token"]')->attr('value');
             self::assertNotEmpty($csrfToken);
 

@@ -25,11 +25,11 @@
         <thead><tr><th>ID</th><th>Image</th><th>Service name</th><th>Description</th><th>Price</th><th>Status</th><th>Actions</th></tr></thead>
         <tbody>
         {% for service in services %}
-            <tr data-search="{{ (service.id ~ ' ' ~ service.name ~ ' ' ~ service.description)|lower }}" data-status="{{ service.active ? '1' : '0' }}">
+            <tr data-id="{{ service.id }}" data-search="{{ (service.id ~ ' ' ~ service.name ~ ' ' ~ service.description)|lower }}" data-status="{{ service.active ? '1' : '0' }}">
                 <td>{{ service.id }}</td>
-                <td>
+                <td data-service-image-cell>
                     {% if service.image %}
-                        <img src="{{ asset(service.image) }}" alt="{{ service.name }}" width="40" height="40" style="object-fit: cover; border-radius: 4px;">
+                        <img src="{{ asset(service.image) }}" alt="{{ service.name }}" width="40" height="40" class="admin-service-thumb">
                     {% else %}
                         <span>No image</span>
                     {% endif %}
@@ -53,7 +53,7 @@
         </tbody>
     </table>
     </div>
-    <dialog id="serviceDetails" class="modal-content" aria-labelledby="serviceDetailsTitle">
+    <dialog id="serviceDetails" class="modal-content admin-view-dialog" aria-labelledby="serviceDetailsTitle">
         <div class="modal-header"><h3 id="serviceDetailsTitle">Service details</h3></div>
         <img data-service-image alt="" width="140" height="140" style="object-fit: contain;">
         <p><strong>ID:</strong> <span data-service-id></span></p>
@@ -63,14 +63,61 @@
         <p><strong>Status:</strong> <span data-service-status></span></p>
         <div class="modal-footer"><button type="button" class="btn-secondary" data-close-service-details>Close</button></div>
     </dialog>
-    <dialog id="serviceFormDialog" class="modal-content" aria-labelledby="serviceFormTitle">
-        <div class="modal-header"><h3 id="serviceFormTitle">Create service</h3></div>
-        <p>When editing, leave the image empty to keep the current image.</p>
-        {{ form_start(serviceForm, {action: path('admin_service_new'), attr: {id: 'serviceAdminForm'}}) }}
-            {{ form_widget(serviceForm) }}
+    <dialog id="serviceFormDialog" class="modal-content admin-edit-dialog" aria-labelledby="serviceFormTitle">
+        <div class="modal-header">
+            <div>
+                <p class="admin-edit-eyebrow">Service catalogue</p>
+                <h3 id="serviceFormTitle">Create service</h3>
+            </div>
+            <button type="button" class="close-btn" data-close-service-form aria-label="Close">×</button>
+        </div>
+        <p class="admin-edit-intro">Keep service details accurate so customers see the correct offering and price.</p>
+        {{ form_start(serviceForm, {action: path('admin_service_new'), attr: {id: 'serviceAdminForm', class: 'admin-edit-form'}}) }}
+            <section class="admin-edit-section">
+                <h4 class="admin-edit-section-title">Service details</h4>
+                <div class="admin-edit-form-grid">
+                    <div class="admin-edit-field">
+                        {{ form_label(serviceForm.name, 'Service name') }}
+                        {{ form_widget(serviceForm.name, {attr: {class: 'form-control', autocomplete: 'off'}}) }}
+                        {{ form_errors(serviceForm.name) }}
+                    </div>
+                    <div class="admin-edit-field">
+                        {{ form_label(serviceForm.price, 'Price') }}
+                        {{ form_widget(serviceForm.price, {attr: {class: 'form-control', inputmode: 'decimal'}}) }}
+                        {{ form_errors(serviceForm.price) }}
+                    </div>
+                    <div class="admin-edit-field admin-edit-field-full">
+                        {{ form_label(serviceForm.description, 'Description') }}
+                        {{ form_widget(serviceForm.description, {attr: {class: 'form-control', rows: 4}}) }}
+                        {{ form_errors(serviceForm.description) }}
+                    </div>
+                    <div class="admin-edit-field">
+                        {{ form_label(serviceForm.active, 'Availability') }}
+                        {{ form_widget(serviceForm.active, {attr: {class: 'form-control'}}) }}
+                        {{ form_errors(serviceForm.active) }}
+                    </div>
+                    <div class="admin-edit-field">
+                        {{ form_label(serviceForm.imageFile, 'Service image') }}
+                        {{ form_widget(serviceForm.imageFile, {attr: {class: 'form-control admin-edit-file'}}) }}
+                        <small class="admin-edit-help">Leave empty to keep the current image.</small>
+                        {{ form_errors(serviceForm.imageFile) }}
+                    </div>
+                    <div class="admin-edit-field admin-edit-field-full">
+                        <div class="admin-edit-toggle">
+                            {{ form_widget(serviceForm.featured, {attr: {class: 'admin-edit-checkbox'}}) }}
+                            <div>
+                                {{ form_label(serviceForm.featured, 'Featured service') }}
+                                <small class="admin-edit-help">Highlight this service where featured items are shown.</small>
+                            </div>
+                        </div>
+                        {{ form_errors(serviceForm.featured) }}
+                    </div>
+                </div>
+            </section>
+            {{ form_rest(serviceForm) }}
             <div class="modal-footer">
-                <button type="submit" class="btn-primary">Save service</button>
                 <button type="button" class="btn-secondary" data-close-service-form>Cancel</button>
+                <button type="submit" class="btn-primary">Save service</button>
             </div>
         {{ form_end(serviceForm) }}
     </dialog>
@@ -112,11 +159,13 @@
     });
     dialog.querySelector('[data-close-service-details]').addEventListener('click', () => dialog.close());
     const title = document.getElementById('serviceFormTitle');
+    const submitButton = form.querySelector('button[type="submit"]');
     createLink.addEventListener('click', event => {
         event.preventDefault();
         form.reset();
         form.action = createLink.dataset.createUrl;
         title.textContent = 'Create service';
+        submitButton.textContent = 'Save service';
         formDialog.showModal();
     });
     table.addEventListener('click', event => {
@@ -131,9 +180,91 @@
         form.elements.namedItem('service[active]').value = link.dataset.active;
         form.elements.namedItem('service[featured]').checked = link.dataset.featured === '1';
         title.textContent = 'Edit service';
+        submitButton.textContent = 'Save changes';
         formDialog.showModal();
     });
-    formDialog.querySelector('[data-close-service-form]').addEventListener('click', () => formDialog.close());
+    formDialog.querySelectorAll('[data-close-service-form]').forEach(button => {
+        button.addEventListener('click', () => formDialog.close());
+    });
+
+    const showNotification = (message, success) => {
+        if (typeof window.showAdminToast === 'function') {
+            window.showAdminToast(message, success ? 'success' : 'error');
+        } else {
+            console.error(message);
+        }
+    };
+
+    form.addEventListener('submit', async (event) => {
+        const path = new URL(form.action, window.location.href).pathname;
+        if (!/^\/admin\/services\/\d+\/edit$/.test(path)) return;
+        event.preventDefault();
+        if (form.dataset.submitting === 'true') return;
+        form.dataset.submitting = 'true';
+        const button = event.submitter;
+        if (button) button.disabled = true;
+
+        try {
+            const response = await fetch(form.action, {
+                method: 'POST',
+                body: new FormData(form),
+                headers: {'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
+                credentials: 'same-origin'
+            });
+            const contentType = response.headers.get('content-type') || '';
+            const result = contentType.includes('application/json') ? await response.json() : {};
+            if (!response.ok) throw new Error(result.message || `Service update failed (${response.status}).`);
+
+            const service = result.service;
+            const row = table.querySelector(`tr[data-id="${service.id}"]`);
+            if (!row) throw new Error('The updated service row could not be found.');
+            row.dataset.search = [service.id, service.name, service.description].join(' ').toLowerCase();
+            row.dataset.status = service.active ? '1' : '0';
+            row.cells[2].textContent = service.name;
+            row.cells[3].textContent = service.description || '';
+            row.cells[4].textContent = `₱${Number(service.price).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+            const badge = row.querySelector('.badge');
+            badge.textContent = service.active ? 'Active' : 'Inactive';
+            badge.classList.toggle('badge-success', service.active);
+            badge.classList.toggle('badge-danger', !service.active);
+
+            const imageCell = row.querySelector('[data-service-image-cell]');
+            imageCell.replaceChildren();
+            if (service.imageUrl) {
+                const image = document.createElement('img');
+                image.src = service.imageUrl;
+                image.alt = service.name;
+                image.width = 40;
+                image.height = 40;
+                image.className = 'admin-service-thumb';
+                imageCell.append(image);
+            } else {
+                imageCell.textContent = 'No image';
+            }
+
+            const viewButton = row.querySelector('.service-view');
+            viewButton.dataset.name = service.name;
+            viewButton.dataset.description = service.description || '';
+            viewButton.dataset.price = service.price;
+            viewButton.dataset.status = service.active ? 'Active' : 'Inactive';
+            viewButton.dataset.image = service.imageUrl || '';
+            const editLink = row.querySelector('.service-edit');
+            editLink.dataset.name = service.name;
+            editLink.dataset.description = service.description || '';
+            editLink.dataset.price = service.price;
+            editLink.dataset.active = service.active ? '1' : '0';
+            editLink.dataset.featured = service.featured ? '1' : '0';
+            filterRows();
+            formDialog.close();
+            showNotification(result.message || 'Service updated.', true);
+        } catch (error) {
+            console.error('Unable to update service.', error);
+            showNotification(error.message || 'Unable to update service.', false);
+        } finally {
+            form.dataset.submitting = 'false';
+            if (button) button.disabled = false;
+        }
+    });
 })();
 </script>
 {% endblock %}

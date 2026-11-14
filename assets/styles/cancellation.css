@@ -85,13 +85,15 @@
 .history-notifications,
 .history-toast-container {
     position: fixed;
-    top: 20px;
-    right: 20px;
-    z-index: 30000;
+    inset: 20px 20px auto auto;
+    z-index: 2147483647;
     display: flex;
     width: min(440px, calc(100vw - 40px));
+    max-height: calc(100vh - 40px);
     flex-direction: column;
     gap: 10px;
+    margin: 0;
+    overflow-y: auto;
 }
 
 [popover="manual"].history-notifications:not(.is-visible),
@@ -246,9 +248,9 @@
 @media (max-width: 560px) {
     .history-notifications,
     .history-toast-container {
-        top: 12px;
-        right: 12px;
+        inset: 12px 12px auto auto;
         width: calc(100vw - 24px);
+        max-height: calc(100vh - 24px);
     }
 
     #admin-toast-container {

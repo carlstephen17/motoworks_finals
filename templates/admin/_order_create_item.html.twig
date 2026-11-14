@@ -1,0 +1,15 @@
+<div class="admin-edit-section order-create-item" data-order-item>
+    <div class="admin-edit-form-grid">
+        <div class="admin-edit-field">
+            {{ form_label(item.productId, 'Product') }}
+            {{ form_widget(item.productId, {attr: {class: 'form-control'}}) }}
+            {{ form_errors(item.productId) }}
+        </div>
+        <div class="admin-edit-field">
+            {{ form_label(item.quantity, 'Quantity') }}
+            {{ form_widget(item.quantity, {attr: {class: 'form-control'}}) }}
+            {{ form_errors(item.quantity) }}
+        </div>
+    </div>
+    <button type="button" class="btn-sm btn-secondary" data-remove-order-item>Remove item</button>
+</div>

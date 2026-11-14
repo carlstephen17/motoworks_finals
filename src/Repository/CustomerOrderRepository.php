@@ -44,7 +44,7 @@ class CustomerOrderRepository extends ServiceEntityRepository
                 'customerOrder.paymentStatus AS paymentStatus',
                 'customerOrder.paymentVerifiedAt AS paymentVerifiedAt',
                 'customerOrder.status AS currentStatus',
-                'CASE WHEN customerOrder.status IN (\'Confirmed\', \'Shipped\') THEN \'Pending\' ELSE customerOrder.status END AS displayStatus',
+                'CASE WHEN customerOrder.status = \'Completed\' THEN \'Completed\' WHEN customerOrder.status = \'Cancelled\' THEN \'Cancelled\' ELSE \'Pending\' END AS displayStatus',
                 'customerOrder.cancellationReason AS cancellationReason',
                 'customerOrder.createdAt AS createdAt',
                 'customer.firstName AS firstName',
@@ -157,12 +157,12 @@ class CustomerOrderRepository extends ServiceEntityRepository
         foreach ($rows as $row) {
             $count = (int) $row['statusCount'];
             $counts['total'] += $count;
-            if (in_array($row['status'], ['Pending', 'Cancellation Pending', 'Confirmed', 'Processing', 'Shipped'], true)) {
-                $counts['pending'] += $count;
+            if ($row['status'] === 'Completed') {
+                $counts['completed'] += $count;
             } elseif ($row['status'] === 'Cancelled') {
                 $counts['cancelled'] += $count;
-            } elseif ($row['status'] === 'Completed') {
-                $counts['completed'] += $count;
+            } else {
+                $counts['pending'] += $count;
             }
         }
 
@@ -199,9 +199,8 @@ class CustomerOrderRepository extends ServiceEntityRepository
         }
 
         if ($status === 'Pending') {
-            $query->andWhere('customerOrder.status IN (:statuses)')->setParameter('statuses', ['Pending', 'Cancellation Pending', 'Confirmed', 'Processing', 'Shipped']);
-        } elseif ($status === 'Processing') {
-            $query->andWhere('customerOrder.status = :status')->setParameter('status', 'Processing');
+            $query->andWhere('customerOrder.status NOT IN (:terminalStatuses)')
+                ->setParameter('terminalStatuses', ['Completed', 'Cancelled']);
         } elseif ($status === 'Cancelled') {
             $query->andWhere('customerOrder.status = :status')->setParameter('status', 'Cancelled');
         } elseif ($status === 'Completed') {

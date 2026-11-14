@@ -24,10 +24,12 @@ class SecurityController extends AbstractController
             return $this->redirectToRoute('app_dashboard');
         }
 
-        return $this->render('security/login.html.twig', [
-            'last_username' => $authenticationUtils->getLastUsername(),
-            'error' => $authenticationUtils->getLastAuthenticationError(),
-        ]);
+        if ($authenticationUtils->getLastAuthenticationError()) {
+            $this->addFlash('auth_error', 'Wrong username or password.');
+            $this->addFlash('auth_username', $authenticationUtils->getLastUsername());
+        }
+
+        return $this->redirectToRoute('app_home', ['auth' => 'login']);
     }
 
     #[Route('/logout', name: 'app_logout', methods: ['POST'])]
@@ -44,6 +46,10 @@ class SecurityController extends AbstractController
         UserPasswordHasherInterface $passwordHasher,
         Security $security,
     ): Response {
+        if ($request->isMethod('GET')) {
+            return $this->redirectToRoute('app_home', ['auth' => 'register']);
+        }
+
         $user = new User();
         $form = $this->createForm(RegistrationType::class, $user);
         $form->handleRequest($request);

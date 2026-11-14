@@ -5,28 +5,48 @@ namespace App\Tests\Controller;
 use App\Entity\User;
 use App\Repository\UserRepository;
 use Doctrine\ORM\EntityManagerInterface;
+use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 
 class SecurityControllerTest extends WebTestCase
 {
-    public function testLoginPageIncludesCsrfAndRememberMeFields(): void
+    public function testLoginRouteRedirectsToHomepageWithAuthModals(): void
     {
         $client = static::createClient();
         $client->request('GET', '/login');
 
+        $this->assertResponseRedirects('/?auth=login');
+        $client->followRedirect();
         $this->assertResponseIsSuccessful();
         $this->assertSelectorExists('#login-modal');
         $this->assertSelectorExists('#ajax-login-form');
+        $this->assertSelectorExists('#register-modal #ajax-register-form');
+        $this->assertSelectorExists('button.btn-login-header[aria-controls="login-modal"]');
+        $this->assertSelectorExists('button.btn-signup-header[aria-controls="register-modal"]');
         $this->assertSelectorCount(2, '#register-modal .toggle-password');
         $this->assertSelectorExists('input[name="_csrf_token"]');
         $this->assertSelectorExists('input[name="_remember_me"]');
+        self::assertStringNotContainsString('Continue in the sign-in dialog.', (string) $client->getResponse()->getContent());
+    }
+
+    public function testRegisterPageRedirectsToHomepageWithRegistrationModalOpen(): void
+    {
+        $client = static::createClient();
+        $client->request('GET', '/register');
+
+        $this->assertResponseRedirects('/?auth=register');
+        $client->followRedirect();
+
+        $this->assertResponseIsSuccessful();
+        $this->assertSelectorExists('#register-modal #ajax-register-form');
+        self::assertStringNotContainsString('Create Your Account', (string) $client->getResponse()->getContent());
     }
 
     public function testInvalidLoginReturnsToLoginWithoutAuthenticating(): void
     {
         $client = static::createClient();
-        $crawler = $client->request('GET', '/login');
+        $crawler = $client->request('GET', '/');
         $form = $crawler->filter('#ajax-login-form')->form();
         $form['username'] = 'no-such-user-'.bin2hex(random_bytes(6));
         $form['password'] = 'invalid-password';
@@ -34,8 +54,11 @@ class SecurityControllerTest extends WebTestCase
         $client->submit($form);
 
         $this->assertResponseRedirects('/login');
-        $client->followRedirect();
-        $this->assertSelectorExists('.alert-error');
+        for ($redirects = 0; $redirects < 3 && $client->getResponse()->isRedirect(); ++$redirects) {
+            $client->followRedirect();
+        }
+        $this->assertResponseIsSuccessful();
+        $this->assertSelectorTextContains('#login-modal-alert', 'Wrong username or password.');
     }
 
     public function testSuccessfulLoginShowsTimedWelcomeNotification(): void
@@ -62,7 +85,7 @@ class SecurityControllerTest extends WebTestCase
         try {
             $entityManager->persist($user);
             $entityManager->flush();
-            $loginPage = $client->request('GET', '/login');
+            $loginPage = $client->request('GET', '/');
             $form = $loginPage->filter('#ajax-login-form')->form();
             $form['username'] = $username;
             $form['password'] = $password;
@@ -98,6 +121,40 @@ class SecurityControllerTest extends WebTestCase
         $this->assertLoginAndLogout('customer', '/dashboard', '/profile');
     }
 
+    public function testLoggingOutDoesNotInvalidateAnotherUsersSession(): void
+    {
+        $kernel = static::bootKernel();
+        $container = static::getContainer();
+        $admin = $container->get(UserRepository::class)->find(2);
+        $customer = $container->get(UserRepository::class)->find(3);
+        self::assertNotNull($admin);
+        self::assertNotNull($customer);
+
+        $adminClient = new KernelBrowser($kernel);
+        $customerClient = new KernelBrowser($kernel);
+        $adminClient->disableReboot();
+        $customerClient->disableReboot();
+        $adminClient->loginUser($admin);
+        $customerClient->loginUser($customer);
+
+        $adminPage = $adminClient->request('GET', '/admin');
+        self::assertSame(200, $adminClient->getResponse()->getStatusCode());
+        $logoutForm = $adminPage->filter('form[action="/logout"]')->form();
+        $adminClient->submit($logoutForm);
+        self::assertTrue($adminClient->getResponse()->isRedirect());
+        self::assertSame('/', parse_url((string) $adminClient->getResponse()->headers->get('Location'), PHP_URL_PATH));
+        $logoutHomePage = $adminClient->followRedirect();
+        self::assertGreaterThan(0, $logoutHomePage->filter('#login-modal')->count());
+        self::assertGreaterThan(0, $logoutHomePage->filter('#register-modal')->count());
+        self::assertStringNotContainsString('Continue in the sign-in dialog.', (string) $adminClient->getResponse()->getContent());
+
+        $customerClient->request('GET', '/profile');
+        self::assertSame(200, $customerClient->getResponse()->getStatusCode());
+        $adminClient->request('GET', '/admin');
+        self::assertTrue($adminClient->getResponse()->isRedirect());
+        self::assertSame('/login', parse_url((string) $adminClient->getResponse()->headers->get('Location'), PHP_URL_PATH));
+    }
+
     public function testRegistrationCreatesCustomerWithHashedPassword(): void
     {
         $client = static::createClient();
@@ -112,8 +169,8 @@ class SecurityControllerTest extends WebTestCase
         $connection->beginTransaction();
 
         try {
-            $registrationPage = $client->request('GET', '/register');
-            $form = $registrationPage->selectButton('Register Account')->form();
+            $registrationPage = $client->request('GET', '/');
+            $form = $registrationPage->filter('#ajax-register-form')->form();
             $form['registration[username]'] = $username;
             $form['registration[firstName]'] = 'New';
             $form['registration[lastName]'] = 'Customer';
@@ -142,8 +199,8 @@ class SecurityControllerTest extends WebTestCase
         $client = static::createClient();
         $existing = static::getContainer()->get(UserRepository::class)->find(3);
         self::assertNotNull($existing);
-        $registrationPage = $client->request('GET', '/register');
-        $form = $registrationPage->selectButton('Register Account')->form();
+        $registrationPage = $client->request('GET', '/');
+        $form = $registrationPage->filter('#ajax-register-form')->form();
         $form['registration[username]'] = strtoupper($existing->getUsername());
         $form['registration[firstName]'] = 'Duplicate';
         $form['registration[lastName]'] = 'Customer';
@@ -204,7 +261,7 @@ class SecurityControllerTest extends WebTestCase
             $entityManager->persist($user);
             $entityManager->flush();
 
-            $loginPage = $client->request('GET', '/login');
+            $loginPage = $client->request('GET', '/');
             $form = $loginPage->filter('#ajax-login-form')->form();
             $form['username'] = $username;
             $form['password'] = $password;
@@ -223,6 +280,14 @@ class SecurityControllerTest extends WebTestCase
             $this->assertSelectorTextContains('#auth-success-notification', 'Login successful! Welcome back.');
             self::assertStringContainsString('no-store', $client->getResponse()->headers->get('Cache-Control', ''));
 
+            $homePage = $client->request('GET', '/');
+            $this->assertResponseIsSuccessful();
+            $homeLogoutForm = $homePage->filter('form[action="/logout"]');
+            self::assertSame('false', $homeLogoutForm->attr('data-turbo'));
+            $homeLogoutToken = $homeLogoutForm->filter('input[name="_csrf_token"]')->attr('value');
+            self::assertNotEmpty($homeLogoutToken);
+            self::assertNotSame('csrf-token', $homeLogoutToken);
+
             $client->request('GET', $protectedPath);
             $this->assertResponseIsSuccessful();
             self::assertStringContainsString('no-store', $client->getResponse()->headers->get('Cache-Control', ''));
@@ -230,16 +295,47 @@ class SecurityControllerTest extends WebTestCase
             $client->request('GET', '/logout');
             $this->assertResponseStatusCodeSame(405);
 
+            $client->request('POST', '/logout', ['_csrf_token' => 'invalid']);
+            $this->assertResponseStatusCodeSame(403);
+            $client->request('GET', $protectedPath);
+            $this->assertResponseIsSuccessful();
+
             $logoutPage = $client->request('GET', $protectedPath);
             $this->assertResponseIsSuccessful();
             $logoutForm = $logoutPage->filter('form[action="/logout"]')->form();
+            $logoutFormNode = $logoutPage->filter('form[action="/logout"]');
+            self::assertSame('false', $logoutFormNode->attr('data-turbo'));
+            $logoutToken = $logoutFormNode->filter('input[name="_csrf_token"]')->attr('value');
+            self::assertNotEmpty($logoutToken);
+            self::assertNotSame('csrf-token', $logoutToken);
             $client->submit($logoutForm);
-            $this->assertResponseRedirects('/login');
+            $this->assertResponseRedirects('/');
             $this->assertResponseHeaderSame('Clear-Site-Data', '"cache", "cookies"');
             self::assertStringContainsString('no-store', $client->getResponse()->headers->get('Cache-Control', ''));
 
             $client->request('GET', $protectedPath);
             $this->assertResponseRedirects('/login');
+
+            $loginPage = $client->request('GET', '/login');
+            $this->assertResponseRedirects('/?auth=login');
+            $loginPage = $client->followRedirect();
+            $this->assertResponseIsSuccessful();
+            $form = $loginPage->filter('#ajax-login-form')->form();
+            $form['username'] = $username;
+            $form['password'] = $password;
+            $form['_target_path'] = match ($role) {
+                'admin' => '/shop',
+                'staff' => '/admin/users',
+                default => '/dashboard',
+            };
+            $client->submit($form);
+            $this->assertResponseRedirects($loginRedirect);
+            for ($redirects = 0; $redirects < 3 && $client->getResponse()->isRedirect(); ++$redirects) {
+                $client->followRedirect();
+            }
+
+            $client->request('GET', $protectedPath);
+            $this->assertResponseIsSuccessful();
         } finally {
             $connection->rollBack();
             $entityManager->clear();

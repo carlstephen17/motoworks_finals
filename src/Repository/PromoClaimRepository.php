@@ -70,18 +70,19 @@ class PromoClaimRepository extends ServiceEntityRepository
         }
 
         if ($status === 'Pending') {
-            $query->andWhere('(claim.status IN (:statuses) OR claim.status IS NULL)')->setParameter('statuses', ['Pending', 'Cancellation Pending']);
-        } elseif (in_array($status, ['Confirmed', 'Completed', 'Cancelled'], true)) {
+            $query->andWhere('(claim.status NOT IN (:terminalStatuses) OR claim.status IS NULL)')
+                ->setParameter('terminalStatuses', ['Completed', 'Cancelled']);
+        } elseif (in_array($status, ['Completed', 'Cancelled'], true)) {
             $query->andWhere('claim.status = :status')->setParameter('status', $status);
         }
 
         return $query->getQuery()->getResult();
     }
 
-    /** @return array{total: int, pending: int, confirmed: int, completed: int, cancelled: int} */
+    /** @return array{total: int, pending: int, completed: int, cancelled: int} */
     public function getStaffStatusCounts(): array
     {
-        $counts = ['total' => 0, 'pending' => 0, 'confirmed' => 0, 'completed' => 0, 'cancelled' => 0];
+        $counts = ['total' => 0, 'pending' => 0, 'completed' => 0, 'cancelled' => 0];
         $rows = $this->createQueryBuilder('claim')
             ->select('claim.status AS status, COUNT(claim.id) AS statusCount')
             ->groupBy('claim.status')
@@ -92,10 +93,12 @@ class PromoClaimRepository extends ServiceEntityRepository
             $count = (int) $row['statusCount'];
             $counts['total'] += $count;
             $status = $row['status'] ?? 'Pending';
-            if (in_array($status, ['Pending', 'Cancellation Pending'], true)) {
+            if ($status === 'Completed') {
+                $counts['completed'] += $count;
+            } elseif ($status === 'Cancelled') {
+                $counts['cancelled'] += $count;
+            } else {
                 $counts['pending'] += $count;
-            } elseif (isset($counts[strtolower($status)])) {
-                $counts[strtolower($status)] += $count;
             }
         }
 

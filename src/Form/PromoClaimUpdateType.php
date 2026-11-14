@@ -18,11 +18,17 @@ class PromoClaimUpdateType extends AbstractType
 {
     public function buildForm(FormBuilderInterface $builder, array $options): void
     {
+        $promoChoices = [];
+        foreach ($options['promos'] as $promo) {
+            if (!$promo instanceof Promo) {
+                throw new \InvalidArgumentException('Promotion choices must be Promo entities.');
+            }
+            $promoChoices[$promo->getTitle()] = $promo->getSlug();
+        }
+
         $builder
             ->add('bundleSlug', ChoiceType::class, [
-                'choices' => $options['promos'],
-                'choice_label' => static fn (Promo $promo): string => $promo->getTitle(),
-                'choice_value' => static fn (?Promo $promo): ?string => $promo?->getSlug(),
+                'choices' => $promoChoices,
                 'placeholder' => 'Choose promotion',
             ])
             ->add('selectedOption', TextType::class, [
@@ -34,8 +40,6 @@ class PromoClaimUpdateType extends AbstractType
             ->add('status', ChoiceType::class, [
                 'choices' => [
                     'Pending' => 'Pending',
-                    'Confirmed' => 'Confirmed',
-                    'Used' => 'Used',
                     'Completed' => 'Completed',
                     'Cancelled' => 'Cancelled',
                 ],
